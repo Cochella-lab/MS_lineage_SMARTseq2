@@ -166,7 +166,7 @@ library(scran)
 options(stringsAsFactors = FALSE)
 
 Manual.vs.outlier.filtering = FALSE
-#load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_sampleInfos_QCs_nf_RNA_seq.Rdata'))
+# load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_sampleInfos_QCs_nf_RNA_seq.Rdata'))
 
 source("scRNAseq_functions.R")
 
@@ -202,17 +202,30 @@ if(Merge.technicalRep){
 
 }
 
+### Creating SCE ####
+
+source("scRNAseq_functions.R")
+library(SingleCellExperiment)
+library(scater)
+options(stringsAsFactors = FALSE)
+
+#load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged.Rdata'))
+sce <- SingleCellExperiment(assays = list(counts = counts), 
+                            colData = as.data.frame(design), 
+                            rowData = data.frame(gene_names = rownames(counts), feature_symbol = rownames(counts)))
 
 ##########################################
 ### Adding FACS data ####
 ##########################################
+
 source("scRNAseq_functions.R")
 #load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged.Rdata')) 
 
-sce = Integrate.FACS.Information(sce)
-save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrectedv2_facsInfos.Rdata')) 
-  
+sce = Integrate.FACS.Information(sce) #6 cells lost :
+#[1] "H7KNYBGXB_1_81805_TCGACGTCTTATGCGA" "HHG5KBGX9_1_80193_ATGCGCAGCTCTCTAT" "HHG5KBGX9_1_80193_GGAGCTACGCGTAAGA" "HHG5KBGX9_1_80193_TAGGCATGCCTAGAGT"
+#[5] "HHG5KBGX9_1_80193_TCGACGTCCTAAGCCT" "CD2GTANXX_5_80194_TGCAGCTACTATTAAG"
 
+save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrectedv2_facsInfos.Rdata')) 
 
 #logcounts(sce) =  assay(sce, "logcounts_seurat_SG2MCorrected")
 table(sce$nb.cells)
@@ -238,17 +251,7 @@ plotColData(sce,
 # 2) clean the cells 
 # 3) clean genes
 ##########################################
-source("scRNAseq_functions.R")
-library(SingleCellExperiment)
-library(scater)
-options(stringsAsFactors = FALSE)
 
-load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged.Rdata'))
-
-## make SCE object and remove genes with zero reads detected
-sce <- SingleCellExperiment(assays = list(counts = counts), 
-                            colData = as.data.frame(design), 
-                            rowData = data.frame(gene_names = rownames(counts), feature_symbol = rownames(counts)))
 
 #write.csv(counts(sce), file=paste0(tabDir, "scRNAseq_raw_readCounts", version.analysis, ".csv"), row.names=TRUE)
 keep_feature <- rowSums(counts(sce) > 0) > 0
@@ -308,7 +311,7 @@ filter_by_total_counts <- (sce$total_counts > threshod.total.counts.per.cell)
 table(filter_by_total_counts)
 filter_by_expr_features <- (sce$total_features_by_counts > threshod.nb.detected.genes.per.cell)
 table(filter_by_expr_features)
-filter_by_MT = sce$pct_counts_Mt < 5 # Adjust the number for each batch
+filter_by_MT = sce$pct_counts_Mt < 8 # Adjust the number for each batch
 table(filter_by_MT)
 
 sce$use <- (
