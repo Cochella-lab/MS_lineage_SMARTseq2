@@ -62,7 +62,7 @@ for(n in 1:length(xlist)){
   }
 }
 
-colnxames(aa)[1] = 'gene';
+colnames(aa)[1] = 'gene';
 if(length(grep("out_gene.featureCounts.txt", colnames(aa)))>0) {
   aa = aa[, -grep("out_gene.featureCounts.txt", colnames(aa))]
 }
@@ -129,8 +129,8 @@ if(Aggregate.nf.QCs.plots.in.designMatrix){
   
   source("scRNAseq_functions.R")
   dirs.all = c("../../data/raw_ngs_data/S76090_R6875/results_v2/multiqc_data/",
-               "../../data/raw_ngs_data/S80193_R7130_rep/results_v2/multiqc_data",
-               "../../data/raw_ngs_data/S80194_R7130_R7133_rep/results_v2/multiqc_data",
+               "../../data/raw_ngs_data/S80193_R7130_rep/results_v2/multiqc_data/",
+               "../../data/raw_ngs_data/S80194_R7130_R7133_rep/results_v2/multiqc_data/",
                "../../data/raw_ngs_data/S97904_R8348/results_v2/multiqc_data/",
                "../../data/raw_ngs_data/S100209_R8526/results_v2/multiqc_data/",
                "../../data/raw_ngs_data/S100210_R8526/results_v2/multiqc_data/",
@@ -152,7 +152,6 @@ if(Aggregate.nf.QCs.plots.in.designMatrix){
    
 }
 
-
 save(aa, design, file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_sampleInfos_QCs_nf_RNA_seq.Rdata'))
 
 ##################################################
@@ -167,7 +166,7 @@ library(scran)
 options(stringsAsFactors = FALSE)
 
 Manual.vs.outlier.filtering = FALSE
-load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_sampleInfos_QCs_nf_RNA_seq.Rdata'))
+#load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_sampleInfos_QCs_nf_RNA_seq.Rdata'))
 
 source("scRNAseq_functions.R")
 
@@ -250,6 +249,7 @@ load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMe
 sce <- SingleCellExperiment(assays = list(counts = counts), 
                             colData = as.data.frame(design), 
                             rowData = data.frame(gene_names = rownames(counts), feature_symbol = rownames(counts)))
+
 #write.csv(counts(sce), file=paste0(tabDir, "scRNAseq_raw_readCounts", version.analysis, ".csv"), row.names=TRUE)
 keep_feature <- rowSums(counts(sce) > 0) > 0
 sce <- sce[keep_feature, ]
