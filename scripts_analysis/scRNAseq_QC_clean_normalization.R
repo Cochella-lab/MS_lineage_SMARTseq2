@@ -4,16 +4,27 @@
 ## Script purpose: analysis the single-cell RNA-seq data
 ## Usage example: 
 ## Author: Jingkui Wang (jingkui.wang@imp.ac.at)
+## 
 ## Date of creation: Mon Feb 19 14:43:38 2018
 ##################################################
 ##################################################
-version.DATA = 'scRNA_R6875_R7116_R7130_R7130redo_R7133_R7926'
-version.analysis =  paste0(version.DATA, '_20190703')
+
+#Determine the script location
+tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
+         error = function(e){ 
+           install.packages("rstudioapi")
+           path <-  rstudioapi::getSourceEditorContext()$path})
+setwd(sub(basename(path), "", path)) 
+
+
+version.DATA = '15_batches'
+version.analysis =  paste0(version.DATA, '_20191115')
 
 dataDir = paste0("../data/")
 resDir = paste0("../results/", version.analysis)
 tabDir = paste0("../results/", version.analysis, "/tables/")
 RdataDir = paste0("../results/", version.analysis, "/Rdata/")
+if(!dir.exists("../results/")){dir.create("../results/")}
 if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
@@ -76,15 +87,30 @@ if(Manually.Specify.sampleInfos.filtering.4scRNAseq){
   # here manually 
   ##########################################
   design$request = NA;
-  design$request[which(design$flowcell.lane == "CCVTBANXX_8")] = "R6875"
-  design$request[which(design$flowcell.lane == "CCVBPANXX_1")] = "R7116"
-  design$request[which(design$flowcell.lane == "HHG5KBGX9_1")] = "R7130"
-  design$request[which(design$flowcell.lane == "HHGHNBGX9_1")] = "R7130"
+  design$request[which(design$flowcell.lane == "CCVTBANXX_8")] = "R6875"  #
+  design$request[which(design$flowcell.lane == "CCVBPANXX_1")] = "R7116"  #
+  design$request[which(design$flowcell.lane == "HHG5KBGX9_1")] = "R7130"  #
+  design$request[which(design$flowcell.lane == "HHGHNBGX9_1")] = "R7130"  #
   
-  design$request[which(design$flowcell.lane == "HLWTCBGX9_1")] = "R7130"
-  design$request[which(design$flowcell.lane == "CCYTEANXX_4")] = "R7130"
-  design$request[which(design$flowcell.lane == "CD2GTANXX_5")] = "R7133"
-  design$request[which(design$flowcell.lane == "H7KNYBGXB_1")] = "R7926"
+  design$request[which(design$flowcell.lane == "HLWTCBGX9_1")] = "R7130"  #
+  design$request[which(design$flowcell.lane == "CCYTEANXX_4")] = "R7130"  #
+  design$request[which(design$flowcell.lane == "CD2GTANXX_5")] = "R7133"  #
+  design$request[which(design$flowcell.lane == "H7KNYBGXB_1")] = "R7926"  #
+  
+  design$request[which(design$flowcell.lane == "CDR6UANXX_1")] = "R8348"  #
+  
+  design$request[which(design$flowcell.lane == "HF3H5BGXC_1")] = "R8526"  #
+  design$request[which(design$flowcell.lane == "HF3MMBGXC_1")] = "R8526"  #
+  design$request[which(design$flowcell.lane == "HFLTLBGXC_1")] = "R8526"  #
+  
+  design$request[which(design$flowcell.lane == "HHKY5BGXC_1")] = "R8612"  #
+  design$request[which(design$flowcell.lane == "HHLYLBGXC_1")] = "R8612"  #
+  design$request[which(design$flowcell.lane == "HFLTMBGXC_1")] = "R8612"  #
+  design$request[which(design$flowcell.lane == "CE0N9ANXX_8")] = "R8613"  #
+  
+  design$request[which(design$flowcell.lane == "HHNNMBGXC_1")] = "R8729"  #
+  design$request[which(design$flowcell.lane == "HHTJNBGXC_1")] = "R8729"  #
+  design$request[which(design$flowcell.lane == "HHNMMBGXC_1")] = "R8729"  #
   
 
   design$seqInfos = paste0(design$request, "_", design$flowcell.lane)
@@ -104,10 +130,20 @@ if(Aggregate.nf.QCs.plots.in.designMatrix){
   #load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_RNA_seq.Rdata'))
   
   source("scRNAseq_functions.R")
-  dirs.all = c('../../../Ariane/R7116_R7130_scrnaseq/results_all/multiqc_data_1', 
-               "../../../Ariane/R6875_scRNAseq/results_all_3rd/MultiQC/multiqc_data", 
-               "../../R7130_redo_R7133/results_v2/multiqc_data_1", 
-               "../../R7926/results_v2/multiqc_data")
+  dirs.all = c("../../data/raw_ngs_data/S76090_R6875/results_v2/multiqc_data/",
+               "../../data/raw_ngs_data/S80193_R7130_rep/results_v2/multiqc_data",
+               "../../data/raw_ngs_data/S80194_R7130_R7133_rep/results_v2/multiqc_data",
+               "../../data/raw_ngs_data/S97904_R8348/results_v2/multiqc_data/",
+               "../../data/raw_ngs_data/S100209_R8526/results_v2/multiqc_data/",
+               "../../data/raw_ngs_data/S100210_R8526/results_v2/multiqc_data/",
+               "../../data/raw_ngs_data/S100211_R8526/results_v2/multiqc_data/",
+               "../../data/raw_ngs_data/S101266_R8612/results_v2/multiqc_data/",
+               "../../data/raw_ngs_data/S101267_R8612/results_v2/multiqc_data/",
+               "../../data/raw_ngs_data/S101268_R8612/results_v2/multiqc_data/",
+               "../../data/raw_ngs_data/S101269_R8613/results_v2/MultiQC/multiqc_data/",
+               "../../data/raw_ngs_data/S102696_R8729/results_v2/multiqc_data/",
+               "../../data/raw_ngs_data/S102697_R8729/results_v2/multiqc_data/",
+               "../../data/raw_ngs_data/S102698_R8729/results_v2/multiqc_data/")
   QCs.nf = aggrate.nf.QCs(dirs.all)
   QCs.nf$Sample = gsub("#", "_", QCs.nf$Sample)
   
