@@ -17,10 +17,10 @@ tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
 setwd(sub(basename(path), "", path)) 
 
 
-version.DATA = '15_batches'
+version.DATA = 'all_batches'
 version.analysis =  paste0(version.DATA, '_20191115')
 
-dataDir = paste0("../data/")
+dataDir = paste0("../../data/gene_counts/")
 resDir = paste0("../results/", version.analysis)
 tabDir = paste0("../results/", version.analysis, "/tables/")
 RdataDir = paste0("../results/", version.analysis, "/Rdata/")
@@ -30,7 +30,7 @@ if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 
-Manually.Specify.sampleInfos.4scRNAseq = TRUE
+Manually.Specify.sampleInfos.filtering.4scRNAseq = TRUE
 Aggregate.nf.QCs.plots.in.designMatrix = TRUE
 #design.file = "../exp_design/R6875_sample_infos.xlsx"
 #Use.sampleID.mapSamples = FALSE
@@ -48,8 +48,7 @@ library(data.table)
 xlist <-list.files(path=dataDir, pattern = "*merged_gene_counts.txt", full.names = TRUE)
 aa = NULL
 
-for(n in 1:length(xlist))
-{
+for(n in 1:length(xlist)){
   # n = 1
   cat(n, '\t')
   cat(xlist[n], '\n')
@@ -63,7 +62,7 @@ for(n in 1:length(xlist))
   }
 }
 
-colnames(aa)[1] = 'gene';
+colnxames(aa)[1] = 'gene';
 if(length(grep("out_gene.featureCounts.txt", colnames(aa)))>0) {
   aa = aa[, -grep("out_gene.featureCounts.txt", colnames(aa))]
 }
@@ -87,8 +86,8 @@ if(Manually.Specify.sampleInfos.filtering.4scRNAseq){
   # here manually 
   ##########################################
   design$request = NA;
-  design$request[which(design$flowcell.lane == "CCVTBANXX_8")] = "R6875"  #
-  design$request[which(design$flowcell.lane == "CCVBPANXX_1")] = "R7116"  #
+  design$request[which(design$flowcell.lane == "CCVTBANXX_8")] = "R6875"  # 
+  #design$request[which(design$flowcell.lane == "CCVBPANXX_1")] = "R7116"  # Robot test batch. Excluded from the analysis
   design$request[which(design$flowcell.lane == "HHG5KBGX9_1")] = "R7130"  #
   design$request[which(design$flowcell.lane == "HHGHNBGX9_1")] = "R7130"  #
   
@@ -112,7 +111,6 @@ if(Manually.Specify.sampleInfos.filtering.4scRNAseq){
   design$request[which(design$flowcell.lane == "HHTJNBGXC_1")] = "R8729"  #
   design$request[which(design$flowcell.lane == "HHNMMBGXC_1")] = "R8729"  #
   
-
   design$seqInfos = paste0(design$request, "_", design$flowcell.lane)
   #jj = grep("CCVTBANXX_8.76090_", colnames(aa))
   #aa = aa[, c(1, jj)]
@@ -172,6 +170,7 @@ Manual.vs.outlier.filtering = FALSE
 load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_sampleInfos_QCs_nf_RNA_seq.Rdata'))
 
 source("scRNAseq_functions.R")
+
 counts = convertGeneNames.forCountTable(aa)
 gg.Mt = find.particular.geneSet("Mt")
 gg.ribo = find.particular.geneSet("ribo")
@@ -181,6 +180,7 @@ gg.ribo = find.particular.geneSet("ribo")
 # merge them 
 # or benchmark batch correction methods
 ##########################################
+
 if(Merge.technicalRep){
   
   source("scRNAseq_functions.R")
@@ -202,6 +202,35 @@ if(Merge.technicalRep){
   save(design, counts, file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged.Rdata'))
 
 }
+
+
+##########################################
+### Adding FACS data ####
+##########################################
+source("scRNAseq_functions.R")
+#load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged.Rdata')) 
+
+sce = Integrate.FACS.Information(sce)
+save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrectedv2_facsInfos.Rdata')) 
+  
+
+
+#logcounts(sce) =  assay(sce, "logcounts_seurat_SG2MCorrected")
+table(sce$nb.cells)
+sce = sce[, which(sce$nb.cells == 1)]
+
+sce$FSC_log2 = 3/2*log2(sce$FSC) ##### Why multiplying by 1.5???? #######
+sce$BSC_log2 = 3/2*log2(sce$BSC)
+
+
+plotColData(sce,
+            x = "FSC_log2",
+            y = "BSC_log2",
+            colour_by = "seqInfos",
+            point_size = 6
+            
+)
+
 
 ##########################################
 # Import SingleCellExperiment and scater packages for the QC and table cleaning
@@ -268,16 +297,18 @@ dev.off()
 # here we are using the 50,000 for library size and 100 expressed genes as thresholds
 ##########################################
 threshod.total.counts.per.cell = 10^5
-threshod.nb.detected.genes.per.cell = 1000;
+threshod.nb.detected.genes.per.cell = 750 # Adjust the number for each batch
+
 #libsize.drop <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE)
 #feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE)
 #libsize.drop = sce$total_counts<5*10^4
 #feature.drop = sce$total_features < 200
+
 filter_by_total_counts <- (sce$total_counts > threshod.total.counts.per.cell)
 table(filter_by_total_counts)
 filter_by_expr_features <- (sce$total_features_by_counts > threshod.nb.detected.genes.per.cell)
 table(filter_by_expr_features)
-filter_by_MT = sce$pct_counts_Mt < 5
+filter_by_MT = sce$pct_counts_Mt < 5 # Adjust the number for each batch
 table(filter_by_MT)
 
 sce$use <- (
@@ -343,7 +374,7 @@ smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
               xlab=expression(Log[10]~"average count"))
 dev.off()
 
-genes.to.keep <- num.cells > 5 & ave.counts >= 1  & ave.counts <10^6  # detected in >= 2 cells, ave.counts >=5 but not too high
+genes.to.keep <- num.cells > 5 & ave.counts >= 1  & ave.counts <10^6  # detected in >= 5 cells, ave.counts >=5 but not too high
 summary(genes.to.keep)
 
 # remove mt and ribo genes

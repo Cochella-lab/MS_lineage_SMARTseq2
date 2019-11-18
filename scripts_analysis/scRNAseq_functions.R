@@ -100,7 +100,7 @@ convertGeneNames.forCountTable = function(aa, discard.gene.with.zero.reads = TRU
   aa = aa[ grep("^__", aa$gene, invert = TRUE), ] ## remove features that are not well aligned
   
   ## load annotation and change the gene names
-  annot = read.csv(file = "../../../../annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
+  annot = read.csv(file = "/Volumes/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
   gg.Mt = annot$Gene.name[which(annot$Chromosome.scaffold.name=="MtDNA")]
   gg.ribo = annot$Gene.name[which(annot$Gene.type=="rRNA")]
   
@@ -129,7 +129,7 @@ convertGeneNames.forCountTable = function(aa, discard.gene.with.zero.reads = TRU
 
 find.particular.geneSet = function(geneSet = "Mt")
 {
-  annot = read.csv(file = "../../../../annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
+  annot = read.csv(file = "/Volumes/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
   if(geneSet == "Mt"){
     return(annot$Gene.name[which(annot$Chromosome.scaffold.name=="MtDNA")])
   }else{
@@ -307,7 +307,7 @@ compare.techinical.replicates = function(design.tr, counts.tr, filter.cells = FA
   
 }
 
-merge.techinical.replicates = function(design, counts, 
+merge.techinical.replicates = function(design, counts, compare.replicates = FALSE,
                                        sampleInfos.techRep = list(c("R7130_HHG5KBGX9_1", "R7130_HLWTCBGX9_1"),
                                                                   c("R7130_HHGHNBGX9_1", "R7130_CCYTEANXX_4", "R7133_CD2GTANXX_5")))
 {
@@ -328,9 +328,10 @@ merge.techinical.replicates = function(design, counts,
     design.sels = design[sels, ]
     counts.sels = counts[, sels]
     
+    if (compare.replicates){
     cat("-- start to compare technical replicates for lanes :", techRep, "\n")
-    
     compare.techinical.replicates(design.tr=design.sels, counts.tr=counts.sels)
+    }
     
     cat("-- start to merge technical replicates for lanes :", techRep, "\n")
     
@@ -1021,7 +1022,7 @@ Integrate.FACS.Information = function(sce, processing.FACS.Info = TRUE)
     ##########################################
     # collecting the facs infos from tables
     ##########################################
-    path2FACS = "/Volumes/groups/cochella/Aleks/ngs_scseq_data/sampleInfos/FACS_indexData"
+    path2FACS = "/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/facs_data/FACS_indexData/"
     ff1 = paste0(path2FACS, "/barcodes_to_wellNames_96w_robot_test_plus_barcodes_CCVBPANXX_1.csv")
     facs = read.csv(ff1, header = TRUE, row.names = 1)
     facs = data.frame(facs, stringsAsFactors = FALSE)
