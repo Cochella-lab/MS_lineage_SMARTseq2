@@ -1084,6 +1084,7 @@ Integrate.FACS.Information = function(sce, processing.FACS.Info = TRUE)
     FSC = rep(NA, ncol(sce))
     BSC = rep(NA, ncol(sce))
     Index.well = rep(NA, ncol(sce))
+    GFP = rep(NA, ncol(sce))
     
     for(n in 1:ncol(sce))
     {
@@ -1094,6 +1095,7 @@ Integrate.FACS.Information = function(sce, processing.FACS.Info = TRUE)
         Index.well[n] = unique(keep$Index.well.new[kk])
         FSC[n] = mean(keep$FSC.A[kk])
         BSC[n] = mean(keep$BSC.A[kk])
+        GFP[n] = mean(keep$FITC.A.Compensated[kk])
       }
     }
     
@@ -1101,6 +1103,7 @@ Integrate.FACS.Information = function(sce, processing.FACS.Info = TRUE)
     sce$index.well = Index.well
     sce$FSC = FSC
     sce$BSC = BSC
+    sce$GFP = GFP
     # save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos.Rdata'))
   
   }

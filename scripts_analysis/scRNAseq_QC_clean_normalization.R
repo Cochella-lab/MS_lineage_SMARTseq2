@@ -9,22 +9,25 @@
 ##################################################
 ##################################################
 
-#Determine the script location
+
+#Determine the script location and user
 tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
          error = function(e){ 
            install.packages("rstudioapi")
            path <-  rstudioapi::getSourceEditorContext()$path})
-setwd(sub(basename(path), "", path)) 
+source.path <- sub(basename(path), "", path)
 
 
+user <- "git_aleks/"
+setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user)) 
 version.DATA = 'all_batches'
 version.analysis =  paste0(version.DATA, '_20191115')
 
-dataDir = paste0("../../data/gene_counts/")
-resDir = paste0("../results/", version.analysis)
-tabDir = paste0("../results/", version.analysis, "/tables/")
-RdataDir = paste0("../results/", version.analysis, "/Rdata/")
-if(!dir.exists("../results/")){dir.create("../results/")}
+dataDir = paste0("../data/gene_counts/")
+resDir = paste0("results/", version.analysis)
+tabDir = paste0("results/", version.analysis, "/tables/")
+RdataDir = paste0("results/", version.analysis, "/Rdata/")
+if(!dir.exists("results/")){dir.create("results/")}
 if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
@@ -34,7 +37,7 @@ Manually.Specify.sampleInfos.filtering.4scRNAseq = TRUE
 Aggregate.nf.QCs.plots.in.designMatrix = TRUE
 #design.file = "../exp_design/R6875_sample_infos.xlsx"
 #Use.sampleID.mapSamples = FALSE
-Merge.technicalRep = TRUE
+
 
 ##################################################
 ##################################################
@@ -127,21 +130,21 @@ if(Manually.Specify.sampleInfos.filtering.4scRNAseq){
 if(Aggregate.nf.QCs.plots.in.designMatrix){
   #load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_RNA_seq.Rdata'))
   
-  source("scRNAseq_functions.R")
-  dirs.all = c("../../data/raw_ngs_data/S76090_R6875/results_v2/multiqc_data/",
-               "../../data/raw_ngs_data/S80193_R7130_rep/results_v2/multiqc_data/",
-               "../../data/raw_ngs_data/S80194_R7130_R7133_rep/results_v2/multiqc_data/",
-               "../../data/raw_ngs_data/S97904_R8348/results_v2/multiqc_data/",
-               "../../data/raw_ngs_data/S100209_R8526/results_v2/multiqc_data/",
-               "../../data/raw_ngs_data/S100210_R8526/results_v2/multiqc_data/",
-               "../../data/raw_ngs_data/S100211_R8526/results_v2/multiqc_data/",
-               "../../data/raw_ngs_data/S101266_R8612/results_v2/multiqc_data/",
-               "../../data/raw_ngs_data/S101267_R8612/results_v2/multiqc_data/",
-               "../../data/raw_ngs_data/S101268_R8612/results_v2/multiqc_data/",
-               "../../data/raw_ngs_data/S101269_R8613/results_v2/MultiQC/multiqc_data/",
-               "../../data/raw_ngs_data/S102696_R8729/results_v2/multiqc_data/",
-               "../../data/raw_ngs_data/S102697_R8729/results_v2/multiqc_data/",
-               "../../data/raw_ngs_data/S102698_R8729/results_v2/multiqc_data/")
+  source(paste0(source.path,"scRNAseq_functions.R"))
+  dirs.all = c("../data/raw_ngs_data/S76090_R6875/results_v2/multiqc_data/",
+               "../data/raw_ngs_data/S80193_R7130_rep/results_v2/multiqc_data/",
+               "../data/raw_ngs_data/S80194_R7130_R7133_rep/results_v2/multiqc_data/",
+               "../data/raw_ngs_data/S97904_R8348/results_v2/multiqc_data/",
+               "../data/raw_ngs_data/S100209_R8526/results_v2/multiqc_data/",
+               "../data/raw_ngs_data/S100210_R8526/results_v2/multiqc_data/",
+               "../data/raw_ngs_data/S100211_R8526/results_v2/multiqc_data/",
+               "../data/raw_ngs_data/S101266_R8612/results_v2/multiqc_data/",
+               "../data/raw_ngs_data/S101267_R8612/results_v2/multiqc_data/",
+               "../data/raw_ngs_data/S101268_R8612/results_v2/multiqc_data/",
+               "../data/raw_ngs_data/S101269_R8613/results_v2/MultiQC/multiqc_data/",
+               "../data/raw_ngs_data/S102696_R8729/results_v2/multiqc_data/",
+               "../data/raw_ngs_data/S102697_R8729/results_v2/multiqc_data/",
+               "../data/raw_ngs_data/S102698_R8729/results_v2/multiqc_data/")
   QCs.nf = aggrate.nf.QCs(dirs.all)
   QCs.nf$Sample = gsub("#", "_", QCs.nf$Sample)
   
@@ -168,43 +171,11 @@ options(stringsAsFactors = FALSE)
 Manual.vs.outlier.filtering = FALSE
 # load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_sampleInfos_QCs_nf_RNA_seq.Rdata'))
 
-source("scRNAseq_functions.R")
-
 counts = convertGeneNames.forCountTable(aa)
 gg.Mt = find.particular.geneSet("Mt")
 gg.ribo = find.particular.geneSet("ribo")
 
-##########################################
-# compare tehnical replicates,
-# merge them 
-# or benchmark batch correction methods
-##########################################
-
-if(Merge.technicalRep){
-  
-  source("scRNAseq_functions.R")
-  pdfname = paste0(resDir, "/scRNAseq_check_technicalRep.pdf")
-  pdf(pdfname, width=12, height = 6)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  
-  xx = merge.techinical.replicates(design = design, counts = counts, 
-                                   sampleInfos.techRep = list(c("R7130_HHG5KBGX9_1", "R7130_HLWTCBGX9_1"), 
-                                                              c("R7130_HHGHNBGX9_1", "R7130_CCYTEANXX_4", "R7133_CD2GTANXX_5")))
-  dev.off()
-  
-  xx1 = xx$design
-  xx2 = xx$counts
-  
-  design = xx1
-  counts = xx2
-  
-  save(design, counts, file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged.Rdata'))
-
-}
-
 ### Creating SCE ####
-
-source("scRNAseq_functions.R")
 library(SingleCellExperiment)
 library(scater)
 options(stringsAsFactors = FALSE)
@@ -214,34 +185,46 @@ sce <- SingleCellExperiment(assays = list(counts = counts),
                             colData = as.data.frame(design), 
                             rowData = data.frame(gene_names = rownames(counts), feature_symbol = rownames(counts)))
 
-##########################################
+
+
 ### Adding FACS data ####
 ##########################################
-
-source("scRNAseq_functions.R")
 #load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged.Rdata')) 
 
-sce = Integrate.FACS.Information(sce) #6 cells lost :
-#[1] "H7KNYBGXB_1_81805_TCGACGTCTTATGCGA" "HHG5KBGX9_1_80193_ATGCGCAGCTCTCTAT" "HHG5KBGX9_1_80193_GGAGCTACGCGTAAGA" "HHG5KBGX9_1_80193_TAGGCATGCCTAGAGT"
-#[5] "HHG5KBGX9_1_80193_TCGACGTCCTAAGCCT" "CD2GTANXX_5_80194_TGCAGCTACTATTAAG"
-
-save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrectedv2_facsInfos.Rdata')) 
+sce = Integrate.FACS.Information(sce) 
+#several cells are lost (NA in FACS info) have no idea why:
+colData(sce)[(which(is.na(sce$FSC))),]
 
 #logcounts(sce) =  assay(sce, "logcounts_seurat_SG2MCorrected")
 table(sce$nb.cells)
 sce = sce[, which(sce$nb.cells == 1)]
 
-sce$FSC_log2 = 3/2*log2(sce$FSC) ##### Why multiplying by 1.5???? #######
+sce$FSC_log2 = 3/2*log2(sce$FSC) 
 sce$BSC_log2 = 3/2*log2(sce$BSC)
+sce$GFP_log2 = 3/2*log2(sce$GFP)
 
 
 plotColData(sce,
             x = "FSC_log2",
             y = "BSC_log2",
             colour_by = "seqInfos",
-            point_size = 6
-            
+            point_size = 2
+            )
+plotColData(sce,
+            x = "FSC_log2",
+            y = "GFP_log2",
+            colour_by = "seqInfos",
+            point_size = 2
 )
+
+save(sce, file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged_facsInfos.Rdata')) 
+
+
+
+
+
+
+
 
 
 ##########################################
@@ -251,8 +234,6 @@ plotColData(sce,
 # 2) clean the cells 
 # 3) clean genes
 ##########################################
-
-
 #write.csv(counts(sce), file=paste0(tabDir, "scRNAseq_raw_readCounts", version.analysis, ".csv"), row.names=TRUE)
 keep_feature <- rowSums(counts(sce) > 0) > 0
 sce <- sce[keep_feature, ]
@@ -355,7 +336,7 @@ save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_filtered_SCE.Rdata'))
 ####################
 ## filter lowly expressed (and probably too highly expressed genes)
 ####################
-load(file=paste0(RdataDir, version.DATA, '_QCed_cells_filtered_SCE.Rdata'))
+#load(file=paste0(RdataDir, version.DATA, '_QCed_cells_filtered_SCE.Rdata'))
 
 pdfname = paste0(resDir, "/scRNAseq_QCs_genes_filterting_", version.analysis, ".pdf")
 pdf(pdfname, width=16, height = 10)
