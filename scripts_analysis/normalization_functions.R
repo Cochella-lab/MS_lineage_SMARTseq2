@@ -58,7 +58,7 @@ calculate.sizeFactors.DESeq2 = function(expr_mat)
   
 }
 
-test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "scran", "Seurat", "SCnorm", "sctransform"), min.size = 100)
+test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "scran", "seurat", "SCnorm", "sctransform"), min.size = 100)
 {
   #Methods.Normalization = "DESeq2" 
   
@@ -99,7 +99,6 @@ test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "s
       sce.qc <- normalize(sce.qc, exprs_values = "counts", return_log = TRUE)
     }
     
-    
     if(method == "TMM"|method == "DESeq2"|method == "UQ"|method == "scran"){
       summary(sizeFactors(sce.qc))
       range(sizeFactors(sce.qc))
@@ -117,35 +116,76 @@ test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "s
       sce.qc = scater::runUMAP(sce.qc, dimred = 'PCA')
       #sce.zeisel <- runTSNE(sce.zeisel, dimred="PCA", perplexity=5)
       #runUMAP(sce.zeisel, dimred="PCA")
+      scater::plotReducedDim(sce.qc, dimred = "PCA", colour_by = 'request')
+      scater::plotReducedDim(sce.qc, dimred = "UMAP", colour_by = 'request')
+      scater::plotReducedDim(sce.qc, dimred = "TSNE", colour_by = 'request')
       
-      p1 = scater::plotPCA(
-        sce.qc[endog_genes, ],
-        run_args = list(exprs_values = "logcounts"), 
-        size_by = "total_counts",
-        #size_by = "total_features_by_counts",
-        colour_by = "request"
-      ) + ggtitle(paste0("PCA -- ", main))
+      # p1 = scater::plotPCA(
+      #   sce.qc[endog_genes, ],
+      #   run_args = list(exprs_values = "logcounts"), 
+      #   size_by = "total_counts",
+      #   #size_by = "total_features_by_counts",
+      #   colour_by = "request"
+      # ) + ggtitle(paste0("PCA -- ", main))
+      # 
+      # 
+      # p2 = plotTSNE(
+      #   sce.qc[endog_genes, ],
+      #   run_args = list(exprs_values = "logcounts", perplexity = param.perplexity), 
+      #   size_by = "total_counts",
+      #   #size_by = "total_features_by_counts",
+      #   colour_by = "seqInfos"  
+      # ) + ggtitle(paste0("tSNE - perplexity = ", param.perplexity, "--", main))
+      # 
+      # p3 = plotUMAP(
+      #   sce.qc[endog_genes, ],
+      #   run_args = list(exprs_values = "logcounts"), 
+      #   size_by = "total_counts",
+      #   #size_by = "total_features_by_counts",
+      #   colour_by = "seqInfos"
+      # ) + ggtitle(paste0("UMAP -- ", main))
+      # 
+      # plot(p1); plot(p2); plot(p3)
+    }
+    
+    
+    if(method == 'seurat'| method == 'sctransform'){
+      ms0 = as.Seurat(sce, counts = 'counts', data = NULL, assay = "RNA")
       
+      if(method == 'seurat'){
+        ms.logtransform <- NormalizeData(ms0, assay = "RNA" )
+        ms.logtransform <- FindVariableFeatures(ms.logtransform, selection.method = "vst", nfeatures = 3000)
+        all.genes <- rownames(ms.logtransform)
+        ms.logtransform <- ScaleData(ms.logtransform, features = all.genes)
+        
+        ms.logtransform <- RunPCA(object = ms.logtransform, verbose = FALSE)
+        
+        #ms.logtransform <- FindNeighbors(object = ms.logtransform, dims = 1:20)
+        #ms.logtransform <- FindClusters(object = ms.logtransform)
+        
+        ms.logtransform <- RunUMAP(object = ms.logtransform, reduction = 'pca', dims = 1:20, n.neighbors = 20)
+        
+        ms.logtransform = RunTSNE(ms.logtransform, reduction = 'pca', dims = 1:20, tsne.method = 'Rtsne')
+        DimPlot(ms.logtransform, reduction = "umap", group.by = 'request')
+        
+        DimPlot(ms.logtransform, reduction = "tsne", group.by = 'request')
+      }
       
-      p2 = plotTSNE(
-        sce.qc[endog_genes, ],
-        run_args = list(exprs_values = "logcounts", perplexity = param.perplexity), 
-        size_by = "total_counts",
-        #size_by = "total_features_by_counts",
-        colour_by = "seqInfos"  
-      ) + ggtitle(paste0("tSNE - perplexity = ", param.perplexity, "--", main))
-      
-      p3 = plotUMAP(
-        sce.qc[endog_genes, ],
-        run_args = list(exprs_values = "logcounts"), 
-        size_by = "total_counts",
-        #size_by = "total_features_by_counts",
-        colour_by = "seqInfos"
-      ) + ggtitle(paste0("UMAP -- ", main))
-      
-      plot(p1); plot(p2); plot(p3)
+      if(method == 'sctransform'){
+        ms <- SCTransform(object = ms0) # new normalization from Seurat
+        
+        ms <- RunPCA(object = ms, verbose = FALSE)
+        #ms <- FindNeighbors(object = ms, dims = 1:20)
+        #ms <- FindClusters(object = ms)
+        
+        ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:20)
+        DimPlot(ms, reduction = "umap", group.by = 'request')
+        
+        #ms <- RunUMAP(object = ms, reduction = 'MNN', dims = 1:20, n.neighbors = 30)
+        #DimPlot(ms, reduction = "umap")
+        
+      }
     }
     
   }
-  
 }
