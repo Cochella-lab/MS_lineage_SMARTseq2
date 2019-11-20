@@ -423,134 +423,115 @@ plot.pair.comparison.plot = function(xx, linear.scale = TRUE, main = "pairwise.c
   
 }
 
-
-##########################################
-# several common functions for normalizations 
-# from Hemberg lab
-# hemberg-lab.github.io/scRNA.seq.course/cleaning-the-expression-matrix.html#normalization-theory
-##########################################
-calc_cpm <- function (expr_mat, spikes = NULL) 
+########################################################
+########################################################
+# Section : integrate the FACS information into the metadata
+# 
+########################################################
+########################################################
+Integrate.FACS.Information = function(sce, processing.FACS.Info = TRUE)
 {
-  norm_factor <- colSums(expr_mat[-spikes, ])
-  return(t(t(expr_mat)/norm_factor)) * 10^6
-}
-
-Down_Sample_Matrix <- function (expr_mat)
-{
-  min_lib_size <- min(colSums(expr_mat))
-  down_sample <- function(x) {
-    prob <- min_lib_size/sum(x)
-    return(unlist(lapply(x, function(y) {
-      rbinom(1, y, prob)
-    })))
-  }
-  down_sampled_mat <- apply(expr_mat, 2, down_sample)
-  return(down_sampled_mat)
-}
-
-cal_uq_Hemberg = function (expr_mat, spikes = NULL) 
-{
-  UQ <- function(x) {
-    quantile(x[x > 0], 0.75)
-  }
-  if(!is.null(spikes)){
-    uq <- unlist(apply(expr_mat[-spikes, ], 2, UQ))
-  }else{
-    uq <- unlist(apply(expr_mat, 2, UQ))
-  }
   
-  norm_factor <- uq/median(uq)
-  return(t(t(expr_mat)/norm_factor))
-}
-
-calculate.sizeFactors.DESeq2 = function(expr_mat)
-{
-  # expr_mat = counts(sce.qc)
-  require('DESeq2')
-  condition <- factor(rep("A", ncol(expr_mat)))
-  dds <- DESeqDataSetFromMatrix(expr_mat, DataFrame(condition), design = ~ 1)
-  dds <- estimateSizeFactors(dds)
-  
-  return(sizeFactors(dds))
-  
-}
-
-test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "scran"), min.size = 100)
-{
-  #Methods.Normalization = "DESeq2" 
-  
-  for(method in Methods.Normalization)
+  find_flowcell_lane = function(x)
   {
-    sce.qc = sce
-    set.seed(1234567)
-    
-    cat('test normalization method -- ', method, "\n")
-    main = paste0(method);
-    
-    if(method == "raw") { # raw log counts
-      assay(sce.qc, "logcounts") <- log2(counts(sce.qc) + 1)
-    }
-    
-    if(method == "cpm") { ### cpm
-      assay(sce.qc, "logcounts") <- log2(calculateCPM(sce.qc, use_size_factors = FALSE) + 1)
-    }
-    if(method == "UQ"){
-      logcounts(sce.qc) <- log2(cal_uq_Hemberg(counts(sce.qc)) + 1)
-    }
-    
-    if(method == "DESeq2"){
-      sizeFactors(sce.qc) = calculate.sizeFactors.DESeq2(counts(sce.qc))
-      sce.qc <- normalize(sce.qc, exprs_values = "counts", return_log = TRUE)
-    }
-    if(method == "downsample") {
-      assay(sce.qc, "logcounts") <- log2(Down_Sample_Matrix(counts(sce.qc)) + 1)
-    }
-    
-    if(method == "scran"){
-      ## scran normalization (not working here, because negative scaling factor found)
-      qclust <- quickCluster(sce.qc, min.size = min.size,  method = 'igraph')
-      sce.qc <- computeSumFactors(sce.qc, clusters = qclust)
-      sce.qc <- normalize(sce.qc, exprs_values = "counts", return_log = TRUE)
-    }
-    
-    if(method == "TMM"|method == "DESeq2"|method == "UQ"|method == "scran"){
-      summary(sizeFactors(sce.qc))
-      range(sizeFactors(sce.qc))
-      
-      plot(sce.qc$total_counts/1e6, sizeFactors(sce.qc), log="xy", main = paste0(method), 
-           xlab="Library size (millions)", ylab="Size factor",
-           pch=16)
-      #legend("bottomright", col=c("black"), pch=16, cex=1.2, legend = "size factor from scran vs total library size")
-    }
-    
-    p1 = scater::plotPCA(
-      sce.qc[endog_genes, ],
-      run_args = list(exprs_values = "logcounts"), 
-      size_by = "total_counts",
-      #size_by = "total_features_by_counts",
-      colour_by = "seqInfos"
-    ) + ggtitle(paste0("PCA -- ", main))
-    
-    param.perplexity = 10;
-    p2 = plotTSNE(
-      sce.qc[endog_genes, ],
-      run_args = list(exprs_values = "logcounts", perplexity = param.perplexity), 
-      size_by = "total_counts",
-      #size_by = "total_features_by_counts",
-      colour_by = "seqInfos"  
-    ) + ggtitle(paste0("tSNE - perplexity = ", param.perplexity, "--", main))
-    
-    p3 = plotUMAP(
-      sce.qc[endog_genes, ],
-      run_args = list(exprs_values = "logcounts"), 
-      size_by = "total_counts",
-      #size_by = "total_features_by_counts",
-      colour_by = "seqInfos"
-    ) + ggtitle(paste0("UMAP -- ", main))
-    
-    plot(p1); plot(p2); plot(p3)
+    x = gsub(".csv", "", x)  
+    x = basename(x)
+    x = unlist(strsplit(as.character(x), "_"))
+    x = paste0(x[c((length(x)-1), length(x))], collapse = "_")
+    return(x)
   }
   
+  if(processing.FACS.Info){
+    ##########################################
+    # collecting the facs infos from tables
+    ##########################################
+    path2FACS = "/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/facs_data/FACS_indexData/"
+    ff1 = paste0(path2FACS, "/barcodes_to_wellNames_96w_robot_test_plus_barcodes_CCVBPANXX_1.csv")
+    facs = read.csv(ff1, header = TRUE, row.names = 1)
+    facs = data.frame(facs, stringsAsFactors = FALSE)
+    flane = find_flowcell_lane(ff1)
+    facs$flowcell_lane = flane
+    
+    keep = facs
+    
+    ffs = list.files(path = path2FACS, pattern = "*.csv", full.names = TRUE)
+    ffs = ffs[grep(flane, ffs, invert = TRUE)]
+    
+    jj = grep("barcodes_to_wellNames", ffs)
+    wells = ffs[jj]
+    facs = ffs[-jj]
+    
+    wells.infos = list()
+    for(n in 1:length(wells))
+    {
+      xx = read.csv(wells[n], header = TRUE)
+      xx = data.frame(xx$well_name, xx$original, stringsAsFactors = FALSE)
+      colnames(xx) = c("index.well", "bc")
+      wells.infos[[n]] = xx
+      if(grepl("384w", wells[n])){
+        names(wells.infos)[n] = "all"
+      }else{
+        names(wells.infos)[n] = find_flowcell_lane(wells[n])
+      }  
+    }
+    #well2barcodes = read.csv(well2barcodes, header = TRUE)
+    #wells = data.frame(well2barcodes$well_name, well2barcodes$original, stringsAsFactors = FALSE)
+    keep2 = c()
+    for(n in 1:length(facs))
+    {
+      # n = 2
+      flane = find_flowcell_lane(facs[n])
+      yy = read.csv(facs[n], header = TRUE)
+      if(flane == "CCVTBANXX_8"){
+        mapping = wells.infos$CCVTBANXX_8
+        yy = data.frame(yy[, c(1:8)], rep(NA, nrow(yy)), rep(NA, nrow(yy)), yy$Index)
+        colnames(yy)[c(9:11)] = colnames(keep)[9:11]
+      }else{
+        mapping = wells.infos$all
+      }
+      yy = data.frame(yy, mapping[match(yy$Index, mapping$index.well),], stringsAsFactors = FALSE)
+      colnames(yy)[c(12:13)] = colnames(keep)[12:13]
+      yy$flowcell_lane = flane
+      keep2 = rbind(keep2, yy)
+    }
+    
+    keep = rbind(keep, keep2)
+    colnames(keep)[11:12] = c("Index.well", "Index.well.new")
+    keep$flowcell_lane_bc = paste0(keep$flowcell_lane, "_", keep$barcode)
+    
+    #save(keep, file = paste0(RdataDir, "merged_FACS_information_all.Rdata"))
+    ##########################################
+    # integrate the facs info into the sce object 
+    ##########################################
+    nb.cells = rep(NA, ncol(sce))
+    FSC = rep(NA, ncol(sce))
+    BSC = rep(NA, ncol(sce))
+    Index.well = rep(NA, ncol(sce))
+    GFP = rep(NA, ncol(sce))
+    
+    for(n in 1:ncol(sce))
+    {
+      kk = which(keep$flowcell_lane_bc == paste0(sce$flowcell.lane[n], "_", sce$barcodes[n]))
+      cat(n, " : ", length(kk), "\n" )
+      if(length(kk)>0){
+        nb.cells[n] = length(kk)
+        Index.well[n] = unique(keep$Index.well.new[kk])
+        FSC[n] = mean(keep$FSC.A[kk])
+        BSC[n] = mean(keep$BSC.A[kk])
+        GFP[n] = mean(keep$FITC.A.Compensated[kk])
+      }
+    }
+    
+    sce$nb.cells = nb.cells
+    sce$index.well = Index.well
+    sce$FSC = FSC
+    sce$BSC = BSC
+    sce$GFP = GFP
+    # save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos.Rdata'))
+    
+  }
+  
+  return(sce)
 }
 
 ########################################################
@@ -1006,111 +987,6 @@ cellCycle.correction = function(sce, method = "seurat")
 # 
 ########################################################
 ########################################################
-Integrate.FACS.Information = function(sce, processing.FACS.Info = TRUE)
-{
-  
-  find_flowcell_lane = function(x)
-  {
-    x = gsub(".csv", "", x)  
-    x = basename(x)
-    x = unlist(strsplit(as.character(x), "_"))
-    x = paste0(x[c((length(x)-1), length(x))], collapse = "_")
-    return(x)
-  }
-  
-  if(processing.FACS.Info){
-    ##########################################
-    # collecting the facs infos from tables
-    ##########################################
-    path2FACS = "/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/facs_data/FACS_indexData/"
-    ff1 = paste0(path2FACS, "/barcodes_to_wellNames_96w_robot_test_plus_barcodes_CCVBPANXX_1.csv")
-    facs = read.csv(ff1, header = TRUE, row.names = 1)
-    facs = data.frame(facs, stringsAsFactors = FALSE)
-    flane = find_flowcell_lane(ff1)
-    facs$flowcell_lane = flane
-    
-    keep = facs
-      
-    ffs = list.files(path = path2FACS, pattern = "*.csv", full.names = TRUE)
-    ffs = ffs[grep(flane, ffs, invert = TRUE)]
-    
-    jj = grep("barcodes_to_wellNames", ffs)
-    wells = ffs[jj]
-    facs = ffs[-jj]
-   
-    wells.infos = list()
-    for(n in 1:length(wells))
-    {
-      xx = read.csv(wells[n], header = TRUE)
-      xx = data.frame(xx$well_name, xx$original, stringsAsFactors = FALSE)
-      colnames(xx) = c("index.well", "bc")
-      wells.infos[[n]] = xx
-      if(grepl("384w", wells[n])){
-        names(wells.infos)[n] = "all"
-      }else{
-        names(wells.infos)[n] = find_flowcell_lane(wells[n])
-      }  
-    }
-    #well2barcodes = read.csv(well2barcodes, header = TRUE)
-    #wells = data.frame(well2barcodes$well_name, well2barcodes$original, stringsAsFactors = FALSE)
-    keep2 = c()
-    for(n in 1:length(facs))
-    {
-      # n = 2
-      flane = find_flowcell_lane(facs[n])
-      yy = read.csv(facs[n], header = TRUE)
-      if(flane == "CCVTBANXX_8"){
-        mapping = wells.infos$CCVTBANXX_8
-        yy = data.frame(yy[, c(1:8)], rep(NA, nrow(yy)), rep(NA, nrow(yy)), yy$Index)
-        colnames(yy)[c(9:11)] = colnames(keep)[9:11]
-      }else{
-        mapping = wells.infos$all
-      }
-      yy = data.frame(yy, mapping[match(yy$Index, mapping$index.well),], stringsAsFactors = FALSE)
-      colnames(yy)[c(12:13)] = colnames(keep)[12:13]
-      yy$flowcell_lane = flane
-      keep2 = rbind(keep2, yy)
-    }
-    
-    keep = rbind(keep, keep2)
-    colnames(keep)[11:12] = c("Index.well", "Index.well.new")
-    keep$flowcell_lane_bc = paste0(keep$flowcell_lane, "_", keep$barcode)
-    
-    #save(keep, file = paste0(RdataDir, "merged_FACS_information_all.Rdata"))
-    ##########################################
-    # integrate the facs info into the sce object 
-    ##########################################
-    nb.cells = rep(NA, ncol(sce))
-    FSC = rep(NA, ncol(sce))
-    BSC = rep(NA, ncol(sce))
-    Index.well = rep(NA, ncol(sce))
-    GFP = rep(NA, ncol(sce))
-    
-    for(n in 1:ncol(sce))
-    {
-      kk = which(keep$flowcell_lane_bc == paste0(sce$flowcell.lane[n], "_", sce$barcodes[n]))
-      cat(n, " : ", length(kk), "\n" )
-      if(length(kk)>0){
-        nb.cells[n] = length(kk)
-        Index.well[n] = unique(keep$Index.well.new[kk])
-        FSC[n] = mean(keep$FSC.A[kk])
-        BSC[n] = mean(keep$BSC.A[kk])
-        GFP[n] = mean(keep$FITC.A.Compensated[kk])
-      }
-    }
-    
-    sce$nb.cells = nb.cells
-    sce$index.well = Index.well
-    sce$FSC = FSC
-    sce$BSC = BSC
-    sce$GFP = GFP
-    # save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos.Rdata'))
-  
-  }
-  
-  return(sce)
-}
-
 Check.MNN.pairs = function(mnn.out, fscs)
 {
   #library(igraph)
