@@ -52,24 +52,25 @@ load(file=paste0("../data/R_processed_data/", version.DATA, '_QCed_cells_genes_f
 # sce.qc <- computeSumFactors(sce.qc, clusters = qclust)
 ########################################################
 ########################################################
+library(Seurat)
 library(scRNA.seq.funcs)
 library(scater)
 library(scran)
 options(stringsAsFactors = FALSE)
 
-Normalization.Testing = FALSE
+Normalization.Testing = TRUE
 
 reducedDim(sce) <- NULL
 endog_genes <- !rowData(sce)$is_feature_control
 
 if(Normalization.Testing){
-  source("scRNAseq_functions.R")
+  source("normalization_functions.R")
   
   pdfname = paste0(resDir, "/scRNAseq_filtered_normalization_testing.pdf")
   pdf(pdfname, width=14, height = 8)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
-  test.normalization(sce, Methods.Normalization = c("cpm", "DESeq2", "scran"), min.size = 100)
+  test.normalization(sce, Methods.Normalization = c("cpm", "DESeq2", "scran", "Seurat", "sctransform"))
   
   dev.off()
 }
@@ -92,24 +93,6 @@ plot(sce$total_counts/1e6, sizeFactors(sce), log="xy",
 sce <- normalize(sce, exprs_values = "counts", return_log = TRUE)
 
 save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE.Rdata'))
-
-
-
-########################################################
-########################################################
-# Section : Dealing with batch confouner
-# first thing to try is the MNN method from scran pacakge after contacting with the first 
-# author, Laleh Haghverdi and Aaron Lun
-# !!!!!! to correct the batch, the main ideal is to 
-# 1) select highly variable genes 2) using these genes to reduce the dimensions and correct the batch in the low dimension
-# 3) the corrected output will be low dimensional output, which will be used to define the distance for clustering and also trajectory
-# or the corrected gene expression matrix (but not used for DE analysis), from which PCs can also be found by PCA
-# Taken together, HGV, dimensionality reduction, batch correction are together. 
-# cluster and DE analysis will be the next two steps. 
-# in addition, the DE analysis will be performed with original counts by providing cluster labels and batches(
-# http://bioconductor.org/packages/devel/workflows/vignettes/simpleSingleCell/inst/doc/de.html#2_blocking_on_uninteresting_factors_of_variation)
-########################################################
-########################################################
 
 
 ##########################################

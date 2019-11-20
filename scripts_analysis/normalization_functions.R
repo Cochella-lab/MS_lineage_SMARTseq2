@@ -58,7 +58,7 @@ calculate.sizeFactors.DESeq2 = function(expr_mat)
   
 }
 
-test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "scran"), min.size = 100)
+test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "scran", "Seurat", "SCnorm", "sctransform"), min.size = 100)
 {
   #Methods.Normalization = "DESeq2" 
   
@@ -67,6 +67,8 @@ test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "s
     sce.qc = sce
     set.seed(1234567)
     
+    method = 'cpm'
+     
     cat('test normalization method -- ', method, "\n")
     main = paste0(method);
     
@@ -75,7 +77,8 @@ test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "s
     }
     
     if(method == "cpm") { ### cpm
-      assay(sce.qc, "logcounts") <- log2(calculateCPM(sce.qc, use_size_factors = FALSE) + 1)
+      #assay(sce.qc, "logcounts") <- log2(calculateCPM(sce.qc, use_size_factors = FALSE) + 1)
+      sce.qc = logNormCounts(sce, size_factors = NULL, log = TRUE, pseudo_count =1)
     }
     if(method == "UQ"){
       logcounts(sce.qc) <- log2(cal_uq_Hemberg(counts(sce.qc)) + 1)
@@ -96,6 +99,7 @@ test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "s
       sce.qc <- normalize(sce.qc, exprs_values = "counts", return_log = TRUE)
     }
     
+    
     if(method == "TMM"|method == "DESeq2"|method == "UQ"|method == "scran"){
       summary(sizeFactors(sce.qc))
       range(sizeFactors(sce.qc))
@@ -106,32 +110,42 @@ test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "s
       #legend("bottomright", col=c("black"), pch=16, cex=1.2, legend = "size factor from scran vs total library size")
     }
     
-    p1 = scater::plotPCA(
-      sce.qc[endog_genes, ],
-      run_args = list(exprs_values = "logcounts"), 
-      size_by = "total_counts",
-      #size_by = "total_features_by_counts",
-      colour_by = "seqInfos"
-    ) + ggtitle(paste0("PCA -- ", main))
+    if(method != 'Seurat' & method != "sctransform"){
+      sce.qc = scater::runPCA(sce.qc)
+      param.perplexity = 10; set.seed(100)
+      sce.qc = scater::runTSNE(sce.qc,dimred = 'PCA', perplexity = param.perplexity)
+      sce.qc = scater::runUMAP(sce.qc, dimred = 'PCA')
+      #sce.zeisel <- runTSNE(sce.zeisel, dimred="PCA", perplexity=5)
+      #runUMAP(sce.zeisel, dimred="PCA")
+      
+      p1 = scater::plotPCA(
+        sce.qc[endog_genes, ],
+        run_args = list(exprs_values = "logcounts"), 
+        size_by = "total_counts",
+        #size_by = "total_features_by_counts",
+        colour_by = "request"
+      ) + ggtitle(paste0("PCA -- ", main))
+      
+      
+      p2 = plotTSNE(
+        sce.qc[endog_genes, ],
+        run_args = list(exprs_values = "logcounts", perplexity = param.perplexity), 
+        size_by = "total_counts",
+        #size_by = "total_features_by_counts",
+        colour_by = "seqInfos"  
+      ) + ggtitle(paste0("tSNE - perplexity = ", param.perplexity, "--", main))
+      
+      p3 = plotUMAP(
+        sce.qc[endog_genes, ],
+        run_args = list(exprs_values = "logcounts"), 
+        size_by = "total_counts",
+        #size_by = "total_features_by_counts",
+        colour_by = "seqInfos"
+      ) + ggtitle(paste0("UMAP -- ", main))
+      
+      plot(p1); plot(p2); plot(p3)
+    }
     
-    param.perplexity = 10;
-    p2 = plotTSNE(
-      sce.qc[endog_genes, ],
-      run_args = list(exprs_values = "logcounts", perplexity = param.perplexity), 
-      size_by = "total_counts",
-      #size_by = "total_features_by_counts",
-      colour_by = "seqInfos"  
-    ) + ggtitle(paste0("tSNE - perplexity = ", param.perplexity, "--", main))
-    
-    p3 = plotUMAP(
-      sce.qc[endog_genes, ],
-      run_args = list(exprs_values = "logcounts"), 
-      size_by = "total_counts",
-      #size_by = "total_features_by_counts",
-      colour_by = "seqInfos"
-    ) + ggtitle(paste0("UMAP -- ", main))
-    
-    plot(p1); plot(p2); plot(p3)
   }
   
 }
