@@ -1,12 +1,38 @@
 ##########################################################################
 ##########################################################################
-# Project:
+# Project: 
 # Script purpose:
 # Usage example: 
 # Author: Jingkui Wang (jingkui.wang@imp.ac.at)
 # Date of creation: Tue Nov 19 16:30:34 2019
 ##########################################################################
 ##########################################################################
+
+## set up the paths for the data and results
+
+tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
+         error = function(e){ 
+           install.packages("rstudioapi")
+           path <-  rstudioapi::getSourceEditorContext()$path})
+source.path <- sub(basename(path), "", path)
+
+
+user <- "results_jiwang/"
+setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user)) 
+version.DATA = 'all_batches'
+version.analysis =  paste0(version.DATA, '_20191115')
+
+dataDir = paste0("../data/gene_counts/")
+resDir = paste0("results/", version.analysis)
+tabDir = paste0("results/", version.analysis, "/tables/")
+RdataDir = paste0("results/", version.analysis, "/Rdata/")
+if(!dir.exists("results/")){dir.create("results/")}
+if(!dir.exists(resDir)){dir.create(resDir)}
+if(!dir.exists(tabDir)){dir.create(tabDir)}
+if(!dir.exists(RdataDir)){dir.create(RdataDir)}
+
+## import the R object from the previous step
+load(file=paste0("../data/R_processed_data/", version.DATA, '_QCed_cells_genes_filtered_SCE.Rdata'))
 ########################################################
 ########################################################
 # Section : scRNA-seq data normalization 
@@ -26,7 +52,6 @@
 # sce.qc <- computeSumFactors(sce.qc, clusters = qclust)
 ########################################################
 ########################################################
-load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_SCE.Rdata'))
 library(scRNA.seq.funcs)
 library(scater)
 library(scran)
@@ -85,19 +110,7 @@ save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normal
 # http://bioconductor.org/packages/devel/workflows/vignettes/simpleSingleCell/inst/doc/de.html#2_blocking_on_uninteresting_factors_of_variation)
 ########################################################
 ########################################################
-path2AleksFolder = '/Volumes/groups/cochella/Aleks/bioinformatics/GitHub/scRNAseq_MS_lineage'
-version.DATA = 'scRNA_8613_full'
-version.analysis =  paste0(version.DATA, '_20191029')
 
-dataDir = paste0("../data/")
-resDir = paste0("../results/", version.analysis)
-tabDir = paste0("../results/", version.analysis, "/tables/")
-RdataDir = paste0("../results/", version.analysis, "/Rdata/")
-RdataDirfromAleks = paste0(path2AleksFolder, "/results/", version.analysis, "/Rdata/")
-
-if(!dir.exists(resDir)){dir.create(resDir)}
-if(!dir.exists(tabDir)){dir.create(tabDir)}
-if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 ##########################################
 # Remove the cell cycle confounder 
