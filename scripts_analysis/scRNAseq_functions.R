@@ -100,7 +100,7 @@ convertGeneNames.forCountTable = function(aa, discard.gene.with.zero.reads = TRU
   aa = aa[ grep("^__", aa$gene, invert = TRUE), ] ## remove features that are not well aligned
   
   ## load annotation and change the gene names
-  annot = read.csv(file = "/Volumes/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
+  annot = read.csv(file = "/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
   gg.Mt = annot$Gene.name[which(annot$Chromosome.scaffold.name=="MtDNA")]
   gg.ribo = annot$Gene.name[which(annot$Gene.type=="rRNA")]
   
@@ -129,7 +129,7 @@ convertGeneNames.forCountTable = function(aa, discard.gene.with.zero.reads = TRU
 
 find.particular.geneSet = function(geneSet = "Mt")
 {
-  annot = read.csv(file = "/Volumes/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
+  annot = read.csv(file = "/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
   if(geneSet == "Mt"){
     return(annot$Gene.name[which(annot$Chromosome.scaffold.name=="MtDNA")])
   }else{

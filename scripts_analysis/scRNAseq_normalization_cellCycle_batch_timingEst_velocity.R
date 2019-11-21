@@ -26,6 +26,19 @@
 # sce.qc <- computeSumFactors(sce.qc, clusters = qclust)
 ########################################################
 ########################################################
+#Determine the script location and user
+tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
+         error = function(e){ 
+           install.packages("rstudioapi")
+           path <-  rstudioapi::getSourceEditorContext()$path})
+source.path <- sub(basename(path), "", path)
+
+
+user <- "git_aleks/"
+setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/", user)) 
+version.DATA = 'all_batches'
+version.analysis =  paste0(version.DATA, '_20191115')
+
 load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_SCE.Rdata'))
 library(scRNA.seq.funcs)
 library(scater)

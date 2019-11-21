@@ -8,8 +8,7 @@
 ## Date of creation: Mon Feb 19 14:43:38 2018
 ##################################################
 ##################################################
-
-
+#Setup the enviroment
 #Determine the script location and user
 tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
          error = function(e){ 
@@ -17,8 +16,9 @@ tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
            path <-  rstudioapi::getSourceEditorContext()$path})
 source.path <- sub(basename(path), "", path)
 
+source(paste0(source.path,"scRNAseq_functions.R"))
 
-user <- "git_aleks/"
+user <- "results_aleks"
 setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user)) 
 version.DATA = 'all_batches'
 version.analysis =  paste0(version.DATA, '_20191115')
@@ -128,9 +128,7 @@ if(Manually.Specify.sampleInfos.filtering.4scRNAseq){
 # aggregated quality controls from nf-RNAseq 
 ##########################################
 if(Aggregate.nf.QCs.plots.in.designMatrix){
-  #load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_RNA_seq.Rdata'))
-  
-  source(paste0(source.path,"scRNAseq_functions.R"))
+  # load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_RNA_seq.Rdata'))
   dirs.all = c("../data/raw_ngs_data/S76090_R6875/results_v2/multiqc_data/",
                "../data/raw_ngs_data/S80193_R7130_rep/results_v2/multiqc_data/",
                "../data/raw_ngs_data/S80194_R7130_R7133_rep/results_v2/multiqc_data/",
@@ -218,12 +216,6 @@ plotColData(sce,
 )
 
 save(sce, file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged_facsInfos.Rdata')) 
-
-
-
-
-
-
 
 
 
