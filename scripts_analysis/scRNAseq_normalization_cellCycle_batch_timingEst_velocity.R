@@ -1,12 +1,38 @@
 ##########################################################################
 ##########################################################################
-# Project:
+# Project: 
 # Script purpose:
 # Usage example: 
 # Author: Jingkui Wang (jingkui.wang@imp.ac.at)
 # Date of creation: Tue Nov 19 16:30:34 2019
 ##########################################################################
 ##########################################################################
+
+## set up the paths for the data and results
+
+tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
+         error = function(e){ 
+           install.packages("rstudioapi")
+           path <-  rstudioapi::getSourceEditorContext()$path})
+source.path <- sub(basename(path), "", path)
+
+
+user <- "results_jiwang/"
+setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user)) 
+version.DATA = 'all_batches'
+version.analysis =  paste0(version.DATA, '_20191115')
+
+dataDir = paste0("../data/gene_counts/")
+resDir = paste0("results/", version.analysis)
+tabDir = paste0("results/", version.analysis, "/tables/")
+RdataDir = paste0("results/", version.analysis, "/Rdata/")
+if(!dir.exists("results/")){dir.create("results/")}
+if(!dir.exists(resDir)){dir.create(resDir)}
+if(!dir.exists(tabDir)){dir.create(tabDir)}
+if(!dir.exists(RdataDir)){dir.create(RdataDir)}
+
+## import the R object from the previous step
+load(file=paste0("../data/R_processed_data/", version.DATA, '_QCed_cells_genes_filtered_SCE.Rdata'))
 ########################################################
 ########################################################
 # Section : scRNA-seq data normalization 
@@ -26,38 +52,25 @@
 # sce.qc <- computeSumFactors(sce.qc, clusters = qclust)
 ########################################################
 ########################################################
-#Determine the script location and user
-tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
-         error = function(e){ 
-           install.packages("rstudioapi")
-           path <-  rstudioapi::getSourceEditorContext()$path})
-source.path <- sub(basename(path), "", path)
-
-
-user <- "git_aleks/"
-setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/", user)) 
-version.DATA = 'all_batches'
-version.analysis =  paste0(version.DATA, '_20191115')
-
-load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_SCE.Rdata'))
+library(Seurat)
 library(scRNA.seq.funcs)
 library(scater)
 library(scran)
 options(stringsAsFactors = FALSE)
 
-Normalization.Testing = FALSE
+Normalization.Testing = TRUE
 
 reducedDim(sce) <- NULL
 endog_genes <- !rowData(sce)$is_feature_control
 
 if(Normalization.Testing){
-  source("scRNAseq_functions.R")
+  source(paste0(source.path, "normalization_functions.R"))
   
   pdfname = paste0(resDir, "/scRNAseq_filtered_normalization_testing.pdf")
   pdf(pdfname, width=14, height = 8)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
-  test.normalization(sce, Methods.Normalization = c("cpm", "DESeq2", "scran"), min.size = 100)
+  test.normalization(sce, Methods.Normalization = c("cpm", "DESeq2", "scran", "seurat", "sctransform"), using.HVGs = TRUE)
   
   dev.off()
 }
@@ -81,36 +94,6 @@ sce <- normalize(sce, exprs_values = "counts", return_log = TRUE)
 
 save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE.Rdata'))
 
-
-
-########################################################
-########################################################
-# Section : Dealing with batch confouner
-# first thing to try is the MNN method from scran pacakge after contacting with the first 
-# author, Laleh Haghverdi and Aaron Lun
-# !!!!!! to correct the batch, the main ideal is to 
-# 1) select highly variable genes 2) using these genes to reduce the dimensions and correct the batch in the low dimension
-# 3) the corrected output will be low dimensional output, which will be used to define the distance for clustering and also trajectory
-# or the corrected gene expression matrix (but not used for DE analysis), from which PCs can also be found by PCA
-# Taken together, HGV, dimensionality reduction, batch correction are together. 
-# cluster and DE analysis will be the next two steps. 
-# in addition, the DE analysis will be performed with original counts by providing cluster labels and batches(
-# http://bioconductor.org/packages/devel/workflows/vignettes/simpleSingleCell/inst/doc/de.html#2_blocking_on_uninteresting_factors_of_variation)
-########################################################
-########################################################
-path2AleksFolder = '/Volumes/groups/cochella/Aleks/bioinformatics/GitHub/scRNAseq_MS_lineage'
-version.DATA = 'scRNA_8613_full'
-version.analysis =  paste0(version.DATA, '_20191029')
-
-dataDir = paste0("../data/")
-resDir = paste0("../results/", version.analysis)
-tabDir = paste0("../results/", version.analysis, "/tables/")
-RdataDir = paste0("../results/", version.analysis, "/Rdata/")
-RdataDirfromAleks = paste0(path2AleksFolder, "/results/", version.analysis, "/Rdata/")
-
-if(!dir.exists(resDir)){dir.create(resDir)}
-if(!dir.exists(tabDir)){dir.create(tabDir)}
-if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 ##########################################
 # Remove the cell cycle confounder 
