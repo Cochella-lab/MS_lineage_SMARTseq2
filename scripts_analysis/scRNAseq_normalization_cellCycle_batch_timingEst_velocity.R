@@ -9,7 +9,6 @@
 ##########################################################################
 
 ## set up the paths for the data and results
-
 tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
          error = function(e){ 
            install.packages("rstudioapi")
@@ -62,6 +61,8 @@ Normalization.Testing = TRUE
 
 reducedDim(sce) <- NULL
 endog_genes <- !rowData(sce)$is_feature_control
+
+#sce$library.size = sumCountsAcrossCells(sce)
 
 if(Normalization.Testing){
   source(paste0(source.path, "normalization_functions.R"))

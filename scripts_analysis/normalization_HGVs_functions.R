@@ -70,6 +70,7 @@ test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "s
   for(method in Methods.Normalization)
   {
     sce.qc = sce
+    sce.qc$library.size = apply(counts(sce.qc), 2, sum)
     set.seed(1234567)
     
     method = 'cpm'
@@ -83,7 +84,7 @@ test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "s
     
     if(method == "cpm") { ### cpm
       #assay(sce.qc, "logcounts") <- log2(calculateCPM(sce.qc, use_size_factors = FALSE) + 1)
-      sce.qc = logNormCounts(sce, size_factors = NULL, log = TRUE, pseudo_count=1)
+      sce.qc = logNormCounts(sce.qc, size_factors = NULL, log = TRUE, pseudo_count=1, center_size_factors = TRUE)
     }
     if(method == "UQ"){
       logcounts(sce.qc) <- log2(cal_uq_Hemberg(counts(sce.qc)) + 1)
@@ -98,18 +99,17 @@ test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "s
     }
     
     if(method == "scran"){
-      min.size = 100
+      #min.size = 100
       ## scran normalization (not working here, because negative scaling factor found)
-      qclust <- quickCluster(sce.qc, min.size = min.size,  method = 'igraph')
+      qclust <- quickCluster(sce.qc,  method = 'igraph')
       sce.qc <- computeSumFactors(sce.qc, clusters = qclust)
-      sce.qc <- normalize(sce.qc, exprs_values = "counts", return_log = TRUE)
+      sce.qc <- logNormCounts(sce.qc)
     }
     
     if(method == "TMM"|method == "DESeq2"|method == "UQ"|method == "scran"){
       summary(sizeFactors(sce.qc))
       range(sizeFactors(sce.qc))
-      
-      plot(sce.qc$total_counts/1e6, sizeFactors(sce.qc), log="xy", main = paste0(method), 
+      plot(sce.qc$library.size/1e6, sizeFactors(sce.qc), log="xy", main = paste0(method), 
            xlab="Library size (millions)", ylab="Size factor",
            pch=16)
       #legend("bottomright", col=c("black"), pch=16, cex=1.2, legend = "size factor from scran vs total library size")
