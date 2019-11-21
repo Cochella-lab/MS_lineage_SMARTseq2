@@ -63,9 +63,9 @@ calculate.sizeFactors.DESeq2 = function(expr_mat)
   
 }
 
-test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "scran", "seurat", "SCnorm", "sctransform"), use.HVGs = TRUE)
+test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "scran", "seurat", "sctransform"), use.HVGs = TRUE)
 {
-  #Methods.Normalization = "DESeq2" 
+  #Methods.Normalization = "DESeq2"
   
   for(method in Methods.Normalization)
   {
