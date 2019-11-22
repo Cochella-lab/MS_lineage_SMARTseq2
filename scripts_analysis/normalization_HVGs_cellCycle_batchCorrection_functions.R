@@ -464,7 +464,7 @@ find.cc.markers.homologues = function()
   #g2m.genes = xx # GO:1902751
   # A list of cell cycle markers, from Tirosh et al, 2015, is loaded with Seurat.  We can
   # segregate this list into markers of G2/M phase and markers of S phase
-  homologues = read.delim("../../../../annotations/cellCycle_genes_worm/BioMart_worm_human_homologe.txt", sep = "\t",
+  homologues = read.delim("/Volumes/groups/cochella/jiwang/annotations/cellCycle_genes_worm/BioMart_worm_human_homologe.txt", sep = "\t",
                           header = TRUE)
   #homologues = homologues[which(homologues$Human.orthology.confidence..0.low..1.high.==1), ]
   s.genes <- cc.genes$s.genes
@@ -544,24 +544,27 @@ find.cellcycle.markers = function(list.sel = 'homologues')
   
 }
 
-cellCycle.correction = function(sce, method = "seurat")
+cellCycle.correction = function(ms, method = "seurat")
 {
   if(method == "seurat"){
+    
     pdfname = paste0(resDir, "/scRNAseq_cellCycle_regression_Seurat.pdf")
     pdf(pdfname, width=12, height = 6)
     
-    library(scater)
-    library(scran)
+    #library(scater)
+    #library(scran)
     # install loomR from GitHub using the remotes package remotes::install_github(repo = 'mojaveazure/loomR', ref = 'develop')
-    library(loomR)
-    library(Seurat)
+    #library(loomR)
+    #library(Seurat)
     # convert sce to seurat object (see https://satijalab.org/seurat/v3.0/conversion_vignette.html)
-    seurat = as.Seurat(sce, counts = "counts", data = "logcounts")
-    Idents(seurat) <- colnames(seurat) # quite important this assignment for cell identity
+    #seurat = as.Seurat(sce, counts = "counts", data = "logcounts")
+    #Idents(seurat) <- colnames(seurat) # quite important this assignment for cell identity
+    #seurat <- FindVariableFeatures(seurat, selection.method = "vst")
     
     detach("package:scater", unload=TRUE)
+    detach("package:scran", unload=TRUE)
     
-    seurat <- FindVariableFeatures(seurat, selection.method = "vst")
+    seurat = ms;
     
     # Identify the 10 most highly variable genes
     top10 <- head(VariableFeatures(seurat), 25)
@@ -569,13 +572,12 @@ cellCycle.correction = function(sce, method = "seurat")
     plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
     CombinePlots(plots = list(plot1, plot2))
     
-    seurat <- ScaleData(seurat, features = rownames(seurat), model.use = "linear") # standardize the data (x - mean(x))/sd(x)
-    seurat <- RunPCA(seurat, features = VariableFeatures(seurat), ndims.print = 6:10, nfeatures.print = 10)
-    
+    #seurat <- ScaleData(seurat, features = rownames(seurat), model.use = "linear") # standardize the data (x - mean(x))/sd(x)
+    #seurat <- RunPCA(seurat, features = VariableFeatures(seurat), ndims.print = 6:10, nfeatures.print = 10)
     #DimPlot(seurat, reduction = "pca")
     # DimHeatmap(seurat, dims = c(1, 2))
     
-    source("scRNAseq_functions.R")
+    #source("scRNAseq_functions.R")
     c3.genes = find.cellcycle.markers(list.sel = "homologues")
     
     s.genes <- c3.genes$s.genes
@@ -591,12 +593,12 @@ cellCycle.correction = function(sce, method = "seurat")
     p00 = RidgePlot(seurat, features = c("cdk-1", "cdk-4", "cyd-1", "cye-1", "cya-1", "wee-1.3"), ncol = 2)
     plot(p00)
     
-    seurat <- RunPCA(seurat, features = VariableFeatures(seurat))
-    DimPlot(seurat)
+    #seurat <- RunPCA(seurat, features = VariableFeatures(seurat), verbose = TRUE)
+    #DimPlot(seurat, reduction = 'pca')
     
     seurat <- RunPCA(seurat, features = c(as.character(s.genes), as.character(g2m.genes)))
-    p0 = DimPlot(seurat, cells = colnames(seurat))
-    plot(p0)
+    DimPlot(seurat, reduction = 'pca')
+    
     # regress out the cell cycle
     seurat1 <- ScaleData(seurat, vars.to.regress = c("S.Score", "G2M.Score"), features = rownames(seurat))
     
@@ -726,6 +728,7 @@ cellCycle.correction = function(sce, method = "seurat")
     }
     
   }
+  
   ##########################################
   # scran method is based on trained classifier for mouse or human
   # so at the end it not usable
@@ -896,6 +899,7 @@ cellCycle.correction = function(sce, method = "seurat")
   }
   
 }
+
 
 
 

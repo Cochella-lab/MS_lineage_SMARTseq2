@@ -28,7 +28,6 @@ source.path <- sub(basename(path), "", path)
 user <- "results_jiwang/"
 setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user))
 
-
 version.DATA = 'all_batches'
 version.analysis =  paste0(version.DATA, '_20191115')
 dataDir = paste0("../data/gene_counts/")
@@ -41,6 +40,7 @@ if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
+correct.cellCycle = FALSE
 ########################################################
 ########################################################
 # Section : timingEst with cpm normalization and add it to the metadata
@@ -189,7 +189,8 @@ reducedDim(sce) <- NULL
 endog_genes <- !rowData(sce)$is_feature_control
 
 Normalization.Testing = FALSE
-source.my.script ("normalization_HVGs_functions.R")
+source.my.script("normalization_HVGs_cellCycle_batchCorrection_functions.R")
+
 if(Normalization.Testing){
   pdfname = paste0(resDir, "/scRNAseq_filtered_normalization_testing.pdf")
   pdf(pdfname, width=14, height = 8)
@@ -206,7 +207,7 @@ ms = as.Seurat(sce, counts = 'counts', data = NULL, assay = "RNA")
 
 nfeatures = 3000
 ms <- SCTransform(object = ms, variable.features.n=nfeatures) # new normalization from Seurat
-ms <- RunPCA(object = ms, verbose = FALSE)
+ms <- RunPCA(object = ms, features = VariableFeatures(ms), verbose = FALSE)
 #ElbowPlot(ms)
 
 nb.pcs = 20; n.neighbors = 30; min.dist = 0.25;
@@ -220,22 +221,16 @@ save(ms, file=paste0(RdataDir, version.DATA, '_QCleaned_sctransformNorm.Rdata'))
 # here we choose to use Seurat to regress out the cell cycle effect
 # we need to train the cells to identify the cell cycle phase
 # this could be more complicated than expected
+# !!! not used, because there is no clear cell cycle pattern when trying to correct the cell cycle
 ##########################################
-correct.cellCycle = FALSE
-
 if(correct.cellCycle){
-  source("scRNAseq_functions.R")
+  source.my.script("normalization_HVGs_cellCycle_batchCorrection_functions.R")
   # cellCycle.correction(sce, method = "seurat")
   #load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected.Rdata'))
-  #sce_old = sce
   load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2.Rdata'))
-
- 
 }else{
   save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2.Rdata'))
 }
-
-
 ########################################################
 ########################################################
 # Section : Batch Correction
