@@ -67,8 +67,8 @@ plotColData(sce,
 # here estimat the timing with timer genes
 ### first test 5 lineages from Hashimsholy et al. paper
 ##########################################
-reEstimate.timing.using.timer.genes = FALSE
-if(reEstimate.timing.using.timer.genes){
+reEstimate.timing.using.timer.genes.using.cpmNorm = FALSE
+if(reEstimate.timing.using.timer.genes.using.cpmNorm){
   Test.Hashimshony_lineages = FALSE
   
   if(Test.Hashimshony_lineages){
@@ -151,6 +151,7 @@ sce$timingEst.group = as.factor(cdata$timing.group)
 sce$timingEst.sd.group = as.factor(cdata$timing.sd.group)
 
 save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos_timingEstGroups.Rdata'))
+
 plotColData(sce,
             x = "FSC_log2",
             y = "BSC_log2",
@@ -184,39 +185,34 @@ library(scater)
 library(scran)
 options(stringsAsFactors = FALSE)
 
-Normalization.Testing = TRUE
-
 reducedDim(sce) <- NULL
 endog_genes <- !rowData(sce)$is_feature_control
 
+Normalization.Testing = FALSE
+source.my.script ("normalization_HVGs_functions.R")
 if(Normalization.Testing){
-  source.my.script ("normalization_functions.R")
-
   pdfname = paste0(resDir, "/scRNAseq_filtered_normalization_testing.pdf")
   pdf(pdfname, width=14, height = 8)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-
-  test.normalization(sce, Methods.Normalization = c("cpm", "DESeq2", "scran", "seurat", "sctransform"), using.HVGs = TRUE)
-
+  
+  #test.normalization(sce, Methods.Normalization = c("cpm", "DESeq2", "scran", "seurat", "sctransform"), using.HVGs = TRUE)
+  compare.scran.seurat.sctransform(sce, using.HVGs = TRUE)
   dev.off()
 }
 
-##########################################
-# select normalization method: scran
-##########################################
-set.seed(1000)
-clusters <- quickCluster(sce, min.size = 100, method="igraph")
-table(clusters)
+# select normalization method: sctransform or scran ()
+sce$library.size = apply(counts(sce), 2, sum)
+ms = as.Seurat(sce, counts = 'counts', data = NULL, assay = "RNA")
 
-sce <- computeSumFactors(sce, clusters = clusters)
+nfeatures = 3000
+ms <- SCTransform(object = ms, variable.features.n=nfeatures) # new normalization from Seurat
+ms <- RunPCA(object = ms, verbose = FALSE)
+#ElbowPlot(ms)
 
-## quick check for size factors calculated by scran
-summary(sizeFactors(sce))
-plot(sce$total_counts/1e6, sizeFactors(sce), log="xy",
-     xlab="Library size (millions)", ylab="Size factor", pch=16)
+nb.pcs = 20; n.neighbors = 30; min.dist = 0.25;
+ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+DimPlot(ms3, reduction = "umap", group.by = 'request') + ggtitle('sctransform')
 
-
-sce <- normalize(sce, exprs_values = "counts", return_log = TRUE)
 
 save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE.Rdata'))
 

@@ -13,7 +13,6 @@
 # to choose the good one
 ########################################################
 ########################################################
-
 # several common functions for normalizations 
 # from Hemberg lab
 # hemberg-lab.github.io/scRNA.seq.course/cleaning-the-expression-matrix.html#normalization-theory
@@ -257,7 +256,81 @@ test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "s
   }
 }
 
+compare.scran.seurat.sctransform = function(sce, using.HVGs = TRUE)
+{
+  sce.qc = sce
+  sce.qc$library.size = apply(counts(sce.qc), 2, sum)
+  set.seed(1234567)
+  
+  ms0 = as.Seurat(sce.qc, counts = 'counts', data = NULL, assay = "RNA")
+  ss = sce.qc$library.size
+  
+  nfeatures = 3000
+  n.neighbors = 30
+  min.dist = 0.25
+  nb.pcs = 20
+  ### seurat normalization (cpm actually) 
+  ms.logtransform <- NormalizeData(ms0, assay = "RNA", normalization.method = 'LogNormalize', scale.factor = mean(ss))
+  ms.logtransform <- FindVariableFeatures(ms.logtransform, selection.method = "vst", nfeatures = nfeatures)
+  
+  ms.logtransform <- ScaleData(ms.logtransform, features = rownames(ms.logtransform))
+  
+  ms.logtransform <- RunPCA(object = ms.logtransform, verbose = FALSE)
+  ElbowPlot(ms.logtransform)
+  
+  ms.logtransform <- RunUMAP(object = ms.logtransform, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+  p0 = DimPlot(ms.logtransform, reduction = "umap", group.by = 'request') + ggtitle("seurat")
+  
+  ### cpm normalized in scater
+  cpm = logNormCounts(sce.qc, size_factors = NULL, log = TRUE, pseudo_count=1, center_size_factors = FALSE)
+  plot(cpm$library.size/1e6, sizeFactors(cpm), log="xy", main = 'cpm', xlab="Library size (millions)", ylab="Size factor")
+  
+  ms1 = as.Seurat(cpm, counts = 'counts', data = 'logcounts', assay = "RNA")
+  ms1 = FindVariableFeatures(ms1, selection.method = 'vst', nfeatures = nfeatures)
+  ms1 = ScaleData(ms1, features = rownames(ms1))
+  ms1 = RunPCA(ms1, verbose = FALSE)
+  ms1 = RunUMAP(ms1, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+  p1 = DimPlot(ms1, reduction = "umap", group.by = 'request') + ggtitle('cpm')
+  
+  ### scran normalization
+  qclust <- quickCluster(sce.qc)
+  sce.norm <- computeSumFactors(sce.qc, clusters = qclust)
+  sce.norm <- logNormCounts(sce.norm, log = TRUE, pseudo_count = 1)
+  plot(sce.norm$library.size/1e6, sizeFactors(sce.norm), log="xy", xlab="Library size (millions)", ylab="Size factor")
+  ms2 = as.Seurat(sce.norm, counts = 'counts', data = 'logcounts', assay = "RNA")
+  ms2 = FindVariableFeatures(ms2, selection.method = 'vst', nfeatures = nfeatures)
+  ms2 = ScaleData(ms2, features = rownames(ms1))
+  ms2 = RunPCA(ms2, verbose = FALSE)
+  ms2 = RunUMAP(ms2, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+  p2 = DimPlot(ms2, reduction = "umap", group.by = 'request') + ggtitle('scran')
+  
+  
+  ms3 <- SCTransform(object = ms0, variable.features.n =nfeatures) # new normalization from Seurat
+  ms3 <- RunPCA(object = ms3, verbose = FALSE)
+  #ElbowPlot(ms)
+  ms3 <- RunUMAP(object = ms3, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+  p3 = DimPlot(ms3, reduction = "umap", group.by = 'request') + ggtitle('sctransform')
+  
+  plot_grid(p0, p1, p2, p3, nrow = 2)
+  
+}
 
+normalized.counts.using.scran.old = function(sce)
+{
+  set.seed(1000)
+  clusters <- quickCluster(sce, min.size = 100, method="igraph")
+  table(clusters)
+  
+  sce <- computeSumFactors(sce, clusters = clusters)
+  
+  ## quick check for size factors calculated by scran
+  summary(sizeFactors(sce))
+  plot(sce$total_counts/1e6, sizeFactors(sce), log="xy",
+       xlab="Library size (millions)", ylab="Size factor", pch=16)
+  
+  sce <- normalize(sce, exprs_values = "counts", return_log = TRUE)
+  
+}
 
 ########################################################
 ########################################################
