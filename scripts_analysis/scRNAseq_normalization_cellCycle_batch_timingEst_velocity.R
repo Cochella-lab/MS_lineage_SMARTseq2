@@ -7,7 +7,6 @@
 # Date of creation: Tue Nov 19 16:30:34 2019
 ##########################################################################
 ##########################################################################
-
 #Function for soursing functions
 source.my.script <- function(name.of.function){
   tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
