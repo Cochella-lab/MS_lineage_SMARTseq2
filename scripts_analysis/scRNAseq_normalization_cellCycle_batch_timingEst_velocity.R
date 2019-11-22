@@ -162,21 +162,10 @@ plotColData(sce,
 
 ########################################################
 ########################################################
-# Section : scRNA-seq data normalization
-# codes original from Hemberg's course
-# https://hemberg-lab.github.io/scRNA.seq.course/cleaning-the-expression-matrix.html#data-visualization
-# Among all normalization methods, DESeq2 and scran normalization will be used
-# consider seurat for UMI counts, but here we are just working on the read counts
-# Many normalization have been proposed
-# Here we test main two methods: TMM from edgeR or from DESeq2
-# and the one from scran
-# the PCA and some other plots were used to assess the normalization
-# After testing different normalization using technical replicates, cpm, DESeq2 and scran yield similar results and scran is slightly better
-# than DESeq2 which is better than cpm
-# !!! parameters of scran normalization required extra care; double check the size factor from scran vs library size
-# the current parameters for scran:
-# qclust <- quickCluster(sce.qc, min.size = 100, method = 'igraph')
-# sce.qc <- computeSumFactors(sce.qc, clusters = qclust)
+# Section : scRNA-seq data processing steps
+# 1) normalization 
+# 2) cell cycle correction (optional)
+# 3) batch correction
 ########################################################
 ########################################################
 library(Seurat)
@@ -217,10 +206,7 @@ DimPlot(ms3, reduction = "umap", group.by = 'request') + ggtitle('sctransform')
 save(ms, file=paste0(RdataDir, version.DATA, '_QCleaned_sctransformNorm.Rdata'))
 
 ##########################################
-# Remove the cell cycle confounder
-# here we choose to use Seurat to regress out the cell cycle effect
-# we need to train the cells to identify the cell cycle phase
-# this could be more complicated than expected
+# (Optional!!) correct the cell cycle confounder using Seurat
 # !!! not used, because there is no clear cell cycle pattern when trying to correct the cell cycle
 ##########################################
 if(correct.cellCycle){
@@ -231,19 +217,13 @@ if(correct.cellCycle){
 }else{
   save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2.Rdata'))
 }
-########################################################
-########################################################
-# Section : Batch Correction
-# Batch correction using fastMNN from scran
-# here we are using fastMNN
-########################################################
-########################################################
 
 ##########################################
-# Feature selection (select HGVs) for batch corrections
-# there are two options: batch-specific or use batch as block
-# https://www.bioconductor.org/packages/devel/workflows/vignettes/simpleSingleCell/inst/doc/batch.html
+# Batch correction using fastMNN from scran
+# here we are calling fastMNN from Seurat 
 ##########################################
+
+
 library(scRNA.seq.funcs)
 library(scater)
 library(SingleCellExperiment)
