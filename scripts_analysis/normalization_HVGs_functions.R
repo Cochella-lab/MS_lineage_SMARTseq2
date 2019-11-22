@@ -449,3 +449,455 @@ find.HVGs = function(sce, Norm.Vars.per.batch = TRUE, method = "scran", ntop = N
   
   return(gene.chosen)
 }
+
+########################################################
+########################################################
+# Section : funcitons for cell cycle scoring and correction
+# At the end, Seurat is used 
+########################################################
+########################################################
+find.cc.markers.homologues = function()
+{
+  detach("package:Seurat", unload=TRUE)
+  require(Seurat)
+  #s.genes = c("cdk-4", "evl-18") # from GO:1901987 http://amigo1.geneontology.org/cgi-bin/amigo/term-assoc.cgi?term=GO:1902808&speciesdb=all&taxid=6239
+  #g2m.genes = xx # GO:1902751
+  # A list of cell cycle markers, from Tirosh et al, 2015, is loaded with Seurat.  We can
+  # segregate this list into markers of G2/M phase and markers of S phase
+  homologues = read.delim("../../../../annotations/cellCycle_genes_worm/BioMart_worm_human_homologe.txt", sep = "\t",
+                          header = TRUE)
+  #homologues = homologues[which(homologues$Human.orthology.confidence..0.low..1.high.==1), ]
+  s.genes <- cc.genes$s.genes
+  g2m.genes <- cc.genes$g2m.genes
+  
+  s.genes = homologues$Gene.name[match(s.genes, homologues$Human.gene.name)]
+  g2m.genes = homologues$Gene.name[match(g2m.genes, homologues$Human.gene.name)]
+  s.genes = s.genes[which(!is.na(s.genes))]
+  g2m.genes = g2m.genes[which(!is.na(g2m.genes))]
+  
+  c3.genes = list(s.genes = s.genes, g2m.genes = g2m.genes)
+  return(c3.genes)
+}
+
+find.cc.markers.GO = function()
+{
+  s.genes = read.delim("../../../../annotations/cellCycle_genes_worm/GO-0006260_worm_dnasynthesis.txt", 
+                       sep = "\t", header = FALSE)
+  gm1 = read.delim("../../../../annotations/cellCycle_genes_worm/GO-0006260_worm_G2Mphase.txt", 
+                   sep = "\t", header = FALSE)
+  gm2 = read.delim("../../../../annotations/cellCycle_genes_worm/GO-0006260_worm_Mphase.txt", 
+                   sep = "\t", header = FALSE)
+  gm3 = read.delim("../../../../annotations/cellCycle_genes_worm/GO-0006260_worm_G2phase.txt", 
+                   sep = "\t", header = FALSE)
+  s.genes = unique(s.genes[, 3])
+  g2m.genes = c(unique(as.character(gm1[,3])), unique(as.character(gm2[, 3])), unique(as.character(gm3[, 3])))
+  
+  c3.genes = list(s.genes = s.genes, g2m.genes = g2m.genes)
+  return(c3.genes)
+}
+
+find.cellcycle.markers = function(list.sel = 'homologues')
+{
+  ##########################################
+  # different strategies to find cell cycle markers of c. elegans for Seurat
+  # 1st method): using homologue between human and c. elegans
+  # 2nd method): find a list of 
+  ##########################################
+  if(list.sel == 'homologues') c3.genes = find.cc.markers.homologues() 
+  if(list.sel == "curated") c3.genes = find.cc.markers.GO()
+  s.genes = c3.genes$s.genes
+  g2m.genes = c3.genes$g2m.genes
+  
+  # manually add genes from wormbook http://www.wormbook.org/chapters/www_cellcyclereguln/cellcyclereguln.html
+  #s.genes = c(as.character(s.genes), c("cye-1")
+  s.genes = unique(c(as.character(s.genes), c('cye-1', 'cya-1', 'evl-18')))
+  g2m.genes = unique(c(as.character(g2m.genes), c('cdk-1', 'mat-1', 'mat-2', 'mat-3', 'emb-27', 'emb-30', 'mdf-1', 'san-1')))
+  
+  c3.genes = list(s.genes = s.genes, g2m.genes = g2m.genes)
+  return(c3.genes)
+  
+  # test the code from https://github.com/hbc/macrae_ghazizadeh_zebrafish_heart_sc/blob/master/seurat_cluster/seurat_cluster_adapted_WT.Rmd
+  # unfornately it does not work, because several pacakges can not be properly installed
+  Test.query.cellCycle.markers = FALSE
+  if(Test.query.cellCycle.markers){
+    require(plotly)
+    require(remotes)
+    annot <- basejump::annotable("Danio rerio") %>% 
+      dplyr::select(c(ensgene,symbol)) %>% 
+      dplyr::mutate(symbol = toupper(symbol)) 
+    cell_cycle_markers <- bcbioSingleCell::cellCycleMarkers[[camel("mus musculus")]] %>% 
+      dplyr::mutate(symbol = toupper(symbol)) %>% dplyr::inner_join(annot,by = "symbol") %>% 
+      dplyr::select(-c(ensgene.x)) %>% dplyr::rename(ensgene = ensgene.y)
+    stopifnot(is.data.frame(cell_cycle_markers))
+    markdownHeader("S phase markers", level = 3)
+    s_genes <- cell_cycle_markers %>%
+      filter(phase == "S") %>%
+      pull("ensgene")
+    print(s_genes)
+    markdownHeader("G2/M phase markers", level = 3)
+    g2m_genes <- cell_cycle_markers %>%
+      filter(phase == "G2/M") %>%
+      pull("ensgene")
+    print(g2m_genes)
+    saveData(cell_cycle_markers, s_genes, g2m_genes, dir = data_dir)
+  }
+  
+}
+
+cellCycle.correction = function(sce, method = "seurat")
+{
+  if(method == "seurat"){
+    pdfname = paste0(resDir, "/scRNAseq_cellCycle_regression_Seurat.pdf")
+    pdf(pdfname, width=12, height = 6)
+    
+    library(scater)
+    library(scran)
+    # install loomR from GitHub using the remotes package remotes::install_github(repo = 'mojaveazure/loomR', ref = 'develop')
+    library(loomR)
+    library(Seurat)
+    # convert sce to seurat object (see https://satijalab.org/seurat/v3.0/conversion_vignette.html)
+    seurat = as.Seurat(sce, counts = "counts", data = "logcounts")
+    Idents(seurat) <- colnames(seurat) # quite important this assignment for cell identity
+    
+    detach("package:scater", unload=TRUE)
+    
+    seurat <- FindVariableFeatures(seurat, selection.method = "vst")
+    
+    # Identify the 10 most highly variable genes
+    top10 <- head(VariableFeatures(seurat), 25)
+    plot1 <- VariableFeaturePlot(seurat)
+    plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+    CombinePlots(plots = list(plot1, plot2))
+    
+    seurat <- ScaleData(seurat, features = rownames(seurat), model.use = "linear") # standardize the data (x - mean(x))/sd(x)
+    seurat <- RunPCA(seurat, features = VariableFeatures(seurat), ndims.print = 6:10, nfeatures.print = 10)
+    
+    #DimPlot(seurat, reduction = "pca")
+    # DimHeatmap(seurat, dims = c(1, 2))
+    
+    source("scRNAseq_functions.R")
+    c3.genes = find.cellcycle.markers(list.sel = "homologues")
+    
+    s.genes <- c3.genes$s.genes
+    g2m.genes <- c3.genes$g2m.genes 
+    s.genes = s.genes[which(!is.na(match(s.genes, rownames(seurat))))]
+    g2m.genes = g2m.genes[which(!is.na(match(g2m.genes, rownames(seurat))))]
+    
+    seurat <- CellCycleScoring(seurat, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+    
+    # view cell cycle scores and phase assignments
+    head(seurat[[]])
+    
+    p00 = RidgePlot(seurat, features = c("cdk-1", "cdk-4", "cyd-1", "cye-1", "cya-1", "wee-1.3"), ncol = 2)
+    plot(p00)
+    
+    seurat <- RunPCA(seurat, features = VariableFeatures(seurat))
+    DimPlot(seurat)
+    
+    seurat <- RunPCA(seurat, features = c(as.character(s.genes), as.character(g2m.genes)))
+    p0 = DimPlot(seurat, cells = colnames(seurat))
+    plot(p0)
+    # regress out the cell cycle
+    seurat1 <- ScaleData(seurat, vars.to.regress = c("S.Score", "G2M.Score"), features = rownames(seurat))
+    
+    seurat1 <- RunPCA(seurat1, features = VariableFeatures(seurat1), nfeatures.print = 10)
+    DimPlot(seurat1)
+    
+    # When running a PCA on only cell cycle genes, cells no longer separate by cell-cycle phase
+    seurat1 <- RunPCA(seurat1, features = c(s.genes, g2m.genes))
+    p1 = DimPlot(seurat1)
+    plot(p1)
+    # regressing out the difference between the G2M and S phase scores
+    seurat$CC.Difference <- seurat$S.Score - seurat$G2M.Score
+    seurat2 <- ScaleData(seurat, vars.to.regress = "CC.Difference", features = rownames(seurat))
+    
+    # cell cycle effects strongly mitigated in PCA
+    seurat2 <- RunPCA(seurat2, features = VariableFeatures(seurat2), nfeatures.print = 10)
+    DimPlot(seurat2)
+    
+    # when running a PCA on cell cycle genes, actively proliferating cells remain distinct from G1
+    # cells however, within actively proliferating cells, G2M and S phase cells group together
+    seurat2 <- RunPCA(seurat2, features = c(s.genes, g2m.genes))
+    p2 = DimPlot(seurat2)
+    plot(p2)
+    
+    # save cell cycle scoring and corrected matrix
+    library(scater)
+    sce$S.Score = seurat$S.Score
+    sce$G2M.Score = seurat$G2M.Score
+    sce$Phase = seurat$Phase
+    #sce$Phase.GO = seurat$old.ident
+    sce$CC.Difference = seurat$CC.Difference
+    
+    #xx = as.data.frame(seurat@assays$RNA@scale.data); rownames(xx) = rownames(sce)
+    #assay(sce, "logcounts_seurat") <- xx
+    xx = as.data.frame(seurat1@assays$RNA@scale.data); rownames(xx) = rownames(sce)
+    assay(sce, "logcounts_seurat_cellcycleCorrected") <- xx
+    xx = as.data.frame(seurat2@assays$RNA@scale.data); rownames(xx) = rownames(sce)
+    assay(sce, "logcounts_seurat_SG2MCorrected") <- xx
+    
+    save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2.Rdata'))
+    
+    dev.off()
+    
+    # return(sce)
+    
+    ##########################################
+    # a peek of source code for cellCycle.scoring function from Seurat
+    # https://github.com/ChristophH/in-lineage/blob/master/R/lib.R
+    ##########################################
+    Example.for.Seurat = FALSE
+    if(Example.for.Seurat){
+      library('Matrix')
+      library('parallel')
+      library('MASS')
+      library('diffusionMap')
+      library('FNN')
+      library('igraph')
+      library('princurve')
+      library('ggplot2')
+      library('inline')
+      library('gplots')
+      
+      # for cell cycle score
+      get.bg.lists <- function(goi, N, expr.bin) {
+        res <- list()
+        goi.bin.tab <- table(expr.bin[goi])
+        for (i in 1:N) {
+          res[[i]] <- unlist(lapply(names(goi.bin.tab), function(b) {
+            sel <- which(expr.bin == as.numeric(b) & !(names(expr.bin) %in% goi))
+            sample(names(expr.bin)[sel], goi.bin.tab[b])
+          }))
+        }
+        return(res)
+      }
+      
+      enr.score <- function(expr, goi, bg.lst) {
+        goi.mean <- apply(expr[goi, ], 2, mean)
+        bg.mean <- sapply(1:length(bg.lst), function(i) apply(expr[bg.lst[[i]], ], 2, mean))
+        return((goi.mean - apply(bg.mean, 1, mean)) / apply(bg.mean, 1, sd))
+      }
+      
+      get.cc.score <- function(cm, N=100, seed=42, 
+                               s.gene.file='./annotation/s_genes.txt',
+                               g2m.gene.file='./annotation/g2m_genes.txt')
+      {
+        set.seed(seed)
+        cat('get.cc.score, ')
+        cat('number of random background gene sets set to', N, '\n')
+        
+        min.cells <- 5
+        
+        cells.mols <- apply(cm, 2, sum)
+        gene.cells <- apply(cm>0, 1, sum)
+        cm <- cm[gene.cells >= min.cells, ]
+        
+        gene.mean <- apply(cm, 1, mean)
+        
+        breaks <- unique(quantile(log10(gene.mean), probs = seq(0,1, length.out = 50)))
+        gene.bin <- cut(log10(gene.mean), breaks = breaks, labels = FALSE)
+        names(gene.bin) <- rownames(cm)
+        gene.bin[is.na(gene.bin)] <- 0
+        
+        regev.s.genes <- read.table(file=s.gene.file, header=FALSE, stringsAsFactors=FALSE)$V1
+        regev.g2m.genes <- read.table(file=g2m.gene.file, header=FALSE, stringsAsFactors=FALSE)$V1
+        
+        goi.lst <- list('S'=rownames(cm)[!is.na(match(toupper(rownames(cm)), regev.s.genes))],
+                        'G2M'=rownames(cm)[!is.na(match(toupper(rownames(cm)), regev.g2m.genes))])
+        
+        n <- min(40, min(sapply(goi.lst, length)))
+        goi.lst <- lapply(goi.lst, function(x) x[order(gene.mean[x], decreasing = TRUE)[1:n]])
+        
+        bg.lst <- list('S'=get.bg.lists(goi.lst[['S']], N, gene.bin),
+                       'G2M'=get.bg.lists(goi.lst[['G2M']], N, gene.bin))
+        
+        all.genes <- sort(unique(c(unlist(goi.lst, use.names=FALSE), unlist(bg.lst, use.names=FALSE))))
+        
+        expr <- log10(cm[all.genes, ]+1)
+        
+        s.score <- enr.score(expr, goi.lst[['S']], bg.lst[['S']])
+        g2m.score <- enr.score(expr, goi.lst[['G2M']], bg.lst[['G2M']])
+        
+        phase <- as.numeric(g2m.score > 2 & s.score <= 2)
+        phase[g2m.score <= 2 & s.score > 2] <- -1
+        
+        return(data.frame(score=s.score-g2m.score, s.score, g2m.score, phase))
+      }
+    }
+    
+  }
+  ##########################################
+  # scran method is based on trained classifier for mouse or human
+  # so at the end it not usable
+  ##########################################
+  if(method == 'scran'){
+    set.seed(100)
+    library(scran)
+    mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", 
+                                    package="scran"))
+    assignments <- cyclone(sce, mm.pairs, gene.names=rowData(sce)$ENSEMBL)
+    plot(assignments$score$G1, assignments$score$G2M, 
+         xlab="G1 score", ylab="G2/M score", pch=16)
+    sce$phases <- assignments$phases
+    table(sce$phases)
+  }
+  
+  if(method == "scLVM"){
+    ##########################################
+    # select the python verson to use for Rstudio
+    # https://cran.r-project.org/web/packages/reticulate/vignettes/versions.html
+    # still does not work at the end
+    # we change the strategy: prepare the tables and run scLVM in the conda version
+    ##########################################
+    # system("python --version")
+    # system("which python")
+    # 
+    # library(reticulate)
+    # use_python("/Users/jiwang/anaconda3/envs/scLVM/bin/python")
+    # #use_condaenv(condaenv = "scLVM", conda = "/Users/jiwang/anaconda3/condabin/conda", required = TRUE)
+    # py_config()
+    # 
+    # system("python --version")
+    # system("which python")
+    # 
+    # Sys.setenv(PATH = paste("/Users/jiwang/anaconda3/envs/scLVM/bin", Sys.getenv("PATH"),sep=":"))
+    
+    #install.packages("rPython", type = "source")
+    #install.packages("/Users/jiwang/src_packages/scLVM_0.99.3.tar.gz", repos = NULL, type="source")
+    
+    ##########################################
+    # example code from scLVM R tutorial
+    # https://github.com/PMBio/scLVM/blob/master/R/tutorials/scLVM_vignette.Rmd
+    ##########################################
+    library(rPython)
+    library(genefilter)
+    library(statmod)
+    require(ggplot2)
+    library(gplots)
+    require(DESeq2)
+    library(scLVM)
+    
+    #limix_path = '/Users/jiwang/anaconda2/envs/scLVM/bin/python'
+    #configLimix(limix_path)
+    
+    data(data_Tcells)
+    help(data_Tcells)
+    
+    #dataMouse[ 1:5, 1:4 ]
+    geneTypes <- factor( c( ENSM="ENSM", ERCC="ERCC" )[
+      substr( rownames(dataMouse), 1, 4 ) ] )
+    #2. calculate normalisation for counts
+    countsMmus <- dataMouse[ which( geneTypes=="ENSM" ), ]
+    countsERCC <- dataMouse[ which( geneTypes=="ERCC" ), ]
+    lengthsMmus <- dataMouse[ which( geneTypes=="ENSM" ), 1 ]
+    lengthsERCC <- dataMouse[ which( geneTypes=="ERCC" ), 1 ]
+    sfERCC <- estimateSizeFactorsForMatrix( countsERCC )
+    sfMmus <- sfERCC #also use ERCC size factor for endogenous genes
+    #normalise read counts
+    nCountsERCC <- t( t(countsERCC) / sfERCC )
+    nCountsMmus <- t( t(countsMmus) / sfERCC )
+    
+    countsMmus = counts(sce)
+    sfERCC = estimateSizeFactorsForMatrix(countsMmus)
+    sfMmus <- sfERCC
+    nCountsMmus = t( t(countsMmus) / sfERCC )
+    #use spike in to find tehcnical noise. 
+    # If no spike-ins are available, we can also use the endogenous read counts for fitting the mean-CV2 relation using a log-linear fit in the log-space.
+    # Alternatively, we can fit the mean-variance relationship in the log-space using local 2nd order polynomial regression (loess).
+    #techNoise = fitTechnicalNoise(nCountsMmus,nCountsERCC=nCountsERCC, fit_type = 'counts')  
+    techNoiseLogFit = fitTechnicalNoise(nCountsMmus, fit_type = 'log', use_ERCC = FALSE, plot=TRUE) 
+    #techNoiseLogVarFit = fitTechnicalNoise(nCountsMmus, fit_type = 'logvar', use_ERCC = FALSE, plot=TRUE) 
+    
+    #call variable genes
+    #is_het = getVariableGenes(nCountsMmus, techNoiseLogFit$fit, method = "fit", 
+    #                          threshold = 0.1, fit_type="log",sfEndo=sfMmus, sfERCC=sfERCC)
+    #table(is_het)
+    
+    #we an also do this for the other fits
+    is_hetLog = getVariableGenes(nCountsMmus, techNoiseLogFit$fit, plot=TRUE)
+    table(is_hetLog)
+    #is_hetLogVar = getVariableGenes(nCountsMmus, techNoiseLogVarFit$fit, plot=TRUE)
+    #table(is_hetLogVar)
+    
+    #get cell cycle genes from GO
+    cc.genes = read.delim("../../../../annotations/cellCycle_genes_worm/GO_0007049_genes.txt", 
+                          sep = "\t", header = FALSE)
+    cc.genes = unique(cc.genes[,3])
+    
+    #rename a few variables
+    Y = t(log10(nCountsMmus+1)) #normalised trandformed read counts
+    genes_het_bool = as.vector(is_hetLog) #variable genes
+    #genes_het_bool[]
+    geneID = rownames(nCountsMmus) #gene IDs
+    tech_noise = as.vector(techNoiseLogFit$techNoiseLog) #technical noise
+    ens_ids_cc <- cc.genes
+    
+    index.cc = match(cc.genes, geneID)
+    index.cc = index.cc[which(!is.na(index.cc))]
+    ##########################################
+    # can not proceed anymore and save tables for python in conda
+    ##########################################
+    #construct and initialize new scLVM object
+    sclvm = new("scLVM")
+    sclvm = init(sclvm,Y=Y,tech_noise = tech_noise)
+    
+    # CellCycleARD = fitFactor(sclvm,geneSet = ens_ids_cc, k=20,use_ard = TRUE)
+    
+    write.table(Y, file = paste0(tabDir, "gene_expression_matrx_4scLVM.txt"), sep = "\t", row.names = FALSE, col.names = FALSE)
+    write.table(tech_noise, file = paste0(tabDir, "tech_noise_4scLVM.txt"), sep = "\t",row.names = FALSE, col.names = TRUE, quote = FALSE )
+    write.table(geneID, file =paste0(tabDir, "geneNames_4scLVM.txt"), sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE )
+    write.table(which(genes_het_bool==TRUE), file =paste0(tabDir, "index_hetgenes_4scLVM.txt"), sep = "\t", 
+                row.names = FALSE, col.names = TRUE, quote = FALSE)
+    write.table(index.cc, file =paste0(tabDir, "index_ccgenes_4scLVM.txt"), sep = "\t", 
+                row.names = FALSE, col.names = FALSE, quote = FALSE)
+  }
+  
+  if(method == "ccRemover"){
+    # see examplel from https://cran.r-project.org/web/packages/ccRemover/vignettes/ccRemover_tutorial.html
+    # this method is pretty slow and probably risky (to test), because simply PCA was done and 
+    # then compare cell cycle genes were compares with control genes and significantly different PCs were removed
+    require(ccRemover)
+    t.cell_data = logcounts(sce)
+    head(t.cell_data[,1:5])
+    
+    summary(apply(t.cell_data,1, mean))
+    mean_gene_exp <- rowMeans(t.cell_data)
+    t_cell_data_cen <- t.cell_data - mean_gene_exp
+    summary(apply(t_cell_data_cen,1,mean))
+    
+    gene_names <- rownames(t_cell_data_cen)
+    # cell_cycle_gene_indices <- gene_indexer(gene_names, species = "mouse", 
+    #                                         name_type = "symbols" )
+    # length(cell_cycle_gene_indices)
+    # if_cc <- rep(FALSE,nrow(t_cell_data_cen)) 
+    # if_cc[cell_cycle_gene_indices] <- TRUE
+    # summary(if_cc)
+    
+    cc.genes = read.delim("../../../../annotations/cellCycle_genes_worm/GO_0007049_genes.txt", header = FALSE)
+    cc.genes = unique(cc.genes$V3)
+    cc.index = match(cc.genes, gene_names)
+    cc.index = cc.index[which(!is.na(cc.index))]
+    
+    if_cc <- rep(FALSE,nrow(t_cell_data_cen))
+    if_cc[cc.index] <- TRUE
+    summary(if_cc)
+    
+    dat <- list(x=t_cell_data_cen, if_cc=if_cc)
+    xhat <- ccRemover(dat, bar=TRUE, max_it = 6, nboot = 100)
+    
+    xhat <- xhat + mean_gene_exp
+    
+    pca1 = prcomp(t(t.cell_data[if_cc,]), scale. = TRUE)
+    pca2 = prcomp(t(xhat[if_cc,]), scale. = TRUE)
+    par(mfrow = c(1, 2))
+    plot(pca1$x[, c(2:3)])
+    plot(pca2$x[, c(1:2)])
+    
+  }
+  
+}
+
+
+
+
+
