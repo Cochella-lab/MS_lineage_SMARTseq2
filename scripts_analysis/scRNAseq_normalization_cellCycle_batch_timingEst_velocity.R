@@ -8,6 +8,16 @@
 ##########################################################################
 ##########################################################################
 
+#Function for soursing functions
+source.my.script <- function(name.of.function){
+  tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
+           error = function(e){ 
+             install.packages("rstudioapi")
+             path <-  rstudioapi::getSourceEditorContext()$path})
+  source.path <- sub(basename(path), "", path)
+  source(paste0(source.path,name.of.function))
+}
+
 ## set up the paths for the data and results
 tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
          error = function(e){ 
@@ -16,7 +26,7 @@ tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
 source.path <- sub(basename(path), "", path)
 
 
-user <- "results_jiwang/"
+user <- "results_aleks/"
 setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user)) 
 version.DATA = 'all_batches'
 version.analysis =  paste0(version.DATA, '_20191115')
@@ -65,7 +75,7 @@ endog_genes <- !rowData(sce)$is_feature_control
 #sce$library.size = sumCountsAcrossCells(sce)
 
 if(Normalization.Testing){
-  source(paste0(source.path, "normalization_functions.R"))
+  source.my.script ("normalization_functions.R")
   
   pdfname = paste0(resDir, "/scRNAseq_filtered_normalization_testing.pdf")
   pdf(pdfname, width=14, height = 8)
@@ -180,6 +190,7 @@ sce = sce[, which(sce$nb.cells == 1)]
 
 sce$FSC_log2 = 3/2*log2(sce$FSC)
 sce$BSC_log2 = 3/2*log2(sce$BSC)
+sce$GFP_log2 = 3/2*log2(sce$GFP)
 
 plotColData(sce,
             x = "FSC_log2",
@@ -321,8 +332,8 @@ k.mnn = 20
 cos.norm = TRUE
 nb.pcs = 50
 
-batch.sequence.to.merge = c('R7130', 'R8612', 'R8526', 'R7926', # 3 plates for each request
-                            'R6875','R7116','R8613','R8348') # 1 plate for each request
+batch.sequence.to.merge = c('R7130', 'R8729', 'R8612', 'R8526', 'R7926', # 3 plates for each request
+                            'R6875','R8613','R8348') # 1 plate for each request
 
 order2correct = match(batch.sequence.to.merge, bc.uniq) 
   #c(12, 13, # the same 
@@ -332,8 +343,8 @@ order2correct = match(batch.sequence.to.merge, bc.uniq)
 
 ## double chekc  the mering order in the batch correction
 source('customizedClustering_functions.R')
-kk = match(sce$request, c('R7130', 'R7926', 'R8526', 'R8612'))
-kk = match(sce$request, c('R7130', 'R6875', 'R7116', 'R8348'))
+kk = match(sce$request, c('R7130', 'R8729', 'R8612', 'R8526', 'R7926'))
+kk = match(sce$request, c('R6875','R8613','R8348'))
 plotColData(sce[,which(!is.na(kk))],
             x = "FSC_log2",
             y = "BSC_log2",

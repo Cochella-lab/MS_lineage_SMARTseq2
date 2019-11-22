@@ -8,15 +8,27 @@
 ## Date of creation: Mon Feb 19 14:43:38 2018
 ##################################################
 ##################################################
+
+#Function for soursing functions
+source.my.script <- function(name.of.function){
+  tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
+           error = function(e){ 
+             install.packages("rstudioapi")
+             path <-  rstudioapi::getSourceEditorContext()$path})
+  source.path <- sub(basename(path), "", path)
+  source(paste0(source.path,name.of.function))
+}
+
+
 #Setup the enviroment
 #Determine the script location and user
 tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
          error = function(e){ 
            install.packages("rstudioapi")
            path <-  rstudioapi::getSourceEditorContext()$path})
-source.path <- sub(basename(path), "", path)
 
-source(paste0(source.path,"scRNAseq_functions.R"))
+
+source.my.script("scRNAseq_functions.R")
 
 user <- "results_aleks"
 setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user)) 
