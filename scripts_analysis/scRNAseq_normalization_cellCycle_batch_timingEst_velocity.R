@@ -213,9 +213,7 @@ nb.pcs = 20; n.neighbors = 30; min.dist = 0.25;
 ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
 DimPlot(ms3, reduction = "umap", group.by = 'request') + ggtitle('sctransform')
 
-
-save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE.Rdata'))
-
+save(ms, file=paste0(RdataDir, version.DATA, '_QCleaned_sctransformNorm.Rdata'))
 
 ##########################################
 # Remove the cell cycle confounder
@@ -224,12 +222,6 @@ save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normal
 # this could be more complicated than expected
 ##########################################
 correct.cellCycle = FALSE
-Import.processed.data.from.Aleks = TRUE
-if(Import.processed.data.from.Aleks){
-  load(file=paste0(RdataDirfromAleks, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE.Rdata'))
-}else{
-  load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE.Rdata'))
-}
 
 if(correct.cellCycle){
   source("scRNAseq_functions.R")
@@ -238,61 +230,9 @@ if(correct.cellCycle){
   #sce_old = sce
   load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2.Rdata'))
 
-  library(scater)
-  p1 = scater::plotPCA(
-    sce,
-    run_args = list(exprs_values = "logcounts", feature_set = c(1:500)),
-    size_by = "total_counts",
-    #size_by = "total_features_by_counts",
-    colour_by = "seqInfos"
-  ) + ggtitle(paste0("PCA -- "))
-
-  p2 = scater::plotPCA(
-    sce,
-    run_args = list(exprs_values = "logcounts_seurat", feature_set = c(1:500)),
-    size_by = "total_counts",
-    #size_by = "total_features_by_counts",
-    colour_by = "seqInfos"
-  ) + ggtitle(paste0("PCA -- "))
-
-  multiplot(p1, p2, cols = 2)
+ 
 }else{
   save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2.Rdata'))
-}
-
-##########################################
-##########################################
-# Prepare the data for batch correction (fastMNN from scran used here) and clustering
-# Feature selection (HVGs) is performed
-# here we just use the scran trandVar()
-# further test to follow for other methods
-# (https://academic.oup.com/bib/advance-article/doi/10.1093/bib/bby011/4898116)
-# But many of them, e.g. BASics, Brennecke works better with spike-in
-##########################################
-##########################################
-
-#load(file = file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos.Rdata'))
-facsInfo.Added = TRUE
-
-##########################################
-# 1) add the facs information in the metadata
-# 2) estimate timing for celes using timer genes
-# 3) have better time estimation by combing both information
-##########################################
-if(Import.processed.data.from.Aleks){
-  load(file = paste0(RdataDirfromAleks, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrectedv2_facsInfos.Rdata'))
-  save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrectedv2_facsInfos.Rdata'))
-}else{
-  if(facsInfo.Added){
-    load(file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos.Rdata'))
-  }else{
-    load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2.Rdata'))
-
-    source("scRNAseq_functions.R")
-    sce = Integrate.FACS.Information(sce)
-
-    save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrectedv2_facsInfos.Rdata'))
-  }
 }
 
 
