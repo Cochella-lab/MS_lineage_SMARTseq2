@@ -7,7 +7,6 @@
 # Date of creation: Tue Nov 19 16:30:34 2019
 ##########################################################################
 ##########################################################################
-
 ## set up the paths for the data and results
 tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
          error = function(e){ 
@@ -30,8 +29,28 @@ if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
-## import the R object from the previous step
+########################################################
+########################################################
+# Section : timingEst with cpm normalization and add it to the metadata
+# 
+########################################################
+########################################################
+## import the R object from the previous step and double check the cells and genes from table 
 load(file=paste0("../data/R_processed_data/", version.DATA, '_QCed_cells_genes_filtered_SCE.Rdata'))
+
+plotColData(sce,
+            x = "log10_total_counts",
+            y = "log10_total_features_by_counts",
+            #colour_by = "percent_mapped",
+            colour_by = "seqInfos",
+            size_by = "pct_counts_Mt"
+) + scale_x_continuous(limits=c(4, 7)) +
+  scale_y_continuous(limits = c(2.5, 4.1)) +
+  geom_hline(yintercept=log10(c(500, 1000, 5000)) , linetype="dashed", color = "darkgray", size=0.5) +
+  geom_vline(xintercept = c(4:6), linetype="dotted", color = "black", size=0.5)
+
+
+
 ########################################################
 ########################################################
 # Section : scRNA-seq data normalization 
@@ -62,11 +81,8 @@ Normalization.Testing = TRUE
 reducedDim(sce) <- NULL
 endog_genes <- !rowData(sce)$is_feature_control
 
-#sce$library.size = sumCountsAcrossCells(sce)
-
 if(Normalization.Testing){
   source(paste0(source.path, "normalization_functions.R"))
-  
   pdfname = paste0(resDir, "/scRNAseq_filtered_normalization_testing.pdf")
   pdf(pdfname, width=14, height = 8)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)

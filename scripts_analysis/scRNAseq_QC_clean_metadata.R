@@ -220,13 +220,6 @@ plotColData(sce,
 save(sce, file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged_facsInfos.Rdata')) 
 
 
-
-
-
-
-
-
-
 ##########################################
 # Import SingleCellExperiment and scater packages for the QC and table cleaning
 # several steps will be proceded:
