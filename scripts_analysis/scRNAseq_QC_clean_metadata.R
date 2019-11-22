@@ -2,24 +2,36 @@
 ##################################################
 ## Project: transcriptional priming mechanism by tbx in C.elegans
 ## Script purpose: analysis the single-cell RNA-seq data
-## Usage example: 
+## Usage example:
 ## Author: Jingkui Wang (jingkui.wang@imp.ac.at)
-## 
+##
 ## Date of creation: Mon Feb 19 14:43:38 2018
 ##################################################
 ##################################################
 
+#Function for soursing functions
+source.my.script <- function(name.of.function){
+  tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
+           error = function(e){
+             install.packages("rstudioapi")
+             path <-  rstudioapi::getSourceEditorContext()$path})
+  source.path <- sub(basename(path), "", path)
+  source(paste0(source.path,name.of.function))
+}
 
+
+#Setup the enviroment
 #Determine the script location and user
-tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
-         error = function(e){ 
+tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
+         error = function(e){
            install.packages("rstudioapi")
            path <-  rstudioapi::getSourceEditorContext()$path})
-source.path <- sub(basename(path), "", path)
 
 
-user <- "git_aleks/"
-setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user)) 
+source.my.script("scRNAseq_functions.R")
+
+user <- "results_aleks"
+setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user))
 version.DATA = 'all_batches'
 version.analysis =  paste0(version.DATA, '_20191115')
 
@@ -41,8 +53,8 @@ Aggregate.nf.QCs.plots.in.designMatrix = TRUE
 
 ##################################################
 ##################################################
-## Section: Import data first 
-## and then add metadata from the design matrix 
+## Section: Import data first
+## and then add metadata from the design matrix
 ## and then the quality controls from nf-RNAseq
 ##################################################
 ##################################################
@@ -55,7 +67,7 @@ for(n in 1:length(xlist)){
   # n = 1
   cat(n, '\t')
   cat(xlist[n], '\n')
-  
+
   if(n==1){
     aa = data.frame(fread(xlist[n], header=TRUE, sep="\t", stringsAsFactors=FALSE), stringsAsFactors = FALSE)
   }else{
@@ -71,49 +83,49 @@ if(length(grep("out_gene.featureCounts.txt", colnames(aa)))>0) {
 }
 
 ##########################################
-# manually make design matrix 
+# manually make design matrix
 ##########################################
 if(Manually.Specify.sampleInfos.filtering.4scRNAseq){
   library(stringi)
   library("openxlsx")
-  
+
   design = data.frame(samples = colnames(aa)[-1], stringsAsFactors = FALSE)
   design = data.frame(sapply(design, function(x) gsub('[.]', '_', x)), stringsAsFactors = FALSE)
-  
+
   design$flowcell.lane = sapply(design$samples, function(x) paste0(unlist(strsplit(as.character(x), "_"))[c(1:2)], collapse = "_"))
   design$sampleIDs = sapply(design$samples, function(x) unlist(strsplit(as.character(x), "_"))[3])
   #design$sampleIDs = gsub('_\\w+$', '', design$sampleIDs)
   design$barcodes = sapply(design$samples, function(x) unlist(strsplit(as.character(x), "_"))[4])
-  
+
   ##########################################
-  # here manually 
+  # here manually
   ##########################################
   design$request = NA;
-  design$request[which(design$flowcell.lane == "CCVTBANXX_8")] = "R6875"  # 
+  design$request[which(design$flowcell.lane == "CCVTBANXX_8")] = "R6875"  #
   #design$request[which(design$flowcell.lane == "CCVBPANXX_1")] = "R7116"  # Robot test batch. Excluded from the analysis
   design$request[which(design$flowcell.lane == "HHG5KBGX9_1")] = "R7130"  #
   design$request[which(design$flowcell.lane == "HHGHNBGX9_1")] = "R7130"  #
-  
+
   design$request[which(design$flowcell.lane == "HLWTCBGX9_1")] = "R7130"  #
   design$request[which(design$flowcell.lane == "CCYTEANXX_4")] = "R7130"  #
   design$request[which(design$flowcell.lane == "CD2GTANXX_5")] = "R7133"  #
   design$request[which(design$flowcell.lane == "H7KNYBGXB_1")] = "R7926"  #
-  
+
   design$request[which(design$flowcell.lane == "CDR6UANXX_1")] = "R8348"  #
-  
+
   design$request[which(design$flowcell.lane == "HF3H5BGXC_1")] = "R8526"  #
   design$request[which(design$flowcell.lane == "HF3MMBGXC_1")] = "R8526"  #
   design$request[which(design$flowcell.lane == "HFLTLBGXC_1")] = "R8526"  #
-  
+
   design$request[which(design$flowcell.lane == "HHKY5BGXC_1")] = "R8612"  #
   design$request[which(design$flowcell.lane == "HHLYLBGXC_1")] = "R8612"  #
   design$request[which(design$flowcell.lane == "HFLTMBGXC_1")] = "R8612"  #
   design$request[which(design$flowcell.lane == "CE0N9ANXX_8")] = "R8613"  #
-  
+
   design$request[which(design$flowcell.lane == "HHNNMBGXC_1")] = "R8729"  #
   design$request[which(design$flowcell.lane == "HHTJNBGXC_1")] = "R8729"  #
   design$request[which(design$flowcell.lane == "HHNMMBGXC_1")] = "R8729"  #
-  
+
   design$seqInfos = paste0(design$request, "_", design$flowcell.lane)
   #jj = grep("CCVTBANXX_8.76090_", colnames(aa))
   #aa = aa[, c(1, jj)]
@@ -121,16 +133,14 @@ if(Manually.Specify.sampleInfos.filtering.4scRNAseq){
   kk = which(!is.na(design$request))
   design = design[kk, ]
   aa = aa[, c(1, kk+1)]
-  
+
 }
 
 ##########################################
-# aggregated quality controls from nf-RNAseq 
+# aggregated quality controls from nf-RNAseq
 ##########################################
 if(Aggregate.nf.QCs.plots.in.designMatrix){
-  #load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_RNA_seq.Rdata'))
-  
-  source(paste0(source.path,"scRNAseq_functions.R"))
+  # load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_RNA_seq.Rdata'))
   dirs.all = c("../data/raw_ngs_data/S76090_R6875/results_v2/multiqc_data/",
                "../data/raw_ngs_data/S80193_R7130_rep/results_v2/multiqc_data/",
                "../data/raw_ngs_data/S80194_R7130_R7133_rep/results_v2/multiqc_data/",
@@ -147,12 +157,12 @@ if(Aggregate.nf.QCs.plots.in.designMatrix){
                "../data/raw_ngs_data/S102698_R8729/results_v2/multiqc_data/")
   QCs.nf = aggrate.nf.QCs(dirs.all)
   QCs.nf$Sample = gsub("#", "_", QCs.nf$Sample)
-  
+
   mm = match(design$samples, QCs.nf$Sample)
   xx = data.frame(design, QCs.nf[mm, ], stringsAsFactors = FALSE)
-  
+
   design = xx;
-   
+
 }
 
 save(aa, design, file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_sampleInfos_QCs_nf_RNA_seq.Rdata'))
@@ -181,17 +191,17 @@ library(scater)
 options(stringsAsFactors = FALSE)
 
 #load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged.Rdata'))
-sce <- SingleCellExperiment(assays = list(counts = counts), 
-                            colData = as.data.frame(design), 
+sce <- SingleCellExperiment(assays = list(counts = counts),
+                            colData = as.data.frame(design),
                             rowData = data.frame(gene_names = rownames(counts), feature_symbol = rownames(counts)))
 
 
 
 ### Adding FACS data ####
 ##########################################
-#load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged.Rdata')) 
+#load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged.Rdata'))
 
-sce = Integrate.FACS.Information(sce) 
+sce = Integrate.FACS.Information(sce)
 #several cells are lost (NA in FACS info) have no idea why:
 colData(sce)[(which(is.na(sce$FSC))),]
 
@@ -199,7 +209,7 @@ colData(sce)[(which(is.na(sce$FSC))),]
 table(sce$nb.cells)
 sce = sce[, which(sce$nb.cells == 1)]
 
-sce$FSC_log2 = 3/2*log2(sce$FSC) 
+sce$FSC_log2 = 3/2*log2(sce$FSC)
 sce$BSC_log2 = 3/2*log2(sce$BSC)
 sce$GFP_log2 = 3/2*log2(sce$GFP)
 
@@ -217,14 +227,14 @@ plotColData(sce,
             point_size = 2
 )
 
-save(sce, file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged_facsInfos.Rdata')) 
+save(sce, file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged_facsInfos.Rdata'))
 
 
 ##########################################
 # Import SingleCellExperiment and scater packages for the QC and table cleaning
 # several steps will be proceded:
 # 1) general overview of data quality: sequencing depth, mapping rate, assignment rate, rRAN codamination for each sequencing lane
-# 2) clean the cells 
+# 2) clean the cells
 # 3) clean genes
 ##########################################
 #write.csv(counts(sce), file=paste0(tabDir, "scRNAseq_raw_readCounts", version.analysis, ".csv"), row.names=TRUE)
@@ -242,7 +252,7 @@ sce <- calculateQCMetrics(sce, feature_controls=list(Mt=is.mito, Ribo=is.ribo))
 head(colnames(colData(sce)), 20)
 
 ####################
-## filter cells with low quality 
+## filter cells with low quality
 ####################
 pdfname = paste0(resDir, "/scRNAseq_QCs_cells_filterting.pdf")
 pdf(pdfname, width=12, height = 6)
@@ -270,7 +280,7 @@ plotColData(sce,
 dev.off()
 
 ##########################################
-## filter cells with low quality 
+## filter cells with low quality
 # here we are using the 50,000 for library size and 100 expressed genes as thresholds
 ##########################################
 threshod.total.counts.per.cell = 10^5
@@ -301,15 +311,15 @@ table(sce$use)
 if(Manual.vs.outlier.filtering){
   sce <- plotPCA(
     sce,
-    size_by = "total_features_by_counts", 
+    size_by = "total_features_by_counts",
     #shape_by = "",
     by_exprs_values = "logcounts",
     shape_by = "use",
     return_SCE = FALSE
   )
-  
+
   table(sce$outlier)
-  
+
   auto <- colnames(sce)[sce$outlier]
   man <- colnames(sce)[!sce$use]
   venn.diag <- vennCounts(
@@ -343,11 +353,11 @@ plotHighestExprs(sce, n=50) + fontsize
 #plotHighestExprs(sce, n=30) + fontsize
 
 ave.counts <- calcAverage(sce)
-hist(log10(ave.counts), breaks=100, main="", col="grey80", 
+hist(log10(ave.counts), breaks=100, main="", col="grey80",
      xlab=expression(Log[10]~"average count"))
 
 num.cells <- nexprs(sce, byrow=TRUE)
-smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells", 
+smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
               xlab=expression(Log[10]~"average count"))
 dev.off()
 
