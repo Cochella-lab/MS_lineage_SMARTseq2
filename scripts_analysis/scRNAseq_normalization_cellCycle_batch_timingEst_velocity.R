@@ -25,14 +25,16 @@ tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
 source.path <- sub(basename(path), "", path)
 
 
-user <- "results_aleks/"
+user <- "results_jiwang/"
 setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user))
+
+
 version.DATA = 'all_batches'
 version.analysis =  paste0(version.DATA, '_20191115')
-
 dataDir = paste0("../data/gene_counts/")
 resDir = paste0("results/", version.analysis)
 tabDir = paste0("results/", version.analysis, "/tables/")
+
 RdataDir = paste0("results/", version.analysis, "/Rdata/")
 if(!dir.exists("results/")){dir.create("results/")}
 if(!dir.exists(resDir)){dir.create(resDir)}
@@ -47,18 +49,114 @@ if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 ########################################################
 ## import the R object from the previous step and double check the cells and genes from table
 load(file=paste0("../data/R_processed_data/", version.DATA, '_QCed_cells_genes_filtered_SCE.Rdata'))
+library(scater)
 
 plotColData(sce,
             x = "log10_total_counts",
             y = "log10_total_features_by_counts",
             #colour_by = "percent_mapped",
-            colour_by = "seqInfos",
+            colour_by = "request",
             size_by = "pct_counts_Mt"
 ) + scale_x_continuous(limits=c(4, 7)) +
   scale_y_continuous(limits = c(2.5, 4.1)) +
   geom_hline(yintercept=log10(c(500, 1000, 5000)) , linetype="dashed", color = "darkgray", size=0.5) +
   geom_vline(xintercept = c(4:6), linetype="dotted", color = "black", size=0.5)
 
+
+##########################################
+# here estimat the timing with timer genes
+### first test 5 lineages from Hashimsholy et al. paper
+##########################################
+reEstimate.timing.using.timer.genes = FALSE
+if(reEstimate.timing.using.timer.genes){
+  Test.Hashimshony_lineages = FALSE
+  
+  if(Test.Hashimshony_lineages){
+    pdfname = paste0("../results/clustering_combining_variousInfos/test_timing_estimation_Hashimshony_lineages_test_with_improvedTimerGenes_v2.pdf")
+    pdf(pdfname, width=10, height = 6)
+    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    source('customizedClustering_functions.R')
+    Test.timingEstimate.with.HashimshonyLineages(fastEstimate = TRUE, timerGenes.pval = 0.0001, lineageCorrs = 0.7,  loess.span = 0.5, lowFilter.threshold.target = 5,
+                                                 PLOT.test = FALSE)
+    
+    dev.off()
+    
+  }
+  
+  ## Here we are sampling a range of parameters and timing estimation were done with each of them
+  ## Whereby we assess the sensibility of our timingEst
+  ## this will take some time to finish
+  source('customizedClustering_functions.R')
+  
+  timingEst = c()
+  for(pv in c(0.001, 0.0001, 0.00001))
+  {
+    for(cutoff.expr in c(4, 5, 6))
+    {
+      for(s in c(0.3, 0.5, 0.7))
+      {
+        cat('pv = ', pv, ' cutoff.expr = ', cutoff.expr, 's = ', s, "\n")
+        sce.test = sc.estimateTiming.with.timer.genes(sce, fastEstimate = TRUE, timerGenes.pval = pv, lineageCorrs = 0.5, loess.span = s,
+                                                      lowFilter.threshold.target = cutoff.expr)
+        timingEst = rbind(timingEst, sce.test$timing.est)
+      }
+    }
+  }
+  
+  #save(sce, timingEst, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrectedv2_facsInfos_timeEst_tmp.Rdata'))
+  
+  timingEst = t(timingEst)
+  timingEst = as.matrix(timingEst)
+  #colnames(timingEst) = c(as.vector(t(outer(c(0.001, 0.0001, 0.00001), c(4:6), paste, sep=""))))
+  find.one.close.to.mean = function(x){
+    # x = timingEst[1, ]
+    difs = abs(x - mean(x))
+    return(x[which(difs == min(difs))[1]])
+  }
+  sce$timingEst = apply(timingEst, 1, find.one.close.to.mean)
+  sce$timingEst.sd = apply(timingEst, 1, sd)
+  
+  save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos_timingEst.Rdata'))
+}else{
+  load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos_timingEst.Rdata'))
+}
+
+
+par(mfrow = c(1, 3))
+plot(sce$FSC_log2, sce$timingEst, type='p', cex = 0.5)
+plot(sce$BSC_log2, sce$timingEst, type='p', cex = 0.5)
+plot(sce$FSC_log2, sce$BSC_log2, type = 'p', cex = 0.5)
+
+cdata = colData(sce)
+cdata = data.frame(cdata[, c((ncol(cdata)-3): ncol(cdata))])
+#cdata$timingEst = cdata$timingEst/50
+
+cdata$timing.group = NA
+cdata$timing.group[which(cdata$timingEst < 50)] = 1
+cdata$timing.group[which(cdata$timingEst >= 450)] = 10
+for(n in 2:9){cdata$timing.group[which(cdata$timingEst >= (n-1)*50 & cdata$timingEst < n*50)] = n}
+
+cdata$timing.sd.group = 3
+cdata$timing.sd.group[which(cdata$timingEst.sd<30)] = 1
+cdata$timing.sd.group[which(cdata$timingEst.sd>=30 & cdata$timingEst.sd<60)] = 2
+cdata$timing.sd.group = as.factor(cdata$timing.sd.group)
+
+ggplot(cdata, aes(x=FSC_log2, y=BSC_log2, color=timingEst, shape = timing.sd.group)) +
+  geom_point() +
+  scale_color_gradientn(colours = rainbow(10))
+
+sce$timingEst = as.factor(sce$timingEst)
+sce$timingEst.group = as.factor(cdata$timing.group)
+sce$timingEst.sd.group = as.factor(cdata$timing.sd.group)
+
+save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos_timingEstGroups.Rdata'))
+plotColData(sce,
+            x = "FSC_log2",
+            y = "BSC_log2",
+            colour_by = "timingEst.group",
+            point_size = 1
+)
 
 
 ########################################################
@@ -201,115 +299,7 @@ if(Import.processed.data.from.Aleks){
   }
 }
 
-# logcounts(sce) =  assay(sce, "logcounts_seurat_SG2MCorrected")
-table(sce$nb.cells)
-sce = sce[, which(sce$nb.cells == 1)]
 
-sce$FSC_log2 = 3/2*log2(sce$FSC)
-sce$BSC_log2 = 3/2*log2(sce$BSC)
-sce$GFP_log2 = 3/2*log2(sce$GFP)
-
-plotColData(sce,
-            x = "FSC_log2",
-            y = "BSC_log2",
-            colour_by = "request",
-            point_size = 1
-)
-
-##########################################
-# here estimat the timing with timer genes
-### first test 5 lineages from Hashimsholy et al. paper
-##########################################
-reEstimate.timing.using.timer.genes = FALSE
-if(reEstimate.timing.using.timer.genes){
-  Test.Hashimshony_lineages = FALSE
-
-  if(Test.Hashimshony_lineages){
-    pdfname = paste0("../results/clustering_combining_variousInfos/test_timing_estimation_Hashimshony_lineages_test_with_improvedTimerGenes_v2.pdf")
-    pdf(pdfname, width=10, height = 6)
-    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-
-    source('customizedClustering_functions.R')
-    Test.timingEstimate.with.HashimshonyLineages(fastEstimate = TRUE, timerGenes.pval = 0.0001, lineageCorrs = 0.7,  loess.span = 0.5, lowFilter.threshold.target = 5,
-                                                 PLOT.test = FALSE)
-
-    dev.off()
-
-  }
-
-  ## Here we are sampling a range of parameters and timing estimation were done with each of them
-  ## Whereby we assess the sensibility of our timingEst
-  ## this will take some time to finish
-  source('customizedClustering_functions.R')
-
-  timingEst = c()
-  for(pv in c(0.001, 0.0001, 0.00001))
-  {
-    for(cutoff.expr in c(4, 5, 6))
-    {
-      for(s in c(0.3, 0.5, 0.7))
-      {
-        cat('pv = ', pv, ' cutoff.expr = ', cutoff.expr, 's = ', s, "\n")
-        sce.test = sc.estimateTiming.with.timer.genes(sce, fastEstimate = TRUE, timerGenes.pval = pv, lineageCorrs = 0.5, loess.span = s,
-                                                      lowFilter.threshold.target = cutoff.expr)
-        timingEst = rbind(timingEst, sce.test$timing.est)
-      }
-    }
-  }
-
-  #save(sce, timingEst, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrectedv2_facsInfos_timeEst_tmp.Rdata'))
-
-  timingEst = t(timingEst)
-  timingEst = as.matrix(timingEst)
-  #colnames(timingEst) = c(as.vector(t(outer(c(0.001, 0.0001, 0.00001), c(4:6), paste, sep=""))))
-  find.one.close.to.mean = function(x){
-    # x = timingEst[1, ]
-    difs = abs(x - mean(x))
-    return(x[which(difs == min(difs))[1]])
-  }
-  sce$timingEst = apply(timingEst, 1, find.one.close.to.mean)
-  sce$timingEst.sd = apply(timingEst, 1, sd)
-
-  save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos_timingEst.Rdata'))
-}else{
-  load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos_timingEst.Rdata'))
-}
-
-
-par(mfrow = c(1, 3))
-plot(sce$FSC_log2, sce$timingEst, type='p', cex = 0.5)
-plot(sce$BSC_log2, sce$timingEst, type='p', cex = 0.5)
-plot(sce$FSC_log2, sce$BSC_log2, type = 'p', cex = 0.5)
-
-cdata = colData(sce)
-cdata = data.frame(cdata[, c((ncol(cdata)-3): ncol(cdata))])
-#cdata$timingEst = cdata$timingEst/50
-
-cdata$timing.group = NA
-cdata$timing.group[which(cdata$timingEst < 50)] = 1
-cdata$timing.group[which(cdata$timingEst >= 450)] = 10
-for(n in 2:9){cdata$timing.group[which(cdata$timingEst >= (n-1)*50 & cdata$timingEst < n*50)] = n}
-
-cdata$timing.sd.group = 3
-cdata$timing.sd.group[which(cdata$timingEst.sd<30)] = 1
-cdata$timing.sd.group[which(cdata$timingEst.sd>=30 & cdata$timingEst.sd<60)] = 2
-cdata$timing.sd.group = as.factor(cdata$timing.sd.group)
-
-ggplot(cdata, aes(x=FSC_log2, y=BSC_log2, color=timingEst, shape = timing.sd.group)) +
-  geom_point() +
-  scale_color_gradientn(colours = rainbow(10))
-
-sce$timingEst = as.factor(sce$timingEst)
-sce$timingEst.group = as.factor(cdata$timing.group)
-sce$timingEst.sd.group = as.factor(cdata$timing.sd.group)
-
-save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos_timingEstGroups.Rdata'))
-plotColData(sce,
-            x = "FSC_log2",
-            y = "BSC_log2",
-            colour_by = "timingEst.group",
-            point_size = 1
-)
 ########################################################
 ########################################################
 # Section : Batch Correction
