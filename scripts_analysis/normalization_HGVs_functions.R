@@ -63,13 +63,14 @@ calculate.sizeFactors.DESeq2 = function(expr_mat)
   
 }
 
-test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "scran", "seurat", "SCnorm", "sctransform"), use.HVGs = TRUE)
+test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "scran", "seurat", "sctransform"), use.HVGs = TRUE)
 {
-  #Methods.Normalization = "DESeq2" 
+  #Methods.Normalization = "DESeq2"
   
   for(method in Methods.Normalization)
   {
     sce.qc = sce
+    sce.qc$library.size = apply(counts(sce.qc), 2, sum)
     set.seed(1234567)
     
     method = 'cpm'
@@ -83,7 +84,7 @@ test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "s
     
     if(method == "cpm") { ### cpm
       #assay(sce.qc, "logcounts") <- log2(calculateCPM(sce.qc, use_size_factors = FALSE) + 1)
-      sce.qc = logNormCounts(sce, size_factors = NULL, log = TRUE, pseudo_count=1)
+      sce.qc = logNormCounts(sce.qc, size_factors = NULL, log = TRUE, pseudo_count=1, center_size_factors = TRUE)
     }
     if(method == "UQ"){
       logcounts(sce.qc) <- log2(cal_uq_Hemberg(counts(sce.qc)) + 1)
@@ -98,18 +99,17 @@ test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "s
     }
     
     if(method == "scran"){
-      min.size = 100
+      #min.size = 100
       ## scran normalization (not working here, because negative scaling factor found)
-      qclust <- quickCluster(sce.qc, min.size = min.size,  method = 'igraph')
+      qclust <- quickCluster(sce.qc,  method = 'igraph')
       sce.qc <- computeSumFactors(sce.qc, clusters = qclust)
-      sce.qc <- normalize(sce.qc, exprs_values = "counts", return_log = TRUE)
+      sce.qc <- logNormCounts(sce.qc)
     }
     
     if(method == "TMM"|method == "DESeq2"|method == "UQ"|method == "scran"){
       summary(sizeFactors(sce.qc))
       range(sizeFactors(sce.qc))
-      
-      plot(sce.qc$total_counts/1e6, sizeFactors(sce.qc), log="xy", main = paste0(method), 
+      plot(sce.qc$library.size/1e6, sizeFactors(sce.qc), log="xy", main = paste0(method), 
            xlab="Library size (millions)", ylab="Size factor",
            pch=16)
       #legend("bottomright", col=c("black"), pch=16, cex=1.2, legend = "size factor from scran vs total library size")
@@ -159,43 +159,81 @@ test.normalization = function(sce, Methods.Normalization = c("cpm", "DESeq2", "s
       
     }
     
+    if(method == 'sctransform'){
+      ms <- SCTransform(object = ms0) # new normalization from Seurat
+      
+      ms <- RunPCA(object = ms, verbose = FALSE)
+      #ms <- FindNeighbors(object = ms, dims = 1:20)
+      #ms <- FindClusters(object = ms)
+      
+      ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:20)
+      DimPlot(ms, reduction = "umap", group.by = 'request')
+      
+      #ms <- RunUMAP(object = ms, reduction = 'MNN', dims = 1:20, n.neighbors = 30)
+      #DimPlot(ms, reduction = "umap")
+      
+    }
     
     if(method == 'seurat'| method == 'sctransform'){
       ms0 = as.Seurat(sce, counts = 'counts', data = NULL, assay = "RNA")
       
       if(method == 'seurat'){
-        ms.logtransform <- NormalizeData(ms0, assay = "RNA")
+        #scale.factor = 10^4
+        scale.factor = mean(sce.qc$library.size)
+        ms.logtransform <- NormalizeData(ms0, assay = "RNA", normalization.method = 'LogNormalize', scale.factor = scale.factor)
         ms.logtransform <- FindVariableFeatures(ms.logtransform, selection.method = "vst", nfeatures = 3000)
-        all.genes <- rownames(ms.logtransform)
-        ms.logtransform <- ScaleData(ms.logtransform, features = all.genes)
+        ms.logtransform <- ScaleData(ms.logtransform, features = rownames(ms.logtransform))
         
-        ms.logtransform <- RunPCA(object = ms.logtransform, verbose = FALSE)
+        ms.logtransform <- RunPCA(object = ms.logtransform, weight.by.var = FALSE, verbose = TRUE)
         
-        #ms.logtransform <- FindNeighbors(object = ms.logtransform, dims = 1:20)
-        #ms.logtransform <- FindClusters(object = ms.logtransform)
-        
-        ms.logtransform <- RunUMAP(object = ms.logtransform, reduction = 'pca', dims = 1:20, n.neighbors = 20)
-        
-        ms.logtransform = RunTSNE(ms.logtransform, reduction = 'pca', dims = 1:20, tsne.method = 'Rtsne')
+        ms.logtransform <- RunUMAP(object = ms.logtransform, reduction = 'pca', dims = 1:30, n.neighbors = 20, umap.method = "uwot",
+                                   metric = 'cosine', min.dist = 0.2)
         DimPlot(ms.logtransform, reduction = "umap", group.by = 'request')
         
+        ms.logtransform = RunTSNE(ms.logtransform, reduction = 'pca', dims = 1:20, tsne.method = 'Rtsne')
         DimPlot(ms.logtransform, reduction = "tsne", group.by = 'request')
       }
       
-      if(method == 'sctransform'){
-        ms <- SCTransform(object = ms0) # new normalization from Seurat
+      
+      Compare.two.norm.in.seurat.and.scran = FALSE
+      if(Compare.two.norm.in.seurat){
+        library(ggplot2)
+        library(cowplot)
+        p1 =DimPlot(ms.logtransform, reduction = "umap", group.by = 'request')
+        p2 = DimPlot(ms, reduction = "umap", group.by = 'request')
+        plot_grid(p1, p2)
         
-        ms <- RunPCA(object = ms, verbose = FALSE)
-        #ms <- FindNeighbors(object = ms, dims = 1:20)
-        #ms <- FindClusters(object = ms)
+        ## compare seurat normalizatioin vs 
+        sce.qc = sce
+        sce.qc$library.size = apply(counts(sce.qc), 2, sum)
+        sce.qc = logNormCounts(sce.qc, size_factors = NULL, log = TRUE, pseudo_count=1, center_size_factors = FALSE)
+        plot(sce.qc$library.size/1e6, sizeFactors(sce.qc), log="xy", main = paste0(method), 
+             xlab="Library size (millions)", ylab="Size factor")
         
-        ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:20)
-        DimPlot(ms, reduction = "umap", group.by = 'request')
+        HVGs = VariableFeatures(ms.logtransform)
+        mm = match(VariableFeatures(ms.logtransform), rownames(sce.qc))
+        sce.qc = scater::runPCA(sce.qc,  subset_row = mm, scale = TRUE)
         
-        #ms <- RunUMAP(object = ms, reduction = 'MNN', dims = 1:20, n.neighbors = 30)
-        #DimPlot(ms, reduction = "umap")
+        sce.qc = scater::runUMAP(sce.qc, dimred = 'PCA', n_dimred = 1:20,  n_neighbors = 20, metric = "cosine")
+        scater::plotReducedDim(sce.qc, dimred = "UMAP", colour_by = 'request')
+        
+        
+        kk = 1
+        xx = log(counts(sce)[,kk]/sce.qc$library.size[kk]*10^4 +1)
+        plot(xx, ms.logtransform@assays$RNA@data[, kk], log= 'xy')
+        abline(0, 1, col='red')
+        
+        yy = log2((counts(sce)[,kk])/sizeFactors(sce.qc)[1] +1)
+        plot(yy, logcounts(sce.qc)[, kk], log= 'xy')
+        abline(0, 1, col='red')
+        
+        plot(logcounts(sce.qc)[, kk],  ms.logtransform@assays$RNA@data[, kk]/log(2))
+        abline(0, 1, col='red')
+        
+        plot(reducedDim(sce.qc, "PCA")[, kk], Reductions(ms.logtransform, slot = 'pca')@cell.embeddings[,kk])
         
       }
+      
     }
     
   }
