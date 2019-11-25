@@ -49,6 +49,7 @@ correct.cellCycle = FALSE
 ########################################################
 ## import the R object from the previous step and double check the cells and genes from table
 load(file=paste0("../data/R_processed_data/", version.DATA, '_QCed_cells_genes_filtered_SCE.Rdata'))
+
 library(scater)
 
 plotColData(sce,
@@ -190,18 +191,26 @@ if(Normalization.Testing){
   dev.off()
 }
 
-# select normalization method: sctransform or scran ()
+## add some extra stat for sce (select normalization method: sctransform or scran ())
 sce$library.size = apply(counts(sce), 2, sum)
+
+#source.my.script("scRNAseq_functions.R")
+#gg.Mt = find.particular.geneSet("Mt")
+#is.mito <- rownames(sce) %in% gg.Mt;
+
+## convert sce to seurat object
 ms = as.Seurat(sce, counts = 'counts', data = NULL, assay = "RNA")
-
 nfeatures = 3000
-ms <- SCTransform(object = ms, variable.features.n=nfeatures) # new normalization from Seurat
-ms <- RunPCA(object = ms, features = VariableFeatures(ms), verbose = FALSE)
-#ElbowPlot(ms)
 
-nb.pcs = 20; n.neighbors = 30; min.dist = 0.25;
+# new normalization from Seurat
+# tried regress out the pct_counts_Mt but works less well
+ms <- SCTransform(object = ms, variable.features.n = nfeatures) 
+ms <- RunPCA(object = ms, features = VariableFeatures(ms), verbose = FALSE)
+ElbowPlot(ms)
+
+nb.pcs = 30; n.neighbors = 30; min.dist = 0.3;
 ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-DimPlot(ms3, reduction = "umap", group.by = 'request') + ggtitle('sctransform')
+DimPlot(ms, reduction = "umap", group.by = 'request') + ggtitle('sctransform')
 
 save(ms, file=paste0(RdataDir, version.DATA, '_QCleaned_sctransformNorm.Rdata'))
 
