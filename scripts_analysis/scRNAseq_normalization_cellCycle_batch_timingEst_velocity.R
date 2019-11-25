@@ -150,6 +150,8 @@ ggplot(cdata, aes(x=FSC_log2, y=BSC_log2, color=timingEst, shape = timing.sd.gro
 sce$timingEst = as.factor(sce$timingEst)
 sce$timingEst.group = as.factor(cdata$timing.group)
 sce$timingEst.sd.group = as.factor(cdata$timing.sd.group)
+# sce$timingEst = as.factor(sce$timingEst)
+# sce$timingEst.group = as.factor(sce$timingEst.group)
 
 save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos_timingEstGroups.Rdata'))
 
@@ -200,7 +202,7 @@ sce$library.size = apply(counts(sce), 2, sum)
 
 ## convert sce to seurat object
 ms = as.Seurat(sce, counts = 'counts', data = NULL, assay = "RNA")
-nfeatures = 3000
+nfeatures = 2000
 
 # new normalization from Seurat
 # tried regress out the pct_counts_Mt but works less well
@@ -212,7 +214,7 @@ nb.pcs = 20; n.neighbors = 30; min.dist = 0.4;
 ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
 DimPlot(ms, reduction = "umap", group.by = 'request') + ggtitle('sctransform')
 
-#save(ms, file=paste0(RdataDir, version.DATA, '_QCleaned_sctransformNorm.Rdata'))
+# save(ms, file=paste0(RdataDir, version.DATA, '_QCleaned_sctransformNorm.Rdata'))
 ##########################################
 # (Optional!!) correct the cell cycle confounder using Seurat
 # !!! not used, because there is no clear cell cycle pattern when trying to correct the cell cycle
@@ -227,112 +229,37 @@ if(correct.cellCycle){
 # Batch correction using fastMNN from scran
 # here we are calling fastMNN from Seurat 
 ##########################################
-library(Seurat)
-library(SeuratWrappers)
+Correction.Batch.using.fastMNN = FALSE
+if(Correction.Batch.using.fastMNN){
+  library(Seurat)
+  library(SeuratWrappers)
+  
+  ## set parameters for fastMNN, most important the merging order
+  bcs = unique(ms$request)
+  ## the ordered used before
+  # c('R7130', 'R8729', 'R8612', 'R8526', 'R7926', # 3 plates for each request
+  # 'R6875','R8613','R8348') # 1 plate for each request
+  for(n in 1:length(bcs)) 
+    eval(parse(text= paste0('p', n, '=  DimPlot(ms, cols.highlight = "red", cells.highlight = as.list(which(ms$request =="', bcs[n], '"))) + NoLegend() + ggtitle("', bcs[n], '")')))
+  
+  CombinePlots(plots = list(p1, p2, p3, p4, p5, p6, p7, p8), ncol = 4)
+  
+  order2correct = list(list(5, 8, 4), list(list(6, 7), list(2, 1, 3)))
+  # HVGs = find.HVGs(sce, Norm.Vars.per.batch = Norm.Vars.per.batch, method = "scran", ntop = 2000) # if use batch-specific HGVs
+  # gene.chosen = match(HVGs, rownames(sce))
+  # cat("nb of HGV : ", length(gene.chosen), "\n")
+  
+  pbmcsca <- RunFastMNN(object.list = SplitObject(ms, split.by = "request"), assay = "SCT", 
+                        features = VariableFeatures(ms), reduction.name = 'mnn', 
+                        cos.norm = TRUE, merge.order = order2correct, min.batch.skip = 1)
+  metadata(pbmcsca@tools$RunFastMNN)$merge.info # check the mergint thresholds
+  
+  nb.pcs = 20; n.neighbors = 30; min.dist = 0.3;
+  pbmcsca <- RunUMAP(pbmcsca, reduction = "mnn", dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+  
+  p1 = DimPlot(pbmcsca, group.by = c("request"))
+  p0 =DimPlot(ms, reduction = 'umap',  group.by = c("request"))
+  plot_grid(p0, p1)
+  #save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_bcMNN.Rdata'))
+}
 
-# ## set parameters for fastMNN 
-# sce$timingEst = as.factor(sce$timingEst)
-# sce$timingEst.group = as.factor(sce$timingEst.group)
-# 
-# # choose the batches (either plates or request)
-# # here we choose the request as batch
-# batches = sce$request
-# bc.uniq = unique(batches)
-# sce$batches <- batches
-# 
-# Use.fastMNN = TRUE
-# Norm.Vars.per.batch = TRUE # HVGs for each batch or not
-# Rescale.Batches = FALSE # scaling data in each batch or not
-# k.mnn = 20
-# cos.norm = TRUE
-# nb.pcs = 50
-# 
-# batch.sequence.to.merge = c('R7130', 'R8729', 'R8612', 'R8526', 'R7926', # 3 plates for each request
-#                             'R6875','R8613','R8348') # 1 plate for each request
-# 
-# order2correct = match(batch.sequence.to.merge, bc.uniq)
-# #c(12, 13, # the same
-# #                10, 9, 8, 5, 6, 7,  8, 11, 1, 2, 3, 4)
-# #order2correct = c(15,14,13,12,11,10,9,8, 1, 2, 3, 4, 5,6,7 )
-# #order2correct = c(3, 4, 1, 2)
-# 
-# ## double chekc  the mering order in the batch correction
-# source('customizedClustering_functions.R')
-# kk = match(sce$request, c('R7130', 'R8729', 'R8612', 'R8526', 'R7926'))
-# kk = match(sce$request, c('R6875','R8613','R8348'))
-# plotColData(sce[,which(!is.na(kk))],
-#             x = "FSC_log2",
-#             y = "BSC_log2",
-#             colour_by = "request",
-#             point_size = 1
-# )
-# 
-# #cat("merging order for batch correction :\n", paste0(bc.uniq[order2correct], collapse = "\n"), "\n")
-# for(n in 1:length(order2correct)){
-#   
-#   #n = 11
-#   kk = order2correct[n]
-#   
-#   p = plotColData(sce[, which(sce$batches== bc.uniq[kk])],
-#                   x = "FSC_log2",
-#                   y = "BSC_log2",
-#                   colour_by = "timingEst",
-#                   point_size = 1
-#                   
-#   )
-#   plot(p)
-#   
-#   cat('#', n, 'batch:',  bc.uniq[kk], ': ', length(which(sce$batches == bc.uniq[kk])), 'cells \n')
-#   
-# }
-# 
-# 
-# HVGs = find.HVGs(sce, Norm.Vars.per.batch = Norm.Vars.per.batch, method = "scran", ntop = 2000)
-# gene.chosen = match(HVGs, rownames(sce))
-# cat("nb of HGV : ", length(gene.chosen), "\n")
-
-pbmcsca <- RunFastMNN(object.list = SplitObject(ms, split.by = "request"), assay = "SCT", 
-                      features = VariableFeatures(ms), reduction.name = 'mnn', 
-                      cos.norm = TRUE, auto.merge = FALSE, min.batch.skip = 0.5)
-
-nb.pcs = 20; n.neighbors = 30; min.dist = 0.25;
-pbmcsca <- RunUMAP(pbmcsca, reduction = "mnn", dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-
-p1 = DimPlot(pbmcsca, group.by = c("request"))
-p0 =DimPlot(ms, reduction = 'umap',  group.by = c("request"))
-plot_grid(p0, p1)
-
-metadata(pbmcsca@tools$RunFastMNN)$merge.info
-#library(harmony)
-#pbmcsca <- RunHarmony(ms, group.by.vars = "request", assay.use="SCT")
-#pbmcsca <- RunUMAP(pbmcsca, reduction = "harmony", dims = 1:20)
-#pbmcsca <- FindNeighbors(pbmcsca, reduction = "harmony", dims = 1:30) %>% FindClusters()
-#DimPlot(pbmcsca, reduction = 'harmony',  group.by = c("request"))
-#DimPlot(pbmcsca, reduction = 'umap',  group.by = c("request"))
-
-
-save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_bcMNN.Rdata'))
-
-##########################################
-# Convert sce object to Seurat object
-# check UMAP and tSNE
-##########################################
-require(Seurat)
-pbmc = as.Seurat(sce)
-
-#pbmc = Seurat::RunPCA(pbmc, pbmc, )
-pbmc <- FindVariableFeatures(pbmc, selection.method = "vst", nfeatures = 2000)
-pbmc <- ScaleData(pbmc, features = rownames(pbmc))
-pbmc <- RunPCA(pbmc, features = VariableFeatures(object = pbmc))
-
-#pbmc <- RunPCA(pbmc, features = HVGs)
-
-pbmc <- Seurat::RunUMAP(pbmc, dims = 1:15, reduction = "MNN",
-                        reduction.key = "umap", n.neighbors = 20, repulsion.strength = 1)
-
-DimPlot(pbmc, reduction = "umap", group.by = 'timingEst')
-
-pbmc <- Seurat::RunUMAP(pbmc, dims = 1:15, reduction = "pca",
-                        reduction.key = "umap.pca", n.neighbors = 20, repulsion.strength = 1)
-
-DimPlot(pbmc, reduction = "umap", group.by = 'timingEst')

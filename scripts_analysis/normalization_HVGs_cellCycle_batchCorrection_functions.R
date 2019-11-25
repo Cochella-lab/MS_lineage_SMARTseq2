@@ -1337,6 +1337,17 @@ batchCorrection_Scanorama = function()
   #integrated.corrected.data <- scanorama$correct(datasets, genes_list, return_dimred=TRUE, return_dense=TRUE)
 }
 
+## test function for Hamony
+test.harmony.function = funciton(ms)
+{
+  #library(harmony)
+  #pbmcsca <- RunHarmony(ms, group.by.vars = "request", assay.use="SCT")
+  #pbmcsca <- RunUMAP(pbmcsca, reduction = "harmony", dims = 1:20)
+  #pbmcsca <- FindNeighbors(pbmcsca, reduction = "harmony", dims = 1:30) %>% FindClusters()
+  #DimPlot(pbmcsca, reduction = 'harmony',  group.by = c("request"))
+  #DimPlot(pbmcsca, reduction = 'umap',  group.by = c("request"))
+  
+}
 
 
 
