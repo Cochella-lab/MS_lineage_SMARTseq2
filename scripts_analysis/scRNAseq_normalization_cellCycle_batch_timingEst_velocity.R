@@ -185,8 +185,8 @@ if(Normalization.Testing){
   pdf(pdfname, width=14, height = 8)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
-  #test.normalization(sce, Methods.Normalization = c("cpm", "DESeq2", "scran", "seurat", "sctransform"), using.HVGs = TRUE)
   compare.scran.seurat.sctransform(sce, using.HVGs = TRUE)
+  
   dev.off()
 }
 
