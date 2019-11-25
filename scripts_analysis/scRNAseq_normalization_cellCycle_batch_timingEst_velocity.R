@@ -229,7 +229,7 @@ if(correct.cellCycle){
 # Batch correction using fastMNN from scran
 # here we are calling fastMNN from Seurat 
 ##########################################
-Correction.Batch.using.fastMNN = FALSE
+Correction.Batch.using.fastMNN = TRUE
 if(Correction.Batch.using.fastMNN){
   library(Seurat)
   library(SeuratWrappers)
@@ -244,14 +244,15 @@ if(Correction.Batch.using.fastMNN){
   
   CombinePlots(plots = list(p1, p2, p3, p4, p5, p6, p7, p8), ncol = 4)
   
-  order2correct = list(list(5, 8, 4), list(list(6, 7), list(2, 1, 3)))
+  #order2correct = list(list(5, 8, 4), list(list(6, 7), list(2, 1, 3)))
+  order2correct = list(2, 6, list(5, 8), 3, 4, 7, 1)
   # HVGs = find.HVGs(sce, Norm.Vars.per.batch = Norm.Vars.per.batch, method = "scran", ntop = 2000) # if use batch-specific HGVs
   # gene.chosen = match(HVGs, rownames(sce))
   # cat("nb of HGV : ", length(gene.chosen), "\n")
   
   pbmcsca <- RunFastMNN(object.list = SplitObject(ms, split.by = "request"), assay = "SCT", 
                         features = VariableFeatures(ms), reduction.name = 'mnn', 
-                        cos.norm = TRUE, merge.order = order2correct, min.batch.skip = 1)
+                        cos.norm = TRUE, merge.order = order2correct, min.batch.skip = 0.6)
   metadata(pbmcsca@tools$RunFastMNN)$merge.info # check the mergint thresholds
   
   nb.pcs = 20; n.neighbors = 30; min.dist = 0.3;
@@ -260,6 +261,6 @@ if(Correction.Batch.using.fastMNN){
   p1 = DimPlot(pbmcsca, group.by = c("request"))
   p0 =DimPlot(ms, reduction = 'umap',  group.by = c("request"))
   plot_grid(p0, p1)
-  #save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_bcMNN.Rdata'))
+  save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_bcMNN.Rdata'))
 }
 
