@@ -208,12 +208,11 @@ ms <- SCTransform(object = ms, variable.features.n = nfeatures)
 ms <- RunPCA(object = ms, features = VariableFeatures(ms), verbose = FALSE)
 ElbowPlot(ms)
 
-nb.pcs = 30; n.neighbors = 30; min.dist = 0.3;
+nb.pcs = 20; n.neighbors = 30; min.dist = 0.4;
 ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
 DimPlot(ms, reduction = "umap", group.by = 'request') + ggtitle('sctransform')
 
-save(ms, file=paste0(RdataDir, version.DATA, '_QCleaned_sctransformNorm.Rdata'))
-
+#save(ms, file=paste0(RdataDir, version.DATA, '_QCleaned_sctransformNorm.Rdata'))
 ##########################################
 # (Optional!!) correct the cell cycle confounder using Seurat
 # !!! not used, because there is no clear cell cycle pattern when trying to correct the cell cycle
@@ -221,10 +220,7 @@ save(ms, file=paste0(RdataDir, version.DATA, '_QCleaned_sctransformNorm.Rdata'))
 if(correct.cellCycle){
   source.my.script("normalization_HVGs_cellCycle_batchCorrection_functions.R")
   # cellCycle.correction(sce, method = "seurat")
-  #load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected.Rdata'))
   load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2.Rdata'))
-}else{
-  save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2.Rdata'))
 }
 
 ##########################################
