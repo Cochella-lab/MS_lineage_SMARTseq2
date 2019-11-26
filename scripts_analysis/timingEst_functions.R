@@ -441,7 +441,6 @@ sc.estimateTiming.with.timer.genes = function(sce, fastEstimate = TRUE, timerGen
 
 Test.sc.estimateTiming.with.timer.genes = function(sce)
 {
-  
   ## extract the gene expression matrix from sce object
   test = logcounts(sce)
   set.seed(2019)
@@ -552,7 +551,101 @@ Test.sc.estimateTiming.with.timer.genes = function(sce)
   
 }
 
+##########################################
+# test the main function with 5 lineages from Hashimshony et al.
+##########################################
+Test.timingEstimate = function()
+{
+  pdfname = paste0("../results/clustering_combining_variousInfos/test_timing_estimation_Hashimshony_lineages_test_with_improvedTimerGenes_v2.pdf")
+  pdf(pdfname, width=10, height = 6)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  source('customizedClustering_functions.R')
+  Test.timingEstimate.with.HashimshonyLineages(fastEstimate = TRUE, timerGenes.pval = 0.0001, lineageCorrs = 0.7,  loess.span = 0.5, lowFilter.threshold.target = 5,
+                                               PLOT.test = FALSE)
+  
+  dev.off()
+}
 
+##########################################
+# Run the main function with range of parameters and assign a confidence scores 
+# because I realized that the estimation is somehow sensitive to hyperparameters 
+##########################################
+estimate.timing.and.variance.with.timer.genes = function(sce)
+{
+  # normalize the sce using cpm, which is used for the timingEst, because the timer genes were normalized in the similar way
+  library(scater)
+  sce = logNormCounts(sce, size_factors = NULL, log = TRUE, pseudo_count=1, center_size_factors = FALSE)
+  
+  ## Here we are sampling a range of parameters and timing estimation were done with each of them
+  ## Whereby we assess the sensibility of our timingEst; this will take some time to finish
+  ## specific parameters: 
+  ## pv -- pvalue of box test for timer genes;
+  ## cutoff.expr -- cut off of expressions for timer genes
+  ## s -- loess span parameters 
+  ## lineageCorrs = 0.5 this is fixed
+  timingEst = c()
+  for(pv in c(0.001, 0.0001, 0.00001))
+  {
+    for(cutoff.expr in c(4, 5, 6))
+    {
+      for(s in c(0.3, 0.5, 0.7))
+      {
+        cat('pv = ', pv, ' cutoff.expr = ', cutoff.expr, 's = ', s, "\n")
+        sce.test = sc.estimateTiming.with.timer.genes(sce, fastEstimate = TRUE, timerGenes.pval = pv, lineageCorrs = 0.5, loess.span = s,
+                                                      lowFilter.threshold.target = cutoff.expr)
+        timingEst = rbind(timingEst, sce.test$timing.est)
+      }
+    }
+  }
+  
+  timingEst = t(timingEst)
+  timingEst = as.matrix(timingEst)
+  #colnames(timingEst) = c(as.vector(t(outer(c(0.001, 0.0001, 0.00001), c(4:6), paste, sep=""))))
+  
+  find.one.close.to.mean = function(x){
+    # x = timingEst[1, ]
+    difs = abs(x - mean(x))
+    return(x[which(difs == min(difs))[1]])
+  }
+  
+  sce$timingEst = apply(timingEst, 1, find.one.close.to.mean)
+  sce$timingEst.sd = apply(timingEst, 1, sd)
+  #sce$timingEst = as.factor(sce$timingEst)
+  
+  ## group the timingEst and timingEst.sd for practical visualization
+  cdata = colData(sce)
+  cdata = data.frame(cdata[, c((ncol(cdata)-3): ncol(cdata))])
+  #cdata$timingEst = cdata$timingEst/50
+  
+  cdata$timing.group = NA
+  cdata$timing.group[which(cdata$timingEst < 50)] = 1
+  cdata$timing.group[which(cdata$timingEst >= 450)] = 10
+  for(n in 2:9){cdata$timing.group[which(cdata$timingEst >= (n-1)*50 & cdata$timingEst < n*50)] = n}
+  
+  cdata$timing.sd.group = 3
+  cdata$timing.sd.group[which(cdata$timingEst.sd<30)] = 1
+  cdata$timing.sd.group[which(cdata$timingEst.sd>=30 & cdata$timingEst.sd<60)] = 2
+  cdata$timing.sd.group = as.factor(cdata$timing.sd.group)
+  
+  #ggplot(cdata, aes(x=FSC_log2, y=BSC_log2, color=timingEst, shape = timing.sd.group)) +
+  #  geom_point() +
+  #  scale_color_gradientn(colours = rainbow(10))
+  
+  sce$timingEst.group = as.factor(cdata$timing.group)
+  sce$timingEst.sd.group = as.factor(cdata$timing.sd.group)
+  sce$timingEst = as.factor(sce$timingEst)
+  # sce$timingEst.group = as.factor(sce$timingEst.group)
+  
+  return(sce)
+  
+}
+
+
+
+##########################################
+# some extra functions for testing purposes
+##########################################
 readkeygraph <- function(prompt)
 {
   getGraphicsEvent(prompt = prompt, 
