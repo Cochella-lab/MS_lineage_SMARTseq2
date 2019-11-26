@@ -51,6 +51,8 @@ correct.cellCycle = FALSE
 load(file=paste0("../data/R_processed_data/", version.DATA, '_QCed_cells_genes_filtered_SCE.Rdata'))
 
 library(scater)
+library(scran)
+options(stringsAsFactors = FALSE)
 
 plotColData(sce,
             x = "log10_total_counts",
@@ -172,10 +174,6 @@ plotColData(sce,
 ########################################################
 ########################################################
 library(Seurat)
-library(scRNA.seq.funcs)
-library(scater)
-library(scran)
-options(stringsAsFactors = FALSE)
 
 reducedDim(sce) <- NULL
 endog_genes <- !rowData(sce)$is_feature_control
