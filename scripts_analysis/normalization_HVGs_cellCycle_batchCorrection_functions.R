@@ -1338,7 +1338,7 @@ batchCorrection_Scanorama = function()
 }
 
 ## test function for Hamony
-test.harmony.function = funciton(ms)
+test.harmony.function = function(ms)
 {
   #library(harmony)
   #pbmcsca <- RunHarmony(ms, group.by.vars = "request", assay.use="SCT")

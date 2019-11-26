@@ -88,19 +88,16 @@ if(reEstimate.timing.using.timer.genes.using.cpmNorm){
 }
 
 par(mfrow = c(1, 3))
-plot(sce$FSC_log2, sce$timingEst, type='p', cex = 0.5)
-plot(sce$BSC_log2, sce$timingEst, type='p', cex = 0.5)
+plot(sce$FSC_log2, as.numeric(as.character(sce$timingEst)), type='p', cex = 0.5)
+plot(sce$BSC_log2, as.numeric(as.character(sce$timingEst)), type='p', cex = 0.5)
 plot(sce$FSC_log2, sce$BSC_log2, type = 'p', cex = 0.5)
 
-#save(sce, file=paste0(RdataDir, version.DATA, 
-#'_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_facsInfos_timingEstGroups.Rdata'))
 plotColData(sce,
             x = "FSC_log2",
             y = "BSC_log2",
-            colour_by = "timingEst.group",
+            colour_by = "timingEst",
             point_size = 1
 )
-
 
 ########################################################
 ########################################################
@@ -110,6 +107,7 @@ plotColData(sce,
 # 3) batch correction
 ########################################################
 ########################################################
+load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_SCE.Rdata'))
 library(Seurat)
 
 reducedDim(sce) <- NULL
@@ -144,6 +142,7 @@ ElbowPlot(ms)
 nb.pcs = 20; n.neighbors = 30; min.dist = 0.4;
 ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
 DimPlot(ms, reduction = "umap", group.by = 'request') + ggtitle('sctransform')
+DimPlot(ms, reduction = "umap", group.by = 'timingEst') 
 
 # save(ms, file=paste0(RdataDir, version.DATA, '_QCleaned_sctransformNorm.Rdata'))
 ##########################################
@@ -193,5 +192,9 @@ if(Correction.Batch.using.fastMNN){
   p0 =DimPlot(ms, reduction = 'umap',  group.by = c("request"))
   plot_grid(p0, p1)
   save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_bcMNN.Rdata'))
+
 }
+
+
+
 
