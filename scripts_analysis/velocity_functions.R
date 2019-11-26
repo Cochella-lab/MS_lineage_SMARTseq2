@@ -1,55 +1,40 @@
 ##########################################################################
 ##########################################################################
-# Project:
-# Script purpose: test Seurat package: normalization and visulization
+# Project: Aleks' singlce cell MS lineage 
+# Script purpose: functions related to RNA velocity
 # Usage example:  
 # Author: Jingkui Wang (jingkui.wang@imp.ac.at)
 # Date of creation: Fri Nov 15 12:31:15 2019
 ##########################################################################
 ##########################################################################
-path2AleksFolder = '/Volumes/groups/cochella/Aleks/bioinformatics/GitHub/scRNAseq_MS_lineage'
-version.DATA = 'scRNA_8613_full'
-version.analysis =  paste0(version.DATA, '_20191029')
-
-dataDir = paste0("../data/")
-resDir = paste0("../results/", version.analysis)
-tabDir = paste0("../results/", version.analysis, "/tables/")
-RdataDir = paste0("../results/", version.analysis, "/Rdata/")
-RdataDirfromAleks = paste0(path2AleksFolder, "/results/", version.analysis, "/Rdata/")
-
-if(!dir.exists(resDir)){dir.create(resDir)}
-if(!dir.exists(tabDir)){dir.create(tabDir)}
-if(!dir.exists(RdataDir)){dir.create(RdataDir)}
-
-library(Seurat)
-library(velocyto.R)
-library(SeuratWrappers)
-library(ggplot2)
 ########################################################
 ########################################################
 # Section : test the normalization SCTransform in Seurat
 # for outputs from feature counts (ours) and velocity.py output
 ########################################################
 ########################################################
-load(file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_bcMNN.Rdata'))
+library(Seurat)
+library(velocyto.R)
+library(SeuratWrappers)
+library(ggplot2)
 
 Test.Velocity.py.output = FALSE
 if(Test.Velocity.py.output){
   # download an example for test
   #curl::curl_download(url = 'http://pklab.med.harvard.edu/velocyto/mouseBM/SCG71.loom', destfile= '~/Downloads/SCG71.loom')
   #ldat <- ReadVelocity(file = "~/Downloads/SCG71.loom")
-  ldat <- ReadVelocity(file = "/Volumes/groups/cochella/Aleks/bioinformatics/raw_ngs_data/global.loom")
-  ms <- as.Seurat(x = ldat)
-  ms <- SCTransform(object = ms, assay = "spliced")
+  ldat <- ReadVelocity(file = "../data/raw_ngs_data/merged.loom")
+  
+  bm <- as.Seurat(x = ldat)
+  bm <- SCTransform(object = bm, assay = "spliced")
+  
+  bm <- RunPCA(object = bm, verbose = FALSE)
+  bm <- FindNeighbors(object = bm, dims = 1:20)
+  bm <- FindClusters(object = bm)
+  bm <- RunUMAP(object = bm, dims = 1:20)
+  DimPlot(bm, reduction = "umap")
+  
 }
-
-ms0 = as.Seurat(sce, counts = 'counts', data = 'logcounts', assay = "RNA")
-
-ms <- SCTransform(object = ms) # new normalization from Seurat
-
-ms <- RunPCA(object = ms, verbose = FALSE)
-ms <- FindNeighbors(object = ms, dims = 1:20)
-ms <- FindClusters(object = ms)
 
 ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:20, n.neighbors = 30)
 DimPlot(ms, reduction = "umap", group.by = 'request')
@@ -69,108 +54,6 @@ ms.logtransform <- FindClusters(object = ms.logtransform)
 
 ms.logtransform <- RunUMAP(object = ms.logtransform, reduction = 'pca', dims = 1:20, n.neighbors = 30)
 DimPlot(ms.logtransform, reduction = "umap", group.by = 'request')
-
-
-########################################################
-########################################################
-# Section : test batch correction in Seurat
-# 1) MNN calling from Seurat 
-# 2) CCA from Seurat
-########################################################
-########################################################
-library(scater)
-library(SingleCellExperiment)
-library(scran)
-
-sce <- as.SingleCellExperiment(ms)
-batches = sce$request 
-bc.uniq = unique(batches)
-sce$batches <- batches
-
-Norm.Vars.per.batch = TRUE # HVGs for each batch or not 
-Rescale.Batches = FALSE # scaling data in each batch or not 
-k.mnn = 20
-cos.norm = TRUE
-nb.pcs = 50
-
-batch.sequence.to.merge = c('R7130', 'R8612', 'R8526', 'R7926', # 3 plates for each request
-                            'R6875','R7116','R8613','R8348') # 1 plate for each request
-order2correct = match(batch.sequence.to.merge, bc.uniq) 
-
-source("scRNAseq_functions.R")
-#HVGs = find.HVGs(sce, Norm.Vars.per.batch = Norm.Vars.per.batch, method = "scran", ntop = 2000)
-HVGs = VariableFeatures(ms)
-gene.chosen = match(HVGs, rownames(sce))
-
-
-cat("nb of HGV : ", length(gene.chosen), "\n")
-
-original = list()
-fscs = c()
-#original0 = list()
-for(n in 1:length(bc.uniq)){
-  #xx = nout[[n]];
-  if(Rescale.Batches){
-    original[[n]] = logcounts((nout[[n]][gene.chosen, ]))
-  }else{
-    original[[n]] = logcounts((sce[gene.chosen, which(sce$batches == bc.uniq[n])])) 
-  }
-  fscs = c(fscs, sce$FSC_log2[which(sce$batches == bc.uniq[n])])
-}
-
-set.seed(1001)
-mnn.out <- do.call(fastMNN, c(original, list(k=k.mnn, cos.norm = cos.norm, d=nb.pcs, auto.order=order2correct,
-                                             approximate=TRUE)))
-
-reducedDim(sce, "sct_MNN") <- mnn.out$corrected
-sce$mnn_Batch <- as.character(mnn.out$batch)
-sce
-
-pbmc = as.Seurat(sce)
-
-
-ms <- RunUMAP(object = pbmc, reduction = 'PCA', dims = 1:20, n.neighbors = 30)
-DimPlot(ms, reduction = "umap", group.by = 'request')
-
-ms <- RunUMAP(object = pbmc, reduction = 'MNN', dims = 1:20, n.neighbors = 30)
-DimPlot(ms, reduction = "umap", group.by = 'request')
-
-ms <- RunUMAP(object = pbmc, reduction = 'sct_MNN', dims = 1:20, n.neighbors = 30)
-DimPlot(ms, reduction = "umap", group.by = 'request')
-
-
-pbmc.list <- SplitObject(ms, split.by = "request")
-pbmcsca <- RunFastMNN(object.list = pbmc.list, features = 2000, reduction.name = 'mnn_sct', 
-                      k=20, cos.norm=TRUE, ndist=3, d=50, approximate=FALSE, auto.order = order2correct)
-
-pbmcsca <- RunUMAP(pbmcsca, reduction = "mnn", dims = 1:30)
-pbmcsca <- FindNeighbors(pbmcsca, reduction = "mnn", dims = 1:30)
-pbmcsca <- FindClusters(pbmcsca)
-DimPlot(pbmcsca, group.by = c("Method", "ident", "CellType"), ncol = 3)
-
-
-pbmc.list <- SplitObject(ms, split.by = "request")
-for (i in names(pbmc.list)) {
-  pbmc.list[[i]] <- SCTransform(pbmc.list[[i]], verbose = FALSE)
-}
-
-pbmc.features <- SelectIntegrationFeatures(object.list = pbmc.list, nfeatures = 3000)
-pbmc.list <- PrepSCTIntegration(object.list = pbmc.list, anchor.features = pbmc.features)
-k.filter <- min(sapply(pbmc.list, ncol)) 
-pbmc.anchors <- FindIntegrationAnchors(object.list = pbmc.list, normalization.method = "SCT", 
-                                       anchor.features = pbmc.features, k.filter = k.filter)
-
-pbmc.integrated <- IntegrateData(anchorset = pbmc.anchors, normalization.method = "SCT")
-
-pbmc.integrated <- RunPCA(object = pbmc.integrated, verbose = FALSE)
-pbmc.integrated <- RunUMAP(object = pbmc.integrated, dims = 1:30)
-
-DimPlot(pbmc.integrated, reduction = "umap", group.by = 'request')
-
-plots <- DimPlot(pbmc.integrated, group.by = c("Method", "CellType"), combine = FALSE)
-plots <- lapply(X = plots, FUN = function(x) x + theme(legend.position = "top") + guides(color = guide_legend(nrow = 4, 
-                                                                                                              byrow = TRUE, override.aes = list(size = 2.5))))
-CombinePlots(plots)
 
 
 ########################################################
@@ -223,17 +106,7 @@ z.ms <- ms.copy@reductions$umap[,3]
 
 x.ms$umap$UMAP_1
 
-
 marker.genes.ms <- row.names(ms)[grep("^fbx.", row.names(ms))]
 
-
-pdf(paste0("~/Desktop/linage_identification/","ms_fbxx.pdf"), width=8, height = 8)
-
-for(n in 1:length(marker.genes.ms)) {
-  
-  FeaturePlot(ms, features = c(marker.genes.ms[n]))
-  
-}
-dev.off()
 
 FeaturePlot(ms, features = c(marker.genes.ms))
