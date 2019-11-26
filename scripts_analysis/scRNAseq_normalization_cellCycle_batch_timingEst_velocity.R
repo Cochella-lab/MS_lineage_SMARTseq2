@@ -196,10 +196,6 @@ if(Normalization.Testing){
 ## add some extra stat for sce (select normalization method: sctransform or scran ())
 sce$library.size = apply(counts(sce), 2, sum)
 
-#source.my.script("scRNAseq_functions.R")
-#gg.Mt = find.particular.geneSet("Mt")
-#is.mito <- rownames(sce) %in% gg.Mt;
-
 ## convert sce to seurat object
 ms = as.Seurat(sce, counts = 'counts', data = NULL, assay = "RNA")
 nfeatures = 2000
