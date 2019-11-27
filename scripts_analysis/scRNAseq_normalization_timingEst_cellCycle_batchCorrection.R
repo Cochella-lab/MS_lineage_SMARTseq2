@@ -110,6 +110,7 @@ plotColData(sce,
 ########################################################
 load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_SCE.Rdata'))
 library(Seurat)
+library(ggplot2)
 
 reducedDim(sce) <- NULL
 endog_genes <- !rowData(sce)$is_feature_control
@@ -133,7 +134,7 @@ sce$library.size = apply(counts(sce), 2, sum)
 ## convert sce to seurat object
 ms = as.Seurat(sce, counts = 'counts', data = NULL, assay = "RNA")
 
-nfeatures = 4000
+nfeatures = 2000
 
 # new normalization from Seurat
 # tried regress out the pct_counts_Mt but works less well
@@ -141,10 +142,10 @@ ms <- SCTransform(object = ms, variable.features.n = nfeatures)
 ms <- RunPCA(object = ms, features = VariableFeatures(ms), verbose = FALSE)
 ElbowPlot(ms)
 
-nb.pcs = 20; n.neighbors = 30; min.dist = 0.4;
+nb.pcs = 20; n.neighbors = 30; min.dist = 0.3;
 ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-DimPlot(ms, reduction = "umap", group.by = 'request') + ggtitle('sctransform')
-DimPlot(ms, reduction = "umap", group.by = 'timingEst') 
+DimPlot(ms, reduction = "umap", group.by = 'request') + ggtitle('sctransform normalization')
+DimPlot(ms, reduction = "umap", group.by = 'timingEst') + ggtitle('2000 HVGs')
 
 # save(ms, file=paste0(RdataDir, version.DATA, '_QCleaned_sctransformNorm.Rdata'))
 ##########################################
@@ -165,6 +166,7 @@ Correction.Batch.using.fastMNN = TRUE
 if(Correction.Batch.using.fastMNN){
   library(Seurat)
   library(SeuratWrappers)
+  library(cowplot)
   
   ## set parameters for fastMNN, most important the merging order
   bcs = unique(ms$request)
@@ -182,21 +184,25 @@ if(Correction.Batch.using.fastMNN){
   # gene.chosen = match(HVGs, rownames(sce))
   # cat("nb of HGV : ", length(gene.chosen), "\n")
   
-  pbmcsca <- RunFastMNN(object.list = SplitObject(ms, split.by = "request"), assay = "SCT", 
+  ## note that after calling fastMNN, many features stored in Seurat object get lost
+  msc <- RunFastMNN(object.list = SplitObject(ms, split.by = "request"), assay = "SCT", 
                         features = VariableFeatures(ms), reduction.name = 'mnn', 
                         cos.norm = TRUE, merge.order = order2correct, min.batch.skip = 0.6)
-  metadata(pbmcsca@tools$RunFastMNN)$merge.info # check the mergint thresholds
+  metadata(msc@tools$RunFastMNN)$merge.info # check the mergint thresholds
+  
+  ms@reductions$mnn = Reductions(msc, slot = 'mnn')
+  ms@tools$RunFastMNN = msc@tools$RunFastMNN
   
   nb.pcs = 20; n.neighbors = 30; min.dist = 0.3;
-  pbmcsca <- RunUMAP(pbmcsca, reduction = "mnn", dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+  ms <- RunUMAP(object = ms, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+  ms <- RunUMAP(ms, reduction = "mnn", reduction.name = "umap_mnn", reduction.key = 'umap_mnn_',dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
   
-  p1 = DimPlot(pbmcsca, group.by = c("request"))
   p0 =DimPlot(ms, reduction = 'umap',  group.by = c("request"))
+  p1 = DimPlot(ms, reduction = 'umap_mnn', group.by = c("request"))
+  
   plot_grid(p0, p1)
-  save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_bcMNN.Rdata'))
+  
+  save(ms, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata'))
 
 }
-
-
-
 
