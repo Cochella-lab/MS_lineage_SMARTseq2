@@ -41,6 +41,7 @@ if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 correct.cellCycle = FALSE
+
 ########################################################
 ########################################################
 # Section : timingEst with cpm normalization and add it to the metadata
@@ -131,7 +132,8 @@ sce$library.size = apply(counts(sce), 2, sum)
 
 ## convert sce to seurat object
 ms = as.Seurat(sce, counts = 'counts', data = NULL, assay = "RNA")
-nfeatures = 2000
+
+nfeatures = 4000
 
 # new normalization from Seurat
 # tried regress out the pct_counts_Mt but works less well
