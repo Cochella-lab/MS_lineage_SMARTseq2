@@ -366,8 +366,6 @@ Test.timingEstimate.with.HashimshonyLineages = function(fastEstimate = TRUE, tim
       timers = timers[kk, ]
       cat('nb of timer genes after filtering : ', length(kk), "\n")
     }
-    
-  }
   
   for(kk in c(1:ncol(test))){
     if(fastEstimate){
@@ -384,7 +382,7 @@ Test.timingEstimate.with.HashimshonyLineages = function(fastEstimate = TRUE, tim
     
   }
   
-  
+  }
   ## compare the estimation with experiment timing
   experiments = rep(c(0, 20, 40, 60, 90, 110, 140, 180, 200, 300, 400), 5)
   plot(experiments, estimation, type='n', main = paste0('timerGene.pval = ', signif(timerGenes.pval, d= 3), ' & loess.span = ', signif(loess.span, d=2)), 
