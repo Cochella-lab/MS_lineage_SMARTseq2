@@ -18,7 +18,7 @@ library(velocyto.R)
 library(SeuratWrappers)
 library(ggplot2)
 
-Test.Velocity.py.output = FALSE
+Test.Velocity.py.output = TRUE
 if(Test.Velocity.py.output){
   # download an example for test
   #curl::curl_download(url = 'http://pklab.med.harvard.edu/velocyto/mouseBM/SCG71.loom', destfile= '~/Downloads/SCG71.loom')
