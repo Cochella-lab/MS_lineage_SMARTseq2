@@ -7,7 +7,7 @@
 # 3) TSCAN
 # 4) Celltree
 # 5) PAGA
-# 5) ELPiGrapha (possible)
+# 6) ELPiGrapha (possible)
 # destiny is installed but not to test in the first time
 # imputation method MAGIC is also installed
 ########################################################
@@ -151,7 +151,6 @@ if(Test.Slingshot){
   lines(SlingshotDataSet(sce), lwd=2)
   
 }
-
 
 Test.ELPiGraph = FALSE
 if(Test.ELPiGraph){

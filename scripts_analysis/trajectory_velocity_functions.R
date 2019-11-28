@@ -62,6 +62,7 @@ DimPlot(ms.logtransform, reduction = "umap", group.by = 'request')
 # 
 ########################################################
 ########################################################
+
 ldat <- ReadVelocity(file = "/Volumes/groups/cochella/Aleks/bioinformatics/raw_ngs_data/global.loom")
 ms <- as.Seurat(x = ldat)
 ms <- SCTransform(object = ms, assay = "spliced")
@@ -84,7 +85,7 @@ FeaturePlot(ms, features = c("unc-30", "let-381", "sfrp-1", "ceh-27", "ceh-32", 
 FeaturePlot(ms, features = c("cutl-2", "D1005.2", "K08B4.2", "noah-2", "let-4"))
 FeaturePlot(ms, features = c("pha-4", "hnd-1"))
 FeaturePlot(ms, features = c("B0310.2"))
-ms
+
 FeaturePlot(ms, features = c("fbxa-81", "fbxa-137"))
 
 
