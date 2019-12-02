@@ -109,8 +109,6 @@ plotColData(sce,
 ########################################################
 ########################################################
 load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_SCE.Rdata'))
-library(Seurat)
-library(ggplot2)
 
 reducedDim(sce) <- NULL
 endog_genes <- !rowData(sce)$is_feature_control
@@ -131,11 +129,13 @@ if(Normalization.Testing){
 ## add some extra stat for sce (select normalization method: sctransform or scran ())
 sce$library.size = apply(counts(sce), 2, sum)
 
+library(Seurat)
+library(ggplot2)
+
 ## convert sce to seurat object
 ms = as.Seurat(sce, counts = 'counts', data = NULL, assay = "RNA")
 
 nfeatures = 2000
-
 # new normalization from Seurat
 # tried regress out the pct_counts_Mt but works less well
 ms <- SCTransform(object = ms, variable.features.n = nfeatures) 
