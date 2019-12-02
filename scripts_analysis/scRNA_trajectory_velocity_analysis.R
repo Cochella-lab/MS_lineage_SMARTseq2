@@ -68,6 +68,11 @@ p1 = DimPlot(ms1, reduction = "umap") + ggtitle('louvain')
 plot_grid(p0, p1, ncol = 2)
 
 
+## test diffusion map
+#library(destiny)
+library(scater)
+dm <- calculateDiffusionMap(ms@assays$SCT@scale.data, ncomponents = 50)
+
 library(loomR)
 
 ## save seurat as loom file

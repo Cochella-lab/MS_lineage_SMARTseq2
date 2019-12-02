@@ -1,38 +1,87 @@
 # -*- coding: utf-8 -*-
 """
 Spyder Editor
-This is a temporary script file.
+This is a script file for running paga and velocity analysis
 """
-import scanpy as sc
 import numpy as np
-import umap
+#import umap
 from matplotlib import rcParams
-#import matplotlib.pyplot as pl
 import matplotlib.pyplot as plt
+import scanpy as sc
+
 #%matplotlib inline 
 
 sc.settings.verbosity = 3  # verbosity: errors (0), warnings (1), info (2), hints (3)
 sc.settings.set_figure_params(dpi=80, color_map='viridis')  # low dpi (dots per inch) yields small inline figures
 sc.logging.print_versions()
+results_file = './paga_test.h5ad'
 
-adata = sc.read_loom('Seurat_tmp.loom', sparse=True, cleanup=False, X_name='SCT', obs_names='CellID', var_names='Gene', dtype='float32')
+#adata = sc.read_loom('Seurat_tmp.loom', sparse=True, cleanup=False, X_name='SCT', obs_names='CellID', var_names='Gene', dtype='float32')
+#adata.write('Adata_from_seurat.h5ad')
+adata = sc.read('Adata_from_seurat.h5ad')
 
-sc.pp.neighbors(adata, n_neighbors = 10, n_pcs = 20, use_rep='pca_cell_embeddings')
+sc.pl.scatter(adata, x='FSC_log2', y='timingEst')
+
+#sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
+#sc.tl.pca(adata, svd_solver='arpack')
+#sc.pp.neighbors(adata, n_neighbors=30, svd_solver='arpack)
+#sc.pl.pca(adata, color='pha-4')
+#sc.pl.pca_variance_ratio(adata, log=True)
+
+sc.pp.neighbors(adata, n_neighbors = 30, n_pcs = 20, use_rep='pca_cell_embeddings')
 #sc$tl$leiden(adata, resolution = 1.0)
 sc.tl.draw_graph(adata)
-sc.pl.draw_graph(adata)
 
-sc.pl.draw_graph(adata, color='ClusterName', legend_loc='on data')
+#sc.pl.draw_graph(adata)
+
+sc.pl.draw_graph(adata, color='ClusterName', legend_loc='on data') # using clustering from Seurat
+
+#sc.tl.louvain(adata, resolution=6)
+#sc.pl.draw_graph(adata, color='louvain', legend_loc='on data')
 
 sc.tl.paga(adata, groups='ClusterName')
-
+#sc.tl.paga(adata)
+sc.pl.paga(adata)
+sc.pl.paga(adata, threshold=0.8, layout='fa')
+#sc.pl.paga(adata, plot=False)
+#sc.tl.umap(adata, init_pos='paga')
 #plt.figure()
-sc.pl.paga(adata, threshold=0.7, layout='fa', frameon=True, fontsize=10, node_size_scale=0.5, max_edge_width=10)
+#sc.pl.paga(adata, threshold=0.7, layout='rt', frameon=True, fontsize=10, node_size_scale=0.5, max_edge_width=10)
+sc.pl.paga(adata,
+    threshold=0.8,           
+    solid_edges='connectivities_tree',
+    dashed_edges='connectivities', 
+    layout='fr',
+    node_size_scale=2,
+    node_size_power=0.5,
+    max_edge_width=4,
+    frameon=True,
+    fontsize=3.5)
+
 #plt.ion()
 #plt.show()
+adata.obs['ClusterName'].cat.categories
 
+#sc.tl.draw_graph(adata, init_pos='paga')
+sc.tl.draw_graph(adata, init_pos='paga', layout='fr', maxiter=50)
+
+X = adata.obsm['X_draw_graph_fr'].copy()
+adata.obsm['X_draw_graph_fr'] = X.copy()
+# adata.obsm['X_draw_graph_fr'][adata.obs['clusters'] == '0', 1] -= 400
+adata.obsm['X_draw_graph_fr'][adata.obs['ClusterName'] == '0', 0] += 500
+# adata.obsm['X_draw_graph_fr'][adata.obs['clusters'] == '1', 1] -= 1000
+adata.obsm['X_draw_graph_fr'][adata.obs['ClusterName'] == '1', 0] -= 500
+
+sc.pl.draw_graph(adata, color='ClusterName', edges=True, size=40, legend_loc='on data')
+
+# umap now working 
 sc.tl.umap(adata)
-sc.tl.umap(adata, init_pos='paga')
+sc.pl.umap(adata, color = 'ClusterName')
+
+sc.tl.umap(adata, init_pos=sc.tl._utils.get_init_pos_from_paga(adata))
+#sc.tl.umap(adata, init_pos='paga')
+sc.pl.umap(adata, color = 'ClusterName')
+
 
 sc.pl.paga_compare(
   adata,
@@ -42,65 +91,65 @@ sc.pl.paga_compare(
   save = True
 )
 
+##################################
+##
+## test scVelo
+##################################
+import scvelo as scv
+scv.logging.print_version()
 
-##print("hello world")
-##pl.plot(arange(5))
-#
-#sc.set_figure_params(dpi=100)  # low dpi (dots per inch) yields small inline figures
-#sc.settings.verbosity = 3  # verbosity: errors (0), warnings (1), info (2), hints (3)
-#sc.logging.print_versions()
-#
-#results_file = '../results/paga_test/planaria_extended.h5ad'
-#
-#paga_plot_params = dict(
-#    legend_fontsize=5,
-#    solid_edges='confidence_tree',
-#    dashed_edges='confidence',
-#    root='neoblast 1',
-#    layout='rt_circular',
-#    node_size_scale=0.5,
-#    node_size_power=0.9,
-#    max_edge_width=0.7,
-#    fontsize=3.5)
-#
-#adata = sc.read('../results/paga_test/R_pca_seurat.txt')
-#clusters = pd.read_csv('../results/paga_test/R_annotation.txt', header=None)
-#adata.obs['clusters'] = clusters[0].values
-#adata.uns['iroot'] = 6  # root cell (the first neoblast in the file)
-#
-#sc.utils.sanitize_anndata(adata)
-#
-#adata.obs['clusters'].cat.reorder_categories([
-#    'early epidermal progenitors', 'activated early epidermal progenitors',
-#    'epidermal neoblasts', 'epidermis', 'epidermis DVb',
-#    'epidermis DVb neoblast', 'glia', 'phagocytes', 'goblet cells',
-#    'psd+ cells', 'gut progenitors', 'late epidermal progenitors 1',
-#    'late epidermal progenitors 2', 'muscle body', 'muscle pharynx',
-#    'muscle progenitors', 'neoblast 1', 'neoblast 2', 'neoblast 3',
-#    'neoblast 4', 'neoblast 5', 'neoblast 6', 'neoblast 7', 'neoblast 8',
-#    'neoblast 9', 'neoblast 10', 'neoblast 11', 'neoblast 12',
-#    'neoblast 13', 'ChAT neurons 1', 'ChAT neurons 2', 'GABA neurons',
-#    'otf+ cells 1', 'otf+ cells 2', 'spp-11+ neurons', 'npp-18+ neurons',
-#    'cav-1+ neurons', 'neural progenitors', 'pharynx cell type progenitors',
-#    'pgrn+ parenchymal cells', 'ldlrr-1+ parenchymal cells',
-#    'psap+ parenchymal cells', 'aqp+ parenchymal cells',
-#    'parenchymal progenitors', 'pharynx cell type', 'pigment',
-#    'protonephridia', 'secretory 1', 'secretory 2', 'secretory 3',
-#    'secretory 4'], inplace=True)
-#
-#
-### run tsne extremely SLOW !!!
-##sc.tl.tsne(adata)
-#
-#colors = pd.read_csv('../results/paga_test/colors_dataset.txt', header=None, sep='\t')
-## transform to dict where keys are cluster names
-#colors = {k: c for k, c in colors.values}
-#adata.uns['clusters_colors'] = [colors[clus] for clus in adata.obs['clusters'].cat.categories]
-#
-#sc.pl.tsne(adata)
-#sc.pl.tsne(adata, color='red', legend_loc='on data', legend_fontsize=5, show=False)
-##pl.plot()
-#
-#adata.write(results_file)
+scv.settings.verbosity = 3  # show errors(0), warnings(1), info(2), hints(3)
+scv.settings.set_figure_params('scvelo')  # for beautified visualization
 
+adata =scv.read_loom('merged.loom') ## extremely slow
+adata.write('Adata_for_RNAvelocity.h5ad')
 
+# show proportions of spliced/unspliced abundances
+scv.utils.show_proportions(adata)
+adata
+
+scv.pp.filter_genes(adata, min_shared_counts=10)
+scv.pp.normalize_per_cell(adata)
+scv.pp.filter_genes_dispersion(adata, n_top_genes=3000)
+scv.pp.log1p(adata)
+
+scv.pp.filter_and_normalize(adata, min_shared_counts=30, n_top_genes=2000)
+scv.pp.moments(adata, n_pcs=30, n_neighbors=30)
+
+scv.tl.velocity(adata)
+
+scv.tl.velocity_graph(adata)
+scv.tl.velocity_confidence(adata)
+
+#scv.tl.velocity_graph(adata)
+scv.tl.umap(adata)
+
+scv.pl.velocity_embedding_stream(adata, basis='umap')
+
+scv.pl.velocity_embedding(adata, basis='umap', arrow_length=1.2, arrow_size=1.2, dpi=150)
+scv.pl.velocity_embedding_grid(adata, color='pha-4', layer=['velocity', 'spliced'], arrow_size=1.5)
+
+scv.pl.velocity_graph(adata)
+
+#############
+# how to combine the paga and velocity 
+# some advice from the author 
+# https://github.com/theislab/paga/issues/11
+#############
+scv.tl.velocity_graph(adata)
+
+sc.tl.louvain(adata, resolution=6)
+sc.tl.paga(adata)
+sc.tl.paga(adata, use_rna_velocity=True)
+
+scv.pl.paga(adata, threshold=0.01, transitions='transitions_confidence')
+
+scv.pl.paga()
+sc.tl.draw_graph(adata, init_pos='paga', layout='fr', maxiter=50)
+X = adata.obsm['X_draw_graph_fr'].copy()
+adata.obsm['X_draw_graph_fr'] = X.copy()
+# adata.obsm['X_draw_graph_fr'][adata.obs['clusters'] == '0', 1] -= 400
+adata.obsm['X_draw_graph_fr'][adata.obs['louvain'] == '0', 0] += 500
+# adata.obsm['X_draw_graph_fr'][adata.obs['clusters'] == '1', 1] -= 1000
+adata.obsm['X_draw_graph_fr'][adata.obs['louvain'] == '1', 0] -= 500
+sc.pl.draw_graph(adata, color='louvain', edges=True, size=40, legend_loc='on data')
