@@ -41,7 +41,6 @@ if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 correct.cellCycle = FALSE
-
 ########################################################
 ########################################################
 # Section : timingEst with cpm normalization and add it to the metadata
@@ -109,7 +108,9 @@ plotColData(sce,
 ########################################################
 ########################################################
 load(file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_SCE.Rdata'))
-
+library(scater)
+library(SingleCellExperiment)
+library(scran)
 reducedDim(sce) <- NULL
 endog_genes <- !rowData(sce)$is_feature_control
 
@@ -126,25 +127,45 @@ if(Normalization.Testing){
   dev.off()
 }
 
-## add some extra stat for sce (select normalization method: sctransform or scran ())
+##########################################
+# add some extra stat for sce (select normalization method: sctransform or scran ())
+# normalized the data with scran 
+##########################################
 sce$library.size = apply(counts(sce), 2, sum)
+qclust <- quickCluster(sce)
+sce <- computeSumFactors(sce, clusters = qclust)
+sce <- logNormCounts(sce, log = TRUE, pseudo_count = 1)
+
+plot(sce$library.size/1e6, sizeFactors(sce), log="xy", xlab="Library size (millions)", ylab="Size factor")
 
 library(Seurat)
 library(ggplot2)
 
-## convert sce to seurat object
-ms = as.Seurat(sce, counts = 'counts', data = NULL, assay = "RNA")
+ms = as.Seurat(sce, counts = 'counts', data = 'logcounts', assay = "RNA") # scran normalized data were kept in Seurat
 
-nfeatures = 2000
+##########################################
+# HVGs were performed 
+##########################################
+#nfeatures = 2000
+ms <- FindVariableFeatures(ms, selection.method = "vst", nfeatures = 2000)
+
+top10 <- head(VariableFeatures(ms), 10) # Identify the 10 most highly variable genes
+
+plot1 <- VariableFeaturePlot(ms)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+CombinePlots(plots = list(plot1, plot2)) # plot variable features with and without labels
+
+ms = ScaleData(ms, features = rownames(ms))
+
 # new normalization from Seurat
 # tried regress out the pct_counts_Mt but works less well
-ms <- SCTransform(object = ms, variable.features.n = nfeatures) 
+#ms <- SCTransform(object = ms, variable.features.n = nfeatures) 
 ms <- RunPCA(object = ms, features = VariableFeatures(ms), verbose = FALSE)
 ElbowPlot(ms)
 
 nb.pcs = 20; n.neighbors = 30; min.dist = 0.3;
 ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-DimPlot(ms, reduction = "umap", group.by = 'request') + ggtitle('sctransform normalization')
+DimPlot(ms, reduction = "umap", group.by = 'request') + ggtitle('scran normalization')
 DimPlot(ms, reduction = "umap", group.by = 'timingEst') + ggtitle('2000 HVGs')
 
 # save(ms, file=paste0(RdataDir, version.DATA, '_QCleaned_sctransformNorm.Rdata'))
@@ -162,7 +183,6 @@ if(correct.cellCycle){
 # Batch correction using fastMNN from scran
 # here we are calling fastMNN from Seurat 
 ##########################################
-Correction.Batch.using.fastMNN = TRUE
 if(Correction.Batch.using.fastMNN){
   library(Seurat)
   library(SeuratWrappers)
@@ -205,7 +225,7 @@ if(Correction.Batch.using.fastMNN){
   save(ms, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata'))
   
 }
-
+Correction.Batch.using.fastMNN = FALSE
 ########################################################
 ########################################################
 # Section : Quick clustering 
@@ -221,6 +241,10 @@ library(ggplot2)
 
 ElbowPlot(ms)
 ms <- FindNeighbors(object = ms, reduction = 'pca', dims = 1:20)
+
+knn = data.frame(ms@graphs$RNA_nn)
+snn = data.frame(ms@graphs$RNA_snn)
+
 ms <- FindClusters(object = ms, resolution = 6, algorithm = 4)
 #DimPlot(ms, reduction = "umap") + ggtitle('Leiden')
 ms1 = FindClusters(object = ms, resolution = 6, algorithm = 1)
