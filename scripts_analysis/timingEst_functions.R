@@ -569,7 +569,7 @@ Test.timingEstimate = function()
 # Run the main function with range of parameters and assign a confidence scores 
 # because I realized that the estimation is somehow sensitive to hyperparameters 
 ##########################################
-estimate.timing.and.variance.with.timer.genes = function(sce)
+estimate.timing.and.variance.with.timer.genes = function(sce, lineageCorrs = NA)
 {
   # normalize the sce using cpm, which is used for the timingEst, because the timer genes were normalized in the similar way
   library(scater)
@@ -589,8 +589,10 @@ estimate.timing.and.variance.with.timer.genes = function(sce)
     {
       for(s in c(0.3, 0.5, 0.7))
       {
-        cat('pv = ', pv, ' cutoff.expr = ', cutoff.expr, 's = ', s, "\n")
-        sce.test = sc.estimateTiming.with.timer.genes(sce, fastEstimate = TRUE, timerGenes.pval = pv, lineageCorrs = 0.5, loess.span = s,
+        cat('pv = ', pv, ' cutoff.expr = ', cutoff.expr, ' loess.span = ', s, "\n")
+        sce.test = sc.estimateTiming.with.timer.genes(sce, fastEstimate = TRUE, timerGenes.pval = pv, 
+                                                      lineageCorrs = lineageCorrs,
+                                                      loess.span = s,
                                                       lowFilter.threshold.target = cutoff.expr)
         timingEst = rbind(timingEst, sce.test$timing.est)
       }

@@ -22,7 +22,71 @@
 # imputation method MAGIC is also installed
 ########################################################
 ########################################################
-clean.NA.for.metadata(md)
+Split.data.per.timeWindow = function(ms)
+{
+  ms@tools$RunFastMNN = list() # reduce a little bit the size of seurat object
+  
+  ##########################################
+  #  # fix time windows
+  ##########################################
+  timingEst = as.numeric(as.character(ms$timingEst))
+  
+  kk1 = which(timingEst <= 150)
+  kk2 = which(timingEst > 150 & timingEst < 230)
+  kk3 = which(timingEst > 230 & timingEst <= 280)
+  kk4 = which(timingEst >280 & timingEst <=320)
+  kk5 = which(timingEst > 320)
+  cat(length(kk1), length(kk2), length(kk3), length(kk4),  length(kk4), '\n')
+  
+  ms$timingEst.group[kk1] = 1
+  ms$timingEst.group[kk2] = 2
+  ms$timingEst.group[kk3] = 3
+  ms$timingEst.group[kk4] = 4
+  ms$timingEst.group[kk5] = 5
+  
+  p1 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk1)) + NoLegend()
+  p2 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk2)) + NoLegend()
+  p3 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk3)) + NoLegend()
+  p4 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk4)) + NoLegend()
+  p5 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk5)) + NoLegend()
+  
+  CombinePlots(plots = list(p1, p2, p3, p4, p5), ncol = 3)
+  
+  library(scater)
+  library(Seurat)
+  sce = as.SingleCellExperiment(ms)
+  rm(ms) # to save the memory
+  
+  save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_Normed_bc_timeWidow_SCE.Rdata'))
+  
+  for(n in 1:5)
+  {
+    n = 1
+    jj = which(sce$timingEst.group == n)
+    xx = sce[jj, ]
+    
+    
+  }
+  #ms1 = subset(ms, cells = colnames(ms)[kk])
+  #ms1 <- FindVariableFeatures(ms1, selection.method = "vst", nfeatures = 800)
+  #ms1 = ScaleData(ms1, features = rownames(ms1))
+  #ms1 <- RunPCA(object = ms1, features = VariableFeatures(ms1), verbose = FALSE)
+  #nb.pcs = 20; n.neighbors = 20; min.dist = 0.3;
+  #ms1 <- RunUMAP(object = ms1, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+  
+  #p1 = DimPlot(ms1, reduction = "umap", group.by = 'timingEst')
+  #p0 = DimPlot(ms, reduction = 'umap', group.by = 'timingEst')
+  #plot_grid(p0, p1, ncol = 2)
+}
+
+########################################################
+########################################################
+# Section : test function (not used now)
+# 
+########################################################
+########################################################
+
+clean.NA.for.metadata = function(md)
 {
   md = md[, c(1:6, 70:74, 121:130)]
   for(n in 1:ncol(md))
@@ -32,6 +96,7 @@ clean.NA.for.metadata(md)
     } 
   }
 }
+
 
 Test.different.trajectory.methods = function()
 {

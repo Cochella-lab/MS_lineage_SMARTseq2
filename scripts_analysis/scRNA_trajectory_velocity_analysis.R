@@ -65,12 +65,11 @@ plotColData(sce,
   geom_hline(yintercept=log10(c(500, 1000, 5000)) , linetype="dashed", color = "darkgray", size=0.5) +
   geom_vline(xintercept = c(4:6), linetype="dotted", color = "black", size=0.5)
 
-
 ##########################################
 # here estimat the timing with timer genes
 ### first test 5 lineages from Hashimsholy et al. paper
 ##########################################
-reEstimate.timing.using.timer.genes.using.cpmNorm = FALSE
+reEstimate.timing.using.timer.genes.using.cpmNorm = FALSEs
 if(reEstimate.timing.using.timer.genes.using.cpmNorm){
   # test the timingEst main function using the 5 lineages from Hashimshony et al. 
   #Test.timingEstimate()
@@ -79,7 +78,7 @@ if(reEstimate.timing.using.timer.genes.using.cpmNorm){
   ## Whereby we assess the sensibility of our timingEst
   ## this will take some time to finish
   source.my.script('timingEst_functions.R')
-  sce = estimate.timing.and.variance.with.timer.genes(sce)
+  sce = estimate.timing.and.variance.with.timer.genes(sce, lineageCorrs = NA)
   
   save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_SCE.Rdata'))
   
@@ -136,6 +135,7 @@ qclust <- quickCluster(sce)
 sce <- computeSumFactors(sce, clusters = qclust)
 sce <- logNormCounts(sce, log = TRUE, pseudo_count = 1)
 
+par(mfrow = c(1, 1))
 plot(sce$library.size/1e6, sizeFactors(sce), log="xy", xlab="Library size (millions)", ylab="Size factor")
 
 library(Seurat)
@@ -206,7 +206,7 @@ if(Correction.Batch.using.fastMNN){
   # cat("nb of HGV : ", length(gene.chosen), "\n")
   
   ## note that after calling fastMNN, many features stored in Seurat object get lost
-  msc <- RunFastMNN(object.list = SplitObject(ms, split.by = "request"), assay = "SCT", 
+  msc <- RunFastMNN(object.list = SplitObject(ms, split.by = "request"), assay = "RNA", 
                     features = VariableFeatures(ms), reduction.name = 'mnn', 
                     cos.norm = TRUE, merge.order = order2correct, min.batch.skip = 0.6)
   metadata(msc@tools$RunFastMNN)$merge.info # check the mergint thresholds
@@ -245,24 +245,13 @@ ms <- FindNeighbors(object = ms, reduction = 'pca', dims = 1:20)
 
 #knn = data.frame(ms@graphs$RNA_nn)
 #snn = data.frame(ms@graphs$RNA_snn)
-
 DimPlot(ms, reduction = "umap", group.by = 'timingEst') + ggtitle('Leiden')
 
-timingEst = as.numeric(as.character(ms$timingEst)) 
-kk = which(timingEst >= 170 & timingEst < 370)
-length(kk)
+source.my.script('trajectory_velocity_functions.R')
+Split.data.per.timeWindow(ms)
 
-ms1 = subset(ms, cells = colnames(ms)[kk])
 
-ms1 <- FindVariableFeatures(ms1, selection.method = "vst", nfeatures = 800)
-ms1 = ScaleData(ms1, features = rownames(ms1))
-ms1 <- RunPCA(object = ms1, features = VariableFeatures(ms1), verbose = FALSE)
-nb.pcs = 20; n.neighbors = 20; min.dist = 0.3;
-ms1 <- RunUMAP(object = ms1, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
 
-p1 = DimPlot(ms1, reduction = "umap", group.by = 'timingEst')
-p0 = DimPlot(ms, reduction = 'umap', group.by = 'timingEst')
-plot_grid(p0, p1, ncol = 2)
 
 ms <- FindClusters(object = ms, resolution = 6, algorithm = 4)
 #DimPlot(ms, reduction = "umap") + ggtitle('Leiden')
