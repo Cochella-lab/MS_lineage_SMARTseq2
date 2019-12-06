@@ -183,6 +183,7 @@ if(correct.cellCycle){
 # Batch correction using fastMNN from scran
 # here we are calling fastMNN from Seurat 
 ##########################################
+Correction.Batch.using.fastMNN = FALSE
 if(Correction.Batch.using.fastMNN){
   library(Seurat)
   library(SeuratWrappers)
@@ -225,7 +226,7 @@ if(Correction.Batch.using.fastMNN){
   save(ms, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata'))
   
 }
-Correction.Batch.using.fastMNN = FALSE
+
 ########################################################
 ########################################################
 # Section : Quick clustering 
@@ -242,8 +243,26 @@ library(ggplot2)
 ElbowPlot(ms)
 ms <- FindNeighbors(object = ms, reduction = 'pca', dims = 1:20)
 
-knn = data.frame(ms@graphs$RNA_nn)
-snn = data.frame(ms@graphs$RNA_snn)
+#knn = data.frame(ms@graphs$RNA_nn)
+#snn = data.frame(ms@graphs$RNA_snn)
+
+DimPlot(ms, reduction = "umap", group.by = 'timingEst') + ggtitle('Leiden')
+
+timingEst = as.numeric(as.character(ms$timingEst)) 
+kk = which(timingEst >= 170 & timingEst < 370)
+length(kk)
+
+ms1 = subset(ms, cells = colnames(ms)[kk])
+
+ms1 <- FindVariableFeatures(ms1, selection.method = "vst", nfeatures = 800)
+ms1 = ScaleData(ms1, features = rownames(ms1))
+ms1 <- RunPCA(object = ms1, features = VariableFeatures(ms1), verbose = FALSE)
+nb.pcs = 20; n.neighbors = 20; min.dist = 0.3;
+ms1 <- RunUMAP(object = ms1, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+
+p1 = DimPlot(ms1, reduction = "umap", group.by = 'timingEst')
+p0 = DimPlot(ms, reduction = 'umap', group.by = 'timingEst')
+plot_grid(p0, p1, ncol = 2)
 
 ms <- FindClusters(object = ms, resolution = 6, algorithm = 4)
 #DimPlot(ms, reduction = "umap") + ggtitle('Leiden')
