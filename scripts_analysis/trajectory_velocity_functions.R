@@ -54,19 +54,32 @@ Split.data.per.timeWindow = function(ms)
   
   library(scater)
   library(Seurat)
+  library(scran)
   sce = as.SingleCellExperiment(ms)
   rm(ms) # to save the memory
   
   save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_Normed_bc_timeWidow_SCE.Rdata'))
   
+  dec.sce = modelGeneVar(sce)
+  length(getTopHVGs(dec.sce, var.threshold = 0))
+  
   for(n in 1:5)
   {
-    n = 1
+    #n = 1
     jj = which(sce$timingEst.group == n)
     xx = sce[jj, ]
     
+    dec.xx <- modelGeneVar(xx)
+    dec.xx[order(dec.xx$bio, decreasing=TRUE), ]
+    
+    hvg.xx <- getTopHVGs(dec.xx, var.threshold = 0)
+    cat('HVGs --', length(hvg.xx), '\n')
+     
+    write.table(match(hvg.xx, rownames(sce)), file = paste0(resDir, '/alex_graph/hvg_index_', n, '.txt'), row.names = FALSE, col.names = FALSE)
+    write.table(logcounts(xx), file = paste0(resDir, '/alex_graph/X_norm_', n, '.txt'), sep='\t', row.names = FALSE, col.names = FALSE)
     
   }
+  
   #ms1 = subset(ms, cells = colnames(ms)[kk])
   #ms1 <- FindVariableFeatures(ms1, selection.method = "vst", nfeatures = 800)
   #ms1 = ScaleData(ms1, features = rownames(ms1))
