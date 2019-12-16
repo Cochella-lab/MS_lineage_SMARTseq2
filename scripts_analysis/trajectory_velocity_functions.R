@@ -31,65 +31,82 @@ Split.data.per.timeWindow = function(ms)
   ##########################################
   timingEst = as.numeric(as.character(ms$timingEst))
   
-  kk1 = which(timingEst <= 150)
-  kk2 = which(timingEst > 150 & timingEst < 230)
-  kk3 = which(timingEst > 230 & timingEst <= 280)
-  kk4 = which(timingEst >280 & timingEst <=320)
-  kk5 = which(timingEst > 320)
-  cat(length(kk1), length(kk2), length(kk3), length(kk4),  length(kk4), '\n')
+  #kk1 = which(timingEst <= 150)
+  kk1 = which(timingEst <= 220)
+  kk2 = which(timingEst > 220 & timingEst <= 280)
+  kk3 = which(timingEst >280 & timingEst <=340)
+  kk4 = which(timingEst > 340 & timingEst<=440)
+  cat(length(kk1), length(kk2), length(kk3), length(kk4), '\n')
   
   ms$timingEst.group[kk1] = 1
   ms$timingEst.group[kk2] = 2
   ms$timingEst.group[kk3] = 3
   ms$timingEst.group[kk4] = 4
-  ms$timingEst.group[kk5] = 5
+  #ms$timingEst.group[kk5] = 5
   
   p1 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk1)) + NoLegend()
   p2 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk2)) + NoLegend()
   p3 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk3)) + NoLegend()
   p4 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk4)) + NoLegend()
-  p5 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk5)) + NoLegend()
+  #p5 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk5)) + NoLegend()
   
-  CombinePlots(plots = list(p1, p2, p3, p4, p5), ncol = 3)
+  CombinePlots(plots = list(p1, p2, p3, p4), ncol = 2)
   
-  library(scater)
-  library(Seurat)
-  library(scran)
-  sce = as.SingleCellExperiment(ms)
-  rm(ms) # to save the memory
   
-  save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_Normed_bc_timeWidow_SCE.Rdata'))
-  
-  dec.sce = modelGeneVar(sce)
-  length(getTopHVGs(dec.sce, var.threshold = 0))
-  
-  for(n in 1:5)
-  {
-    #n = 1
-    jj = which(sce$timingEst.group == n)
-    xx = sce[jj, ]
+  HVG.using.scran = TRUE
+  if(HVG.using.scran){
+    library(scater)
+    library(Seurat)
+    library(scran)
     
-    dec.xx <- modelGeneVar(xx)
-    dec.xx[order(dec.xx$bio, decreasing=TRUE), ]
+    sce = as.SingleCellExperiment(ms)
+    #rm(ms) # to save the memory
+
+    #save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_Normed_bc_timeWidow_SCE.Rdata'))
+
+    dec.sce = modelGeneVar(sce)
+    length(getTopHVGs(dec.sce, var.threshold = 0))
+    for(n in 1:4)
+    {
+      #n = 1
+      jj = which(sce$timingEst.group == n)
+      xx = sce[jj, ]
+      
+      dec.xx <- modelGeneVar(xx)
+      dec.xx[order(dec.xx$bio, decreasing=TRUE), ]
+      
+      hvg.xx <- getTopHVGs(dec.xx, var.threshold = 0)
+      cat('HVGs --', length(hvg.xx), '\n')
+      
+      write.table(match(hvg.xx, rownames(sce)), file = paste0(resDir, '/alex_graph/hvg_index_', n, '.txt'), row.names = FALSE, col.names = FALSE)
+      write.table(logcounts(xx), file = paste0(resDir, '/alex_graph/X_norm_', n, '.txt'), sep='\t', row.names = FALSE, col.names = FALSE)
+    }
     
-    hvg.xx <- getTopHVGs(dec.xx, var.threshold = 0)
-    cat('HVGs --', length(hvg.xx), '\n')
-     
-    write.table(match(hvg.xx, rownames(sce)), file = paste0(resDir, '/alex_graph/hvg_index_', n, '.txt'), row.names = FALSE, col.names = FALSE)
-    write.table(logcounts(xx), file = paste0(resDir, '/alex_graph/X_norm_', n, '.txt'), sep='\t', row.names = FALSE, col.names = FALSE)
+    
+  }else{
+    
+    for(n in 1:4){
+      jj = which(ms$timingEst.group == n)
+      ms1 = subset(ms, cells = colnames(ms)[jj])
+      ms1 <- FindVariableFeatures(ms1, selection.method = "vst", nfeatures = 800)
+      
+      #ms1 = ScaleData(ms1, features = rownames(ms1))
+      #ms1 <- RunPCA(object = ms1, features = VariableFeatures(ms1), verbose = FALSE)
+      #nb.pcs = 20; n.neighbors = 20; min.dist = 0.3;
+      #ms1 <- RunUMAP(object = ms1, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+      
+      #p1 = DimPlot(ms1, reduction = "umap", group.by = 'timingEst')
+      #p0 = DimPlot(ms, reduction = 'umap', group.by = 'timingEst')
+      #plot_grid(p0, p1, ncol = 2)
+      hvg.index = match(VariableFeatures(ms1), rownames(ms1))
+      cat(n, '-- ', length(hvg.index), 'hvg \n')
+      X_norm = as.data.frame(ms1@assays$RNA@data)
+      write.table(hvg.index, file = paste0(resDir, '/alex_graph/hvg_index_', n, '.txt'), row.names = FALSE, col.names = FALSE)
+      write.table(X_norm, file = paste0(resDir, '/alex_graph/X_norm_', n, '.txt'), sep='\t', row.names = FALSE, col.names = FALSE)
+    }
     
   }
   
-  #ms1 = subset(ms, cells = colnames(ms)[kk])
-  #ms1 <- FindVariableFeatures(ms1, selection.method = "vst", nfeatures = 800)
-  #ms1 = ScaleData(ms1, features = rownames(ms1))
-  #ms1 <- RunPCA(object = ms1, features = VariableFeatures(ms1), verbose = FALSE)
-  #nb.pcs = 20; n.neighbors = 20; min.dist = 0.3;
-  #ms1 <- RunUMAP(object = ms1, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-  
-  #p1 = DimPlot(ms1, reduction = "umap", group.by = 'timingEst')
-  #p0 = DimPlot(ms, reduction = 'umap', group.by = 'timingEst')
-  #plot_grid(p0, p1, ncol = 2)
 }
 
 ########################################################

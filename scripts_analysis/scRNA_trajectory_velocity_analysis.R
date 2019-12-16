@@ -240,6 +240,11 @@ library(SeuratWrappers)
 library(cowplot)
 library(ggplot2)
 
+## for the sake of memory empty some slots in seurat object
+ms@tools$RunFastMNN = list() 
+ms@reductions$umap_mnn = list()
+ms@commands = list()
+
 ElbowPlot(ms)
 ms <- FindNeighbors(object = ms, reduction = 'pca', dims = 1:20)
 
@@ -248,8 +253,8 @@ ms <- FindNeighbors(object = ms, reduction = 'pca', dims = 1:20)
 DimPlot(ms, reduction = "umap", group.by = 'timingEst') + ggtitle('Leiden')
 
 source.my.script('trajectory_velocity_functions.R')
-Split.data.per.timeWindow(ms)
 
+Split.data.per.timeWindow(ms)
 
 
 
