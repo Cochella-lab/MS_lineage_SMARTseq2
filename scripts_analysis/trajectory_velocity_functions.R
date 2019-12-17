@@ -24,12 +24,34 @@
 ########################################################
 Split.data.per.timeWindow = function(ms)
 {
+  ## for the sake of memory empty some slots in seurat object
+  ms@tools$RunFastMNN = list() 
+  ms@reductions$umap_mnn = list()
+  ms@commands = list()
   ms@tools$RunFastMNN = list() # reduce a little bit the size of seurat object
+  #knn = data.frame(ms@graphs$RNA_nn)
+  #snn = data.frame(ms@graphs$RNA_snn)
+  
+  ##########################################
+  # look into the HVGs 
+  ##########################################
+  source.my.script('timingEst_functions.R')
+  dataDir.Hashimsholy = '../data/Hashimsholy_et_al'
+  load(file = paste0(dataDir.Hashimsholy, "/timer_genes_with_ac_pval_plus_timepoints.Rdata"))
+  #head(timers)
+  timerGenes.pval=0.001; timerGenes.ac=0.5;
+  sels.timerGenes = which(timers$ac.max > timerGenes.ac & timers$pval.box < timerGenes.pval)
+  timers = timers[sels.timerGenes, -c(1:4)]
+  hvgs = VariableFeatures(ms)
+  
+  length(intersect(hvgs, rownames(timers)))/length(hvgs)
   
   ##########################################
   #  # fix time windows
   ##########################################
   timingEst = as.numeric(as.character(ms$timingEst))
+  kk = which(timingEst <= 440)
+  ms = subset(ms, cells = colnames(ms)[kk])
   
   #kk1 = which(timingEst <= 150)
   kk1 = which(timingEst <= 220)
@@ -44,16 +66,18 @@ Split.data.per.timeWindow = function(ms)
   ms$timingEst.group[kk4] = 4
   #ms$timingEst.group[kk5] = 5
   
-  p1 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk1)) + NoLegend()
-  p2 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk2)) + NoLegend()
-  p3 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk3)) + NoLegend()
-  p4 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk4)) + NoLegend()
-  #p5 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk5)) + NoLegend()
+  timeWindowPlot = FALSE
+  if(timeWindowPlot){
+    p1 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk1)) + NoLegend()
+    p2 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk2)) + NoLegend()
+    p3 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk3)) + NoLegend()
+    p4 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk4)) + NoLegend()
+    #p5 = DimPlot(ms, reduction = 'umap', cols.highlight = "red", cells.highlight = as.list(kk5)) + NoLegend()
+    
+    CombinePlots(plots = list(p1, p2, p3, p4), ncol = 2)
+  }
   
-  CombinePlots(plots = list(p1, p2, p3, p4), ncol = 2)
-  
-  
-  HVG.using.scran = TRUE
+  HVG.using.scran = FALSE
   if(HVG.using.scran){
     library(scater)
     library(Seurat)
@@ -61,9 +85,7 @@ Split.data.per.timeWindow = function(ms)
     
     sce = as.SingleCellExperiment(ms)
     #rm(ms) # to save the memory
-
     #save(sce, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_Normed_bc_timeWidow_SCE.Rdata'))
-
     dec.sce = modelGeneVar(sce)
     length(getTopHVGs(dec.sce, var.threshold = 0))
     for(n in 1:4)
@@ -85,27 +107,54 @@ Split.data.per.timeWindow = function(ms)
     
   }else{
     
+    saveTableForStitch = FALSE
+    ms = FindVariableFeatures(ms, selection.method = "vst", nfeatures = 3000, verbose = FALSE)
+    
+    HVGs = cbind(VariableFeatures(ms), rep(0, length(VariableFeatures(ms))))
+    nfeatures = c(500, 800, 1000, 2000)
+    
     for(n in 1:4){
       jj = which(ms$timingEst.group == n)
       ms1 = subset(ms, cells = colnames(ms)[jj])
-      ms1 <- FindVariableFeatures(ms1, selection.method = "vst", nfeatures = 800)
+      ms1 <- FindVariableFeatures(ms1, selection.method = "vst", nfeatures = nfeatures[n], verbose = FALSE)
+      hvgs = VariableFeatures(ms1)
       
+      HVGs = rbind(HVGs, cbind(hvgs, rep(n, length(hvgs))))
       #ms1 = ScaleData(ms1, features = rownames(ms1))
       #ms1 <- RunPCA(object = ms1, features = VariableFeatures(ms1), verbose = FALSE)
       #nb.pcs = 20; n.neighbors = 20; min.dist = 0.3;
       #ms1 <- RunUMAP(object = ms1, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-      
       #p1 = DimPlot(ms1, reduction = "umap", group.by = 'timingEst')
       #p0 = DimPlot(ms, reduction = 'umap', group.by = 'timingEst')
       #plot_grid(p0, p1, ncol = 2)
       hvg.index = match(VariableFeatures(ms1), rownames(ms1))
-      cat(n, '-- ', length(hvg.index), 'hvg \n')
+      cat(n, '-- ', length(hvg.index), 'hvg -- ', 
+          length(intersect(hvgs, rownames(timers)))/length(hvgs),  ' timer genes --',
+          length(setdiff(hvgs, VariableFeatures(ms))), 'specific for this timeWindow\n')
       X_norm = as.data.frame(ms1@assays$RNA@data)
-      write.table(hvg.index, file = paste0(resDir, '/alex_graph/hvg_index_', n, '.txt'), row.names = FALSE, col.names = FALSE)
-      write.table(X_norm, file = paste0(resDir, '/alex_graph/X_norm_', n, '.txt'), sep='\t', row.names = FALSE, col.names = FALSE)
+      if(saveTableForStitch){
+        write.table(hvg.index, file = paste0(resDir, '/alex_graph/hvg_index_', n, '.txt'), row.names = FALSE, col.names = FALSE)
+        write.table(X_norm, file = paste0(resDir, '/alex_graph/X_norm_', n, '.txt'), sep='\t', row.names = FALSE, col.names = FALSE)
+      }
     }
+    colnames(HVGs) = c('hvg', 'timewindow')
+    HVGs = data.frame(HVGs, stringsAsFactors = FALSE)
+    
+    genes2use = unique(HVGs$hvg)
+    #genes2use = intersect(unique(HVGs$hvg), rownames(timers))
+    #genes2use = setdiff(unique(HVGs$hvg), rownames(timers)) 
+    cat('nb of genes to use --', length(genes2use), '\n')
+    
+    msx <- RunPCA(object = ms, features = genes2use, verbose = FALSE, npcs = 100, weight.by.var = FALSE)
+    ElbowPlot(msx, ndims = 50)
+    
+    nb.pcs = 40; n.neighbors = 20; min.dist = 0.25;
+    msx <- RunUMAP(object = msx, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist, metric = 'cosine')
+    DimPlot(msx, reduction = "umap", group.by = 'timingEst') + ggtitle('HVGs test')
     
   }
+  
+  
   
 }
 

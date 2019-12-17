@@ -240,22 +240,14 @@ library(SeuratWrappers)
 library(cowplot)
 library(ggplot2)
 
-## for the sake of memory empty some slots in seurat object
-ms@tools$RunFastMNN = list() 
-ms@reductions$umap_mnn = list()
-ms@commands = list()
-
 ElbowPlot(ms)
-ms <- FindNeighbors(object = ms, reduction = 'pca', dims = 1:20)
+#ms <- FindNeighbors(object = ms, reduction = 'pca', dims = 1:20)
 
-#knn = data.frame(ms@graphs$RNA_nn)
-#snn = data.frame(ms@graphs$RNA_snn)
 DimPlot(ms, reduction = "umap", group.by = 'timingEst') + ggtitle('Leiden')
 
 source.my.script('trajectory_velocity_functions.R')
 
 Split.data.per.timeWindow(ms)
-
 
 
 ms <- FindClusters(object = ms, resolution = 6, algorithm = 4)
