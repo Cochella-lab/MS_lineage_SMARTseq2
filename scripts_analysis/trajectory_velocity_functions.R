@@ -108,10 +108,10 @@ Split.data.per.timeWindow = function(ms)
   }else{
     
     saveTableForStitch = FALSE
-    ms = FindVariableFeatures(ms, selection.method = "vst", nfeatures = 3000, verbose = FALSE)
+    ms = FindVariableFeatures(ms, selection.method = "vst", nfeatures = 2000, verbose = FALSE)
     
     HVGs = cbind(VariableFeatures(ms), rep(0, length(VariableFeatures(ms))))
-    nfeatures = c(500, 800, 1000, 2000)
+    nfeatures = c(500, 1000, 1500, 2000)
     
     for(n in 1:4){
       jj = which(ms$timingEst.group == n)
@@ -148,13 +148,11 @@ Split.data.per.timeWindow = function(ms)
     msx <- RunPCA(object = ms, features = genes2use, verbose = FALSE, npcs = 100, weight.by.var = FALSE)
     ElbowPlot(msx, ndims = 50)
     
-    nb.pcs = 40; n.neighbors = 20; min.dist = 0.25;
-    msx <- RunUMAP(object = msx, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist, metric = 'cosine')
+    nb.pcs = 50; n.neighbors = 20; min.dist = 0.3; spread = 1;
+    msx <- RunUMAP(object = msx, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist, spread = spread, metric = 'cosine')
     DimPlot(msx, reduction = "umap", group.by = 'timingEst') + ggtitle('HVGs test')
     
   }
-  
-  
   
 }
 
