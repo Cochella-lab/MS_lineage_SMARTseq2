@@ -39,6 +39,95 @@ if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
+if(!require("DropletUtils")) BiocManager::install('DropletUtils')
+library(DropletUtils)
+library(data.table)
+library(Matrix)
+
+# # args = commandArgs(T)
+
+Generate.enhancer.annotation = FALSE
+if(Generate.enhancer.annotation){
+  enhancers = read.table('/Volumes/groups/cochella/jiwang/annotations/promoter_enhancer_annotation-elife-37344-fig2-data1-v2.txt', header = TRUE)
+  enhancers = enhancers[ which(enhancers$annot == 'putative_enhancer'), ]
+  enhancers = data.frame(enhancers$chrom_ce11, enhancers$start_ce11, enhancers$end_ce11, enhancers$associated_gene_id, stringsAsFactors = FALSE)
+  enhancers$scores = '.'
+  enhancers$strand = '.'
+  write.table(enhancers, file = '/Volumes/groups/cochella/jiwang/annotations/ce11_enhancers_Jaenes_et_al_elife_2018.bed',
+              row.names = FALSE, col.names = FALSE, sep = '\t', quote = FALSE)
+}
+
+
+setwd('/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC')
+input_mtx_file = 'output/raw_matrix/MACS2/matrix.mtx'
+output_dir = 'output/filtered_matrix'
+
+input_mtx_dir = dirname(input_mtx_file)
+
+mat = readMM(input_mtx_file)
+features = fread(paste0(input_mtx_dir, '/features.txt'), header = F)
+barcodes = fread(paste0(input_mtx_dir, '/barcodes.txt'), header = F)
+rownames(mat) = features$V1
+colnames(mat) = barcodes$V1
+metrics = read.csv('res_counts/outs/singlecell.csv', header = TRUE)
+
+set.seed(2019)
+cell.out <- emptyDrops(mat)
+
+PLOT.barcode.rank = FALSE
+if(PLOT.barcode.rank){
+  #my.counts <- DropletUtils:::simCounts()
+  br.out <- barcodeRanks(mat)
+  
+  # Making a plot.
+  plot(br.out$rank, br.out$total, log="xy", xlab="Rank", ylab="Total")
+  o <- order(br.out$rank)
+  lines(br.out$rank[o], br.out$fitted[o], col="red")
+  
+  abline(h=metadata(br.out)$knee, col="dodgerblue", lty=2)
+  abline(h=metadata(br.out)$inflection, col="forestgreen", lty=2)
+  legend("bottomleft", lty=2, col=c("dodgerblue", "forestgreen"), 
+         legend=c("knee", "inflection"))
+  
+  
+  set.seed(100)
+  e.out <- cell.out
+  e.out
+  
+  is.cell <- e.out$FDR < 0.01
+  sum(is.cell, na.rm=TRUE)
+  
+  table(Limited=e.out$Limited, Significant=is.cell)
+  
+  plot(e.out$Total, -e.out$LogProb, col=ifelse(is.cell, "red", "black"),
+       xlab="Total UMI count", ylab="-Log Probability", log='x')
+  
+}
+
+
+filter.out <- cell.out[complete.cases(cell.out), ]
+
+saveRDS(filter.out, file = paste0(output_dir, '/EmptyDrop_obj.rds'))
+
+fdr = 0.01
+filter.out = filter.out[filter.out$FDR <= fdr, ]
+select.cells = rownames(filter.out)
+length(select.cells)
+
+out_mat = mat[, colnames(mat) %in% select.cells]
+barcodes = colnames(out_mat)
+
+metrics$barcode = sapply(metrics$barcode, function(x) gsub('-1', '', x))
+mm = match(barcodes, metrics$barcode)
+metrics = metrics[]
+
+system(paste('mkdir -p', output_dir))
+writeMM(out_mat, file = paste0(output_dir, '/matrix.mtx'))  
+write.table(barcodes, file = paste0(output_dir, '/barcodes.txt'), sep = '\t', 
+            row.names = F, quote = F, col.names = F)
+write.table(features, file = paste0(output_dir, '/features.txt'), sep = '\t',
+            row.names = F, quote = F, col.names = F)
+
 ########################################################
 ########################################################
 # Section : Input data 
