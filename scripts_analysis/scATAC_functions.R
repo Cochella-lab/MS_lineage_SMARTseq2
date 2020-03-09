@@ -13,6 +13,7 @@
 # Section :
 # functions from Andrew Hill
 # andrewjohnhill.com/images/posts/2019-5-6-dimensionality-reduction-for-scatac-data/analysis.html
+# Andrew's cistopic analysis was done with cisTopic 0.2 
 ########################################################
 ########################################################
 options(stringsAsFactors = FALSE)
@@ -25,7 +26,7 @@ library(patchwork)
 library(plyr)
 library(dplyr)
 library(stringr)
-library(SnapATAC)
+#library(SnapATAC)
 library(GenomicRanges)
 library(cisTopic)
 
@@ -268,13 +269,17 @@ tenx_lsi_workflow = function(bmat, dims, metadata=NULL, reduction='pca.l2', reso
 #   topic (vector of int): topic numbers to generate models for
 # Returns:
 #   cisTopic object: cisTopic object with models generated
-cistopic_workflow = function(bmat, topic=c(40, 50)) {
+cistopic_workflow = function(bmat, topic=seq(30, 80, by=10)) {
   coords = str_split_fixed(rownames(bmat), '_', 3)
   new_coords = paste0(coords[, 1], ':', coords[, 2], '-', coords[, 3])
   rownames(bmat) = new_coords
   
   cisTopicObject = cisTopic::createcisTopicObject(bmat, project.name='mouse_atac')
-  cisTopicObject = cisTopic::runModels(cisTopicObject, topic, seed=2019, nCores=1, burnin = 250, iterations = 500)
+  
+  #cisTopicObject = cisTopic::runModels(cisTopicObject, topic, seed=2019, nCores=4, burnin = 250, iterations = 500)
+  cisTopicObject = cisTopic::runWarpLDAModels(cisTopicObject, topic = topic, seed=2019, nCores=4, iterations = 500, addModels = FALSE)
+  #cisTopicObject <- runWarpLDAModels(cisTopicObject, topic=nb.topcis, seed=987, nCores=6, iterations = 200, addModels=FALSE)
+  
   return(cisTopicObject)
 }
 
@@ -464,6 +469,8 @@ snapatac_rerun_jaccard = function(snap_obj, pc.num=50) {
 # Returns:
 #   Seurat object: Seurat object. clustering + tSNE + UMAP done on topic matrix from cisTopic
 seurat_workflow_on_cistopic = function(cistopicObject, method='Z-score', reduction='pca', resolution=0.3) {
+  
+  # cistopicObject = mouse.cistopic
   cistopicObject = cisTopic::selectModel(cistopicObject)
   
   cistopicObject.reduced_space = t(cisTopic::modelMatSelection(cistopicObject, target='cell', method=method))
@@ -475,6 +482,7 @@ seurat_workflow_on_cistopic = function(cistopicObject, method='Z-score', reducti
   cistopicObject.seurat = cistopicObject.seurat %>% 
     Seurat::FindNeighbors(reduction=reduction, nn.eps=0.25, dims=1:dimensions) %>%
     Seurat::FindClusters(reduction=reduction, n.start=20, resolution=resolution)
+  
   return(cistopicObject.seurat)
 }
 
@@ -513,10 +521,10 @@ plot_clustering_comparison = function(seurat_obj1, seurat_obj2, reduction, descr
   seurat_obj1 = SetIdent(seurat_obj1, value=cluster_column1)
   seurat_obj2 = SetIdent(seurat_obj2, value=cluster_column2)
   
-  p1 = DimPlot(seurat_obj1, reduction = 'tsne', pt.size=0.25) +
+  p1 = DimPlot(seurat_obj1, reduction = reduction, pt.size=0.25) +
     ggtitle(description1)
   
-  p2 = DimPlot(seurat_obj2, reduction = 'tsne', pt.size=0.25) +
+  p2 = DimPlot(seurat_obj2, reduction = reduction, pt.size=0.25) +
     ggtitle(description2)
   
   # Now swap the labels to verify they are finding the same groups
@@ -534,6 +542,8 @@ plot_clustering_comparison = function(seurat_obj1, seurat_obj2, reduction, descr
   
   (p1 + p3) / (p2 + p4)
 }
+
+
 
 
 
