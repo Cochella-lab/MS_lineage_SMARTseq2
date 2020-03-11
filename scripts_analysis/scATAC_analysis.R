@@ -237,7 +237,7 @@ nb.pcs = 35; n.neighbors = 30; min.dist = 0.25;
 seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
 DimPlot(object = seurat.cistopic, label = TRUE, reduction = 'umap') + NoLegend()
 
-#saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
+saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
 
 ########################################################
 ########################################################
@@ -245,6 +245,7 @@ DimPlot(object = seurat.cistopic, label = TRUE, reduction = 'umap') + NoLegend()
 # or using scRNA-seq data
 ########################################################
 ########################################################
+seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
 
 p1 <- DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.1, label.size = 5) + NoLegend()
 p1
@@ -267,6 +268,7 @@ seurat.cistopic = seurat.cistopic[-peaks.chrM, ]
 
 source.my.script('scATAC_functions.R')
 fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cellranger_atac_wbcel235/outs/fragments.tsv.gz'
+
 seurat.cistopic = compute.gene.acitivity.scores(seurat.cistopic, fragment.file = fragment.file)
 
 ##########################################

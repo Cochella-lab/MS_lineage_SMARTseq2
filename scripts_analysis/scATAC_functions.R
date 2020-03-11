@@ -568,12 +568,14 @@ compute.gene.acitivity.scores = function(seurat.cistopic, fragment.file = '')
   genebodyandpromoter.coords <- Extend(x = gene.coords, upstream = 2000, downstream = 0)
   
   # build a gene by cell matrix
+  tic('run model for cisTopic')
   gene.activities <- FeatureMatrix(
     fragments = fragment.file,
     features = genebodyandpromoter.coords,
-    cells = colnames(brain),
+    cells = colnames(seurat.cistopic),
     chunk = 10
   )
+  toc()
   
   # convert rownames from chromsomal coordinates into gene names
   gene.key <- genebodyandpromoter.coords$gene_name
