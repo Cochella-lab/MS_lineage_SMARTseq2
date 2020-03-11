@@ -46,7 +46,7 @@ library(data.table)
 library(Matrix)
 library(tictoc)
 
-scATACpro_output_path = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/output_cellrangerMapping_scATACproPeakAndMatrix/'
+scATACpro_output_path = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/output/'
 raw_mtx_file = paste0(scATACpro_output_path, '/raw_matrix/MACS2/matrix.mtx')
 filtered_mtx_dir = paste0(scATACpro_output_path, 'filtered_matrix_peaks_barcodes')
 raw_mtx_dir = dirname(raw_mtx_file)
@@ -206,27 +206,38 @@ DimPlot(object = tenx.seurat.lsi_log, label = TRUE, reduction = 'umap') + NoLege
 ##########################################
 source.my.script('scATAC_functions.R')
 
-tic('run model for cisTopic')
-tenx.cistopic = cistopic_workflow(tenx.bmat, topic = seq(20, 100, by=5))
-saveRDS(tenx.cistopic, file =  paste0(RdataDir, 'atac_cisTopic_runWrapLDAModel_localRunning.rds'))
+Run.cistopic_workflow = FALSE
+if(Run.cistopic_workflow){
+  tic('run model for cisTopic')
+  tenx.cistopic = cistopic_workflow(tenx.bmat, topic = seq(20, 100, by=5))
+  saveRDS(tenx.cistopic, file =  paste0(RdataDir, 'atac_cisTopic_runWrapLDAModel_localRunning.rds'))
+  
+  toc 
+}
 
-toc 
-
+tenx.cistopic = readRDS(file =  paste0(RdataDir, 'atac_cisTopic_runWrapLDAModel_localRunning.rds'))
 #tenx.cistopic = readRDS('data_downloads/atac_v1_adult_brain_fresh_5k.cistopic.rds')
-tenx.seurat.cistopic = seurat_workflow_on_cistopic(tenx.cistopic, resolution=1.5, method='Z-score')
 
-plot_clustering_comparison(tenx.seurat.lsi_log,
-                           tenx.seurat.cistopic,
-                           reduction='umap',
-                           description1='LSI logTF',
-                           description2='cisTopic',
-                           cluster_column1='RNA_snn_res.1.5',
-                           cluster_column2='RNA_snn_res.1.5')
+cisTopicObject = tenx.cistopic
+par(mfrow=c(3,3))
+cisTopicObject <- selectModel(cisTopicObject, type='maximum')
+cisTopicObject <- selectModel(cisTopicObject, type='perplexity')
+#cisTopicObject <- selectModel(cisTopicObject, type='derivative')
 
-nb.pcs = 35; n.neighbors = 30; min.dist = 0.2;
-tenx.seurat.cistopic <- RunUMAP(object = tenx.seurat.cistopic, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-DimPlot(object = tenx.seurat.cistopic, label = TRUE, reduction = 'umap') + NoLegend()
+seurat.cistopic = seurat_workflow_on_cistopic(tenx.cistopic, resolution=0.8, method='Z-score')
+# plot_clustering_comparison(tenx.seurat.lsi_log,
+#                            seurat.cistopic,
+#                            reduction='umap',
+#                            description1='LSI logTF',
+#                            description2='cisTopic',
+#                            cluster_column1='RNA_snn_res.1.5',
+#                            cluster_column2='RNA_snn_res.1.5')
 
+nb.pcs = 35; n.neighbors = 30; min.dist = 0.25;
+seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+DimPlot(object = seurat.cistopic, label = TRUE, reduction = 'umap') + NoLegend()
+
+#saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
 
 ########################################################
 ########################################################
@@ -235,7 +246,78 @@ DimPlot(object = tenx.seurat.cistopic, label = TRUE, reduction = 'umap') + NoLeg
 ########################################################
 ########################################################
 
+p1 <- DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.1, label.size = 5) + NoLegend()
+p1
 
 
+##########################################
+# generate bigwigs for each cluster for visualization
+##########################################
+barcode.cluster = data.frame(Barcode = colnames(seurat.cistopic),
+                             Cluster = seurat.cistopic$seurat_clusters, 
+                             stringsAsFactors = FALSE)
+write.table(barcode.cluster, file = paste0(filtered_mtx_dir, '/barcodes_and_clusters.txt'), 
+            col.names = TRUE, row.names = FALSE, quote = FALSE, sep = '\t')
+
+##########################################
+# compute gene activity score to annotate clusters
+##########################################
+peaks.chrM = grep('chrM', rownames(seurat.cistopic))
+seurat.cistopic = seurat.cistopic[-peaks.chrM, ]
+
+source.my.script('scATAC_functions.R')
+fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cellranger_atac_wbcel235/outs/fragments.tsv.gz'
+seurat.cistopic = compute.gene.acitivity.scores(seurat.cistopic, fragment.file = fragment.file)
+
+##########################################
+# motif enrichment analysis  
+##########################################
+seurat.cistopic = compute.motif.enrichment(seurat.cistopic)
+
+
+# tbx-38
+p1 = FeaturePlot(
+  object = seurat.cistopic,
+  features = rownames(seurat.cistopic)[201],
+  #cols = c('red', 'blue'),
+  min.cutoff = 0,
+  max.cutoff = 'q95',
+  pt.size = 0.1
+)
+
+# med-2 
+p2 = FeaturePlot(
+  object = seurat.cistopic,
+  features = rownames(seurat.cistopic)[106],
+  #cols = c('red', 'blue'),
+  min.cutoff = 0,
+  max.cutoff = 'q95',
+  #blend = TRUE,
+  pt.size = 0.1
+)
+
+# elt-3
+p3 = FeaturePlot(
+  object = seurat.cistopic,
+  features = rownames(seurat.cistopic)[280],
+  #cols = c('red', 'blue'),
+  min.cutoff = 0,
+  max.cutoff = 'q95',
+  #blend = TRUE,
+  pt.size = 0.1
+)
+
+# pal-1 
+p4 = FeaturePlot(
+  object = seurat.cistopic,
+  features = rownames(seurat.cistopic)[292],
+  #cols = c('green', 'blue'),
+  min.cutoff = 0,
+  max.cutoff = 'q95',
+  #blend = TRUE,
+  pt.size = 0.1
+)
+
+CombinePlots(list(p1, p2, p3, p4), ncol = 2)
 
 

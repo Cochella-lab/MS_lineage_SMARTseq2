@@ -188,12 +188,12 @@ do_pca = function(mat, dims=50) {
 #   Seurat object: seurat object
 run_dim_reduction = function(atac_matrix, cell_embeddings, dims, metadata=NULL, reduction='pca.l2') {
   if (is.null(metadata)) {
-    seurat_obj = Seurat::CreateSeuratObject(atac_matrix)
+    seurat_obj = Seurat::CreateSeuratObject(atac_matrix, assay = 'peaks')
   } else {
-    seurat_obj = Seurat::CreateSeuratObject(atac_matrix, meta.data = metadata)
+    seurat_obj = Seurat::CreateSeuratObject(atac_matrix, meta.data = metadata, assay = 'peaks')
   }
   
-  seurat_obj[['pca']] = Seurat::CreateDimReducObject(embeddings=cell_embeddings, key='PC_', assay='RNA')
+  seurat_obj[['pca']] = Seurat::CreateDimReducObject(embeddings=cell_embeddings, key='PC_', assay='peaks')
   seurat_obj = seurat_obj %>%
     Seurat::L2Dim(reduction='pca') %>%
     Seurat::RunUMAP(reduction = reduction, dims = dims) %>%
@@ -543,8 +543,156 @@ plot_clustering_comparison = function(seurat_obj1, seurat_obj2, reduction, descr
   (p1 + p3) / (p2 + p4)
 }
 
+########################################################
+########################################################
+# Section : my own functions for cluster annotations
+# 
+########################################################
+########################################################
+compute.gene.acitivity.scores = function(seurat.cistopic, fragment.file = '')
+{
+  library(Signac)
+  library(Seurat)
+  #library(BSgenome.Celegans.UCSC.ce11)
+  library(GenomeInfoDb)
+  library(TxDb.Celegans.UCSC.ce11.ensGene)
+  library(ggplot2)
+  set.seed(1234)
+  
+  set.seed(1234)
+  
+  #extract gene coordinates from Ensembl, and ensure name formatting is consistent with  Seurat object 
+  gene.coords <- genes(TxDb.Celegans.UCSC.ce11.ensGene)
+  seqlevelsStyle(gene.coords) <- 'Ensembl'
+  genebody.coords <- keepStandardChromosomes(gene.coords, pruning.mode = 'coarse')
+  genebodyandpromoter.coords <- Extend(x = gene.coords, upstream = 2000, downstream = 0)
+  
+  # build a gene by cell matrix
+  gene.activities <- FeatureMatrix(
+    fragments = fragment.file,
+    features = genebodyandpromoter.coords,
+    cells = colnames(brain),
+    chunk = 10
+  )
+  
+  # convert rownames from chromsomal coordinates into gene names
+  gene.key <- genebodyandpromoter.coords$gene_name
+  names(gene.key) <- GRangesToString(grange = genebodyandpromoter.coords)
+  rownames(gene.activities) <- make.unique(gene.key[rownames(gene.activities)])
+  gene.activities <- gene.activities[rownames(gene.activities)!="",]
+  
+  #Add the gene activity matrix to the Seurat object as a new assay, and normalize it
+  brain[['RNA']] <- CreateAssayObject(counts = gene.activities)
+  brain <- NormalizeData(
+    object = brain,
+    assay = 'RNA',
+    normalization.method = 'LogNormalize',
+    scale.factor = median(brain$nCount_RNA)
+  )
+  
+  
+}
 
-
+compute.motif.enrichment = function(seurat.cistopic)
+{
+  library(Signac)
+  library(Seurat)
+  library(JASPAR2018)
+  library(TFBSTools)
+  library(BSgenome.Celegans.UCSC.ce11)
+  set.seed(1234)
+  
+  ## make the motif class
+  # Get a list of motif position frequency matrices from the JASPAR database
+  # pfm <- getMatrixSet(
+  #   x = JASPAR2018,
+  #   opts = list(species = 6239, all_versions = FALSE)
+  # )
+  
+  
+  Convert.MEME.to.JASPAR = FALSE
+  if(Convert.MEME.to.JASPAR){
+    library(universalmotif) 
+    library(MotifDb)
+    pwm.meme = read_meme(file = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015.meme')
+    write_jaspar(pwm.meme, file = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015.pfm')
+  }
+  
+  pfm = readJASPARMatrix(fn = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015.pfm', 
+                         matrixClass = 'PFM')
+  
+  
+  # Scan the DNA sequence of each peak for the presence of each motif
+  tic('scan the motif for peak regions')
+  motif.matrix <- CreateMotifMatrix(
+    features = StringToGRanges(rownames(seurat.cistopic), sep = c(":", "-")),
+    pwm = pfm,
+    genome = BSgenome.Celegans.UCSC.ce11,
+    sep = c(":", "-"),
+    use.counts = TRUE
+  )
+  #saveRDS(motif.matrix, file =  paste0(RdataDir, 'motifOccurence_inPeaks.rds'))
+  toc()
+  
+  # Create a new Mofif object to store the results
+  motif <- CreateMotifObject(
+    data = motif.matrix,
+    pwm = pwms
+  )
+  
+  # Add the Motif object to the assay
+  seurat.cistopic[['RNA']] <- AddMotifObject(
+    object = seurat.cistopic[['RNA']],
+    motif.object = motif
+  )
+  
+  seurat.cistopic <- RegionStats(
+    object = seurat.cistopic,
+    genome = BSgenome.Celegans.UCSC.ce11,
+    sep = c(":", "-")
+  )
+  
+  
+  Idents(seurat.cistopic) = seurat.cistopic$seurat_clusters
+  
+  ##########################################
+  # Finding overrepresented motifs 
+  ##########################################
+  da_peaks <- FindMarkers(
+    object = seurat.cistopic,
+    ident.1 = Idents(seurat.cistopic),
+    #only.pos = TRUE,
+    #test.use = 'LR',
+    min.pct = 0.25, 
+    logfc.threshold = 0.25,
+    latent.vars = 'nCount_peaks'
+  )
+  
+  # Test the differentially accessible peaks for overrepresented motifs
+  enriched.motifs <- FindMotifs(
+    object = seurat.cistopic,
+    features = head(rownames(da_peaks), 1000)
+  )
+  
+  head(enriched.motifs)
+  
+  MotifPlot(
+    object = mouse_brain,
+    motifs = head(rownames(enriched.motifs))
+  )
+  
+  ##########################################
+  # run ChromVAR
+  ##########################################
+  seurat.cistopic <- RunChromVAR(
+    object = seurat.cistopic,
+    genome = BSgenome.Celegans.UCSC.ce11
+    
+  )
+  
+  DefaultAssay(seurat.cistopic) <- 'chromvar'
+  
+}
 
 ##########################################
 # firrst test cisTopic and Seurat
