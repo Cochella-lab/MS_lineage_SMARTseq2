@@ -546,7 +546,9 @@ plot_clustering_comparison = function(seurat_obj1, seurat_obj2, reduction, descr
 ########################################################
 ########################################################
 # Section : my own functions for cluster annotations
-# 
+# 1) compute gene activity scores
+# 2) motif enrichment analysis
+# 3) integrate scRNA-seq data 
 ########################################################
 ########################################################
 compute.gene.acitivity.scores = function(seurat.cistopic, fragment.file = 'fragments.tsv.gz', calculate.feature.matrix = FALSE,
@@ -623,14 +625,9 @@ compute.motif.enrichment = function(seurat.cistopic)
   library(BSgenome.Celegans.UCSC.ce11)
   set.seed(1234)
   
-  ## make the motif class
-  # Get a list of motif position frequency matrices from the JASPAR database
-  # pfm <- getMatrixSet(
-  #   x = JASPAR2018,
-  #   opts = list(species = 6239, all_versions = FALSE)
-  # )
-  
-  
+  ##########################################
+  # add motif class in assay 'peaks' for seurat object
+  ##########################################
   Convert.MEME.to.JASPAR = FALSE
   if(Convert.MEME.to.JASPAR){
     library(universalmotif) 
@@ -658,12 +655,12 @@ compute.motif.enrichment = function(seurat.cistopic)
   # Create a new Mofif object to store the results
   motif <- CreateMotifObject(
     data = motif.matrix,
-    pwm = pwms
+    pwm = pfm
   )
   
   # Add the Motif object to the assay
-  seurat.cistopic[['RNA']] <- AddMotifObject(
-    object = seurat.cistopic[['RNA']],
+  seurat.cistopic[['peaks']] <- AddMotifObject(
+    object = seurat.cistopic[['peaks']],
     motif.object = motif
   )
   
@@ -674,33 +671,27 @@ compute.motif.enrichment = function(seurat.cistopic)
   )
   
   
-  Idents(seurat.cistopic) = seurat.cistopic$seurat_clusters
-  
   ##########################################
-  # Finding overrepresented motifs 
+  # Finding overrepresented motifs for differentially accessible peaks
   ##########################################
   da_peaks <- FindMarkers(
     object = seurat.cistopic,
-    ident.1 = Idents(seurat.cistopic),
-    #only.pos = TRUE,
-    #test.use = 'LR',
-    min.pct = 0.25, 
-    logfc.threshold = 0.25,
-    latent.vars = 'nCount_peaks'
+    ident.1 = '10', 
+    ident.2 = '0',
+    min.pct = 0.1,
+    test.use = 'LR',
+    latent.vars = 'nFeature_peaks'
   )
   
-  # Test the differentially accessible peaks for overrepresented motifs
+  head(da_peaks)
+  
   enriched.motifs <- FindMotifs(
     object = seurat.cistopic,
-    features = head(rownames(da_peaks), 1000)
+    #background = 2000,
+    features = head(rownames(da_peaks), 2000)
   )
   
-  head(enriched.motifs)
-  
-  MotifPlot(
-    object = mouse_brain,
-    motifs = head(rownames(enriched.motifs))
-  )
+  head(enriched.motifs, 20)
   
   ##########################################
   # run ChromVAR
@@ -710,10 +701,30 @@ compute.motif.enrichment = function(seurat.cistopic)
     genome = BSgenome.Celegans.UCSC.ce11
     
   )
-  
-  DefaultAssay(seurat.cistopic) <- 'chromvar'
+  return(seurat.cistopic)
   
 }
+
+##########################################
+# integrate scRNA-seq data from published dataset in https://github.com/qinzhu/VisCello.celegans
+# Packer, J. S J. I. Murray (2019). A lineage-resolved molecular atlas of C. elegans embryogenesis at single-cell resolution. Science: eaax1971.
+##########################################
+process.scRNAseq.for.early.embryo.packer.et.al = function()
+{
+  Install.VisCello.celegans = FALSE
+  if(Install.VisCello.celegans){
+    devtools::install_local("/Volumes/groups/cochella/jiwang/Projects/Aleks/scRNAseq_published_dataSets/VisCello.celegans", force=T)
+    packageurl <- "https://cran.r-project.org/src/contrib/Archive/tidytree/tidytree_0.2.6.tar.gz"
+    install.packages(packageurl, repos=NULL, type="source")
+    #library(VisCello.celegans)
+    cello()
+  }
+  
+  cello.data.path = "/Volumes/groups/cochella/jiwang/Projects/Aleks/scRNAseq_published_dataSets/VisCello.celegans"
+  cello = readRDS(paste0(cello.data.path, '/inst/app/data/eset.rds'))
+  
+}
+
 
 ##########################################
 # firrst test cisTopic and Seurat

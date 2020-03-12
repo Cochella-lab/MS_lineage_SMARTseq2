@@ -287,19 +287,29 @@ FeaturePlot(
 )
 
 ##########################################
-# motif enrichment analysis  
+# find differentially accessible peaks and motif enrichment analysis  
 ##########################################
+DefaultAssay(seurat.cistopic) <- 'peaks'
+
 seurat.cistopic = compute.motif.enrichment(seurat.cistopic)
 
-DefaultAssay(seurat.cistopic) <- 'RNA'
+DefaultAssay(seurat.cistopic) <- 'chromvar'
+
 # tbx-38, med-2, elt-3, pal-1
+motifs2check = rownames(seurat.cistopic)[grep('tbx-35|tbx-38|MA0542.1|MA0924.1 pal-1|MA0546.1|end-1', rownames(seurat.cistopic))]
+
 FeaturePlot(
   object = seurat.cistopic,
-  features = rownames(seurat.cistopic)[c(201, 105, 280, 292]
+  features = motifs2check,
   pt.size = 0.1,
-  #max.cutoff = 'q95',
-  #min.cutoff = 'q5',
+  max.cutoff = 'q90',
+  min.cutoff = 'q10',
   ncol = 3
 )
+
+saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneActivity_motifClassChromVar.rds'))
+##########################################
+# Integrating with scRNA-seq data 
+##########################################
 
 
