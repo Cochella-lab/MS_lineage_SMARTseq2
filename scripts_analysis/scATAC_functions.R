@@ -549,7 +549,8 @@ plot_clustering_comparison = function(seurat_obj1, seurat_obj2, reduction, descr
 # 
 ########################################################
 ########################################################
-compute.gene.acitivity.scores = function(seurat.cistopic, fragment.file = '')
+compute.gene.acitivity.scores = function(seurat.cistopic, fragment.file = 'fragments.tsv.gz', calculate.feature.matrix = FALSE,
+                                         RdataDir = "results/scATAC_earlyEmbryo_20200302/Rdata/")
 {
   library(Signac)
   library(Seurat)
@@ -567,32 +568,50 @@ compute.gene.acitivity.scores = function(seurat.cistopic, fragment.file = '')
   genebody.coords <- keepStandardChromosomes(gene.coords, pruning.mode = 'coarse')
   genebodyandpromoter.coords <- Extend(x = gene.coords, upstream = 2000, downstream = 0)
   
-  # build a gene by cell matrix
-  tic('run model for cisTopic')
-  gene.activities <- FeatureMatrix(
-    fragments = fragment.file,
-    features = genebodyandpromoter.coords,
-    cells = colnames(seurat.cistopic),
-    chunk = 10
-  )
-  toc()
+  if(calculate.feature.matrix){
+    # build a gene by cell matrix
+    tic('counting fragments for gene body and promoter')
+    gene.activities <- FeatureMatrix(
+      fragments = fragment.file,
+      features = genebodyandpromoter.coords,
+      cells = colnames(seurat.cistopic),
+      chunk = 10
+    )
+    toc()
+    saveRDS(gene.activities, file =  paste0(RdataDir, 'gene_activities_matrix.rds'))
+  }else{
+    gene.activities = readRDS(file = paste0(RdataDir, 'gene_activities_matrix.rds'))
+  }
   
   # convert rownames from chromsomal coordinates into gene names
-  gene.key <- genebodyandpromoter.coords$gene_name
+  gene.key <- genebodyandpromoter.coords$gene_id
   names(gene.key) <- GRangesToString(grange = genebodyandpromoter.coords)
   rownames(gene.activities) <- make.unique(gene.key[rownames(gene.activities)])
   gene.activities <- gene.activities[rownames(gene.activities)!="",]
   
+  #ss = Matrix::rowSums(gene.activities)
+  #gene.activities = gene.activities[ss>0, ]
+  
+  annot = read.csv(file = "/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/annotations/BioMart_WBcel235_noFilters.csv",
+                   header = TRUE)
+  annot = annot[which(annot$Gene.type == 'miRNA' | annot$Gene.type == 'protein_coding'), ]
+  
+  mm = match(rownames(gene.activities), annot$Gene.stable.ID) 
+  gene.activities = gene.activities[which(!is.na(mm)), ]
+  rownames(gene.activities) = annot$Gene.name[match(rownames(gene.activities), annot$Gene.stable.ID) ]
+  
   #Add the gene activity matrix to the Seurat object as a new assay, and normalize it
-  brain[['RNA']] <- CreateAssayObject(counts = gene.activities)
-  brain <- NormalizeData(
-    object = brain,
+  #xx = seurat.cistopic;
+  
+  seurat.cistopic[['RNA']] <- CreateAssayObject(counts = gene.activities)
+  seurat.cistopic <- NormalizeData(
+    object = seurat.cistopic,
     assay = 'RNA',
     normalization.method = 'LogNormalize',
-    scale.factor = median(brain$nCount_RNA)
+    scale.factor = median(seurat.cistopic$nCount_RNA)
   )
   
-  
+  return(seurat.cistopic)
 }
 
 compute.motif.enrichment = function(seurat.cistopic)

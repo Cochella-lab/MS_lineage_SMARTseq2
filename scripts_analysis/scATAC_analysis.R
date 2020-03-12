@@ -247,8 +247,7 @@ saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
 ########################################################
 seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
 
-p1 <- DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.1, label.size = 5) + NoLegend()
-p1
+DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.1, label.size = 10) + NoLegend()
 
 
 ##########################################
@@ -270,6 +269,22 @@ source.my.script('scATAC_functions.R')
 fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cellranger_atac_wbcel235/outs/fragments.tsv.gz'
 
 seurat.cistopic = compute.gene.acitivity.scores(seurat.cistopic, fragment.file = fragment.file)
+
+save
+#xx = seurat.cistopic
+#DefaultAssay(seurat.cistopic) <- 'peaks'
+#seurat.cistopic = FindClusters(seurat.cistopic,reduction='pca', n.start=20, resolution=0.8)
+
+DefaultAssay(seurat.cistopic) <- 'RNA'
+FeaturePlot(
+  object = seurat.cistopic,
+  features = c('tbx-37','tbx-38', 'lsy-6', "tbx-35","elt-2","med-1","med-2", 'pal-1', 'pha-4', 'tbx-7', 'end-1', 'mom-1',
+               'tbx-11', 'tbx-33', 'tbx-9'),
+  pt.size = 0.1,
+  #max.cutoff = 'q95',
+  #min.cutoff = 'q5',
+  ncol = 3
+)
 
 ##########################################
 # motif enrichment analysis  
