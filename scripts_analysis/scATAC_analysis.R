@@ -270,7 +270,7 @@ fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cel
 
 seurat.cistopic = compute.gene.acitivity.scores(seurat.cistopic, fragment.file = fragment.file)
 
-save
+saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_geneActivity_object.rds'))
 #xx = seurat.cistopic
 #DefaultAssay(seurat.cistopic) <- 'peaks'
 #seurat.cistopic = FindClusters(seurat.cistopic,reduction='pca', n.start=20, resolution=0.8)
@@ -291,50 +291,15 @@ FeaturePlot(
 ##########################################
 seurat.cistopic = compute.motif.enrichment(seurat.cistopic)
 
-
-# tbx-38
-p1 = FeaturePlot(
+DefaultAssay(seurat.cistopic) <- 'RNA'
+# tbx-38, med-2, elt-3, pal-1
+FeaturePlot(
   object = seurat.cistopic,
-  features = rownames(seurat.cistopic)[201],
-  #cols = c('red', 'blue'),
-  min.cutoff = 0,
-  max.cutoff = 'q95',
-  pt.size = 0.1
+  features = rownames(seurat.cistopic)[c(201, 105, 280, 292]
+  pt.size = 0.1,
+  #max.cutoff = 'q95',
+  #min.cutoff = 'q5',
+  ncol = 3
 )
-
-# med-2 
-p2 = FeaturePlot(
-  object = seurat.cistopic,
-  features = rownames(seurat.cistopic)[106],
-  #cols = c('red', 'blue'),
-  min.cutoff = 0,
-  max.cutoff = 'q95',
-  #blend = TRUE,
-  pt.size = 0.1
-)
-
-# elt-3
-p3 = FeaturePlot(
-  object = seurat.cistopic,
-  features = rownames(seurat.cistopic)[280],
-  #cols = c('red', 'blue'),
-  min.cutoff = 0,
-  max.cutoff = 'q95',
-  #blend = TRUE,
-  pt.size = 0.1
-)
-
-# pal-1 
-p4 = FeaturePlot(
-  object = seurat.cistopic,
-  features = rownames(seurat.cistopic)[292],
-  #cols = c('green', 'blue'),
-  min.cutoff = 0,
-  max.cutoff = 'q95',
-  #blend = TRUE,
-  pt.size = 0.1
-)
-
-CombinePlots(list(p1, p2, p3, p4), ncol = 2)
 
 
