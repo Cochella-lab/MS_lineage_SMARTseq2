@@ -723,6 +723,8 @@ process.scRNAseq.for.early.embryo.packer.et.al = function()
   cello.data.path = "/Volumes/groups/cochella/jiwang/Projects/Aleks/scRNAseq_published_dataSets/VisCello.celegans"
   cello = readRDS(paste0(cello.data.path, '/inst/app/data/eset.rds'))
   
+  saveRDS(cello, file =  paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
+  
 }
 
 
