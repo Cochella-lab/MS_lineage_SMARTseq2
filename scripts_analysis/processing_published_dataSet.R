@@ -50,21 +50,31 @@ process.scRNAseq.for.early.embryo.packer.et.al = function()
 {
   Install.VisCello.celegans = FALSE
   if(Install.VisCello.celegans){
-    devtools::install_local("/Volumes/groups/cochella/jiwang/Projects/Aleks/scRNAseq_published_dataSets/VisCello.celegans", force=T)
+    devtools::install_local("../VisCello.celegans", force=T)
     packageurl <- "https://cran.r-project.org/src/contrib/Archive/tidytree/tidytree_0.2.6.tar.gz"
     install.packages(packageurl, repos=NULL, type="source")
-    #library(VisCello.celegans)
+    library(VisCello.celegans)
     cello()
     
     cello.data.path = "/Volumes/groups/cochella/jiwang/Projects/Aleks/scRNAseq_published_dataSets/VisCello.celegans"
     cello = readRDS(paste0(cello.data.path, '/inst/app/data/eset.rds'))
-    
     saveRDS(cello, file =  paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
     
+    eset <- readRDS("data/eset.rds")
+    clist <- readRDS("data/clist.rds")
+    elist <- readRDS("data/elist.rds")
+    ct_tbl <-  readRDS("data/s6_tbl.rds")
+    lin_tbl <-  readRDS("data/s7_tbl.rds")
+    tree_tbl <- as_tibble(readRDS("data/lineage_tree_tbl.rds"))
+    lin_sc_expr <- readRDS("data/lin_sc_expr_190602.rds")
+    lin.expanded.list <- readRDS("data/lin_expanded_list_0602.rds")
+    avail_nodes <- readRDS("data/avail_nodes.rds")
+    cell_type_markers <- read.xlsx("data/Supplementary_Tables_190611.xlsx",sheet=1, startRow=4)
+    lineage_markers <-  read.xlsx("data/Supplementary_Tables_190611.xlsx",sheet=4, startRow=7)
+    
   }else{
-    cello = readRDS(file = paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
+    est = readRDS(file = paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
   }
-  
   
 }
 
