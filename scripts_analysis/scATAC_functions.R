@@ -709,23 +709,6 @@ compute.motif.enrichment = function(seurat.cistopic)
 # integrate scRNA-seq data from published dataset in https://github.com/qinzhu/VisCello.celegans
 # Packer, J. S J. I. Murray (2019). A lineage-resolved molecular atlas of C. elegans embryogenesis at single-cell resolution. Science: eaax1971.
 ##########################################
-process.scRNAseq.for.early.embryo.packer.et.al = function()
-{
-  Install.VisCello.celegans = FALSE
-  if(Install.VisCello.celegans){
-    devtools::install_local("/Volumes/groups/cochella/jiwang/Projects/Aleks/scRNAseq_published_dataSets/VisCello.celegans", force=T)
-    packageurl <- "https://cran.r-project.org/src/contrib/Archive/tidytree/tidytree_0.2.6.tar.gz"
-    install.packages(packageurl, repos=NULL, type="source")
-    #library(VisCello.celegans)
-    cello()
-  }
-  
-  cello.data.path = "/Volumes/groups/cochella/jiwang/Projects/Aleks/scRNAseq_published_dataSets/VisCello.celegans"
-  cello = readRDS(paste0(cello.data.path, '/inst/app/data/eset.rds'))
-  
-  saveRDS(cello, file =  paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
-  
-}
 
 
 ##########################################

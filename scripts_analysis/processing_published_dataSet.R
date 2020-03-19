@@ -39,4 +39,34 @@ if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
-source.my.script('scATAC_functions.R')
+# source.my.script('scATAC_functions.R')
+########################################################
+########################################################
+# Section : processing the Murray's scRNA-seq raw data
+# 
+########################################################
+########################################################
+process.scRNAseq.for.early.embryo.packer.et.al = function()
+{
+  Install.VisCello.celegans = FALSE
+  if(Install.VisCello.celegans){
+    devtools::install_local("/Volumes/groups/cochella/jiwang/Projects/Aleks/scRNAseq_published_dataSets/VisCello.celegans", force=T)
+    packageurl <- "https://cran.r-project.org/src/contrib/Archive/tidytree/tidytree_0.2.6.tar.gz"
+    install.packages(packageurl, repos=NULL, type="source")
+    #library(VisCello.celegans)
+    cello()
+    
+    cello.data.path = "/Volumes/groups/cochella/jiwang/Projects/Aleks/scRNAseq_published_dataSets/VisCello.celegans"
+    cello = readRDS(paste0(cello.data.path, '/inst/app/data/eset.rds'))
+    
+    saveRDS(cello, file =  paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
+    
+  }else{
+    cello = readRDS(file = paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
+  }
+  
+  
+}
+
+
+
