@@ -40,6 +40,7 @@ if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 source.my.script('scATAC_functions.R')
+
 if(!require("DropletUtils")) BiocManager::install('DropletUtils')
 library(DropletUtils)
 library(data.table)
@@ -200,7 +201,6 @@ nb.pcs = 50; n.neighbors = 20; min.dist = 0.2;
 tenx.seurat.lsi_log <- RunUMAP(object = tenx.seurat.lsi_log, reduction = 'pca.l2', dims = 2:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
 DimPlot(object = tenx.seurat.lsi_log, label = TRUE, reduction = 'umap') + NoLegend()
 
-
 ##########################################
 # compare LAD from cistopic with lsi-log
 ##########################################
@@ -245,10 +245,14 @@ saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
 # or using scRNA-seq data
 ########################################################
 ########################################################
+#seurat.cistopic = load( file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
 seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
 
 DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.1, label.size = 10) + NoLegend()
 
+nb.pcs = 35; n.neighbors = 30; min.dist = 0.4;
+seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.1, label.size = 10) + NoLegend()
 
 ##########################################
 # generate bigwigs for each cluster for visualization
@@ -274,6 +278,7 @@ saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_geneActivity_
 #xx = seurat.cistopic
 #DefaultAssay(seurat.cistopic) <- 'peaks'
 #seurat.cistopic = FindClusters(seurat.cistopic,reduction='pca', n.start=20, resolution=0.8)
+
 
 DefaultAssay(seurat.cistopic) <- 'RNA'
 FeaturePlot(
@@ -308,8 +313,83 @@ FeaturePlot(
 )
 
 saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneActivity_motifClassChromVar.rds'))
+
 ##########################################
 # Integrating with scRNA-seq data 
+# see details in https://satijalab.org/signac/articles/mouse_brain_vignette.html#integrating-with-scrna-seq-data
 ##########################################
+library(Signac)
+library(Seurat)
+
+seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneActivity_motifClassChromVar.rds'))
+DefaultAssay(seurat.cistopic) <- 'peaks'
+
+seurat.cistopic <- RunTFIDF(seurat.cistopic)
+seurat.cistopic <- FindTopFeatures(seurat.cistopic, min.cutoff = 'q25')
+seurat.cistopic <- RunSVD(
+  object = seurat.cistopic,
+  assay = 'peaks',
+  reduction.key = 'LSI_',
+  reduction.name = 'lsi'
+)
+
+#VariableFeatures(seurat.cistopic) <- names(which(Matrix::rowSums(seurat.cistopic) > 100))
+#seurat.cistopic <- RunLSI(seurat.cistopic, n = 50, scale.max = NULL)
+#seurat.cistopic <- RunUMAP(seurat.cistopic, reduction = "lsi", dims = 1:50)
+
+# Here, we process the gene activity matrix 
+# in order to find anchors between cells in the scATAC-seq dataset 
+# and the scRNA-seq dataset.
+DefaultAssay(seurat.cistopic) <- 'RNA'
+seurat.cistopic <- FindVariableFeatures(seurat.cistopic, nfeatures = 2000)
+seurat.cistopic <- NormalizeData(seurat.cistopic)
+seurat.cistopic <- ScaleData(seurat.cistopic)
+
+# Load the pre-processed scRNA-seq data 
+tintori <- readRDS(paste0(RdataDir, 'Tintori_et_al_highQualtiyCells.rds'))
+tintori <- FindVariableFeatures(
+  object = tintori,
+  nfeatures = 2000
+)
+
+transfer.anchors <- FindTransferAnchors(
+  reference = tintori,
+  query = seurat.cistopic,
+  features = VariableFeatures(object = tintori),
+  reference.assay = 'RNA',
+  query.assay = 'RNA',
+  reduction = 'cca',
+  dims = 1:30
+)
+
+predicted.labels <- TransferData(
+  anchorset = transfer.anchors,
+  refdata = tintori$lineage,
+  weight.reduction = seurat.cistopic[['pca']]
+)
+
+seurat.cistopic <- AddMetaData(object = seurat.cistopic, metadata = predicted.labels)
+
+DimPlot(seurat.cistopic, group.by = "predicted.id", label = TRUE, repel = TRUE) + ggtitle("scATAC-seq cells") + 
+  NoLegend() + scale_colour_hue(drop = FALSE)
+
+table(seurat.cistopic$prediction.score.max > 0.5)
 
 
+hist(seurat.cistopic$prediction.score.max)
+abline(v = 0.5, col = "red")
+
+seurat.cistopic.filtered <- subset(seurat.cistopic, subset = prediction.score.max > 0.5)
+seurat.cistopic.filtered$predicted.id <- factor(seurat.cistopic.filtered$predicted.id, levels = levels(tintori))  # to make the colors match
+DimPlot(seurat.cistopic.filtered, group.by = "predicted.id", label = TRUE, repel = TRUE) + ggtitle("scATAC-seq cells") + 
+  NoLegend() + scale_colour_hue(drop = FALSE)
+
+##########################################
+# test liger  
+##########################################
+library(SeuratData)
+library(SeuratWrappers)
+
+library(SeuratData)
+InstallData("pbmcsca")
+data("pbmcsca")
