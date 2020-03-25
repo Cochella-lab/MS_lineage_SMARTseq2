@@ -1,10 +1,11 @@
 ##########################################################################
 ##########################################################################
-# Project: Aleks' single-cell MS project 
-# Script purpose: analyze scATAC-seq with cisTopic
+# Project: Aleks' single-cell project
+# Script purpose: mainly cell filtering for scATAC-seq data for peak- and window-basded matrix
+# and also does crude clustering for windown-based matrix
 # Usage example: 
 # Author: Jingkui Wang (jingkui.wang@imp.ac.at)
-# Date of creation: Mon Mar  2 14:43:04 2020
+# Date of creation: Wed Mar 25 11:41:30 2020
 ##########################################################################
 ##########################################################################
 source.my.script <- function(name.of.function){
@@ -41,10 +42,132 @@ if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 source.my.script('scATAC_functions.R')
 
+if(!require("DropletUtils")) BiocManager::install('DropletUtils')
+library(DropletUtils)
+library(data.table)
+library(Matrix)
+library(tictoc)
+
+scATACpro_output_path = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/output/'
+raw_mtx_file = paste0(scATACpro_output_path, '/raw_matrix/MACS2/matrix.mtx')
+filtered_mtx_dir = paste0(scATACpro_output_path, 'filtered_matrix_peaks_barcodes')
+raw_mtx_dir = dirname(raw_mtx_file)
+
+if(!dir.exists(filtered_mtx_dir)){dir.create(filtered_mtx_dir)}
 
 
+########################################################
+########################################################
+# Section : prepare annotation files
+# 
+########################################################
+########################################################
+# # args = commandArgs(T)
+Generate.enhancer.annotation = FALSE
+if(Generate.enhancer.annotation){
+  enhancers = read.table('/Volumes/groups/cochella/jiwang/annotations/promoter_enhancer_annotation-elife-37344-fig2-data1-v2.txt', header = TRUE)
+  enhancers = enhancers[ which(enhancers$annot == 'putative_enhancer'), ]
+  enhancers = data.frame(enhancers$chrom_ce11, enhancers$start_ce11, enhancers$end_ce11, enhancers$associated_gene_id, stringsAsFactors = FALSE)
+  enhancers$scores = '.'
+  enhancers$strand = '.'
+  write.table(enhancers, file = '/Volumes/groups/cochella/jiwang/annotations/ce11_enhancers_Jaenes_et_al_elife_2018.bed',
+              row.names = FALSE, col.names = FALSE, sep = '\t', quote = FALSE)
+}
+
+########################################################
+########################################################
+# Section : Cell filtering using DropletUtils
+#  prepare filtered matrix, barcodes and peaks
+########################################################
+########################################################
+mat = readMM(raw_mtx_file)
+features = fread(paste0(raw_mtx_dir, '/features.txt'), header = F)
+barcodes = fread(paste0(raw_mtx_dir, '/barcodes.txt'), header = F)
+rownames(mat) = features$V1
+colnames(mat) = barcodes$V1
+
+# metrics = read.csv('res_counts/outs/singlecell.csv', header = TRUE)
+
+set.seed(2019)
+
+tic('emptyDrops running :')
+cell.out <- emptyDrops(mat, BPPARAM = SerialParam())
+toc()
+
+PLOT.barcode.rank = FALSE
+if(PLOT.barcode.rank){
+  
+  pdfname = paste0(resDir, "/EmptyDrop_barcode_filtering.pdf")
+  pdf(pdfname, width=14, height = 8)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  #my.counts <- DropletUtils:::simCounts()
+  br.out <- barcodeRanks(mat)
+  
+  # Making a plot.
+  plot(br.out$rank, br.out$total, log="xy", xlab="Rank", ylab="Total")
+  o <- order(br.out$rank)
+  lines(br.out$rank[o], br.out$fitted[o], col="red")
+  abline(h=metadata(br.out)$knee, col="dodgerblue", lty=2)
+  abline(h=metadata(br.out)$inflection, col="forestgreen", lty=2)
+  legend("bottomleft", lty=2, col=c("dodgerblue", "forestgreen"), 
+         legend=c("knee", "inflection"))
+  
+  
+  #set.seed(100)
+  #cell.out <- cell.out
+  cell.out
+  
+  is.cell <- cell.out$PValue < 0.0001
+  sum(is.cell, na.rm=TRUE)
+  
+  table(Limited=cell.out$Limited, Significant=is.cell)
+  plot(cell.out$Total, -cell.out$LogProb, col=ifelse(is.cell, "red", "black"),
+       xlab="Total UMI count", ylab="-Log Probability", log='x')
+  
+  dev.off()
+  
+}
 
 
+filter.out <- cell.out[complete.cases(cell.out), ]
+
+saveRDS(filter.out, file = paste0(filtered_mtx_dir, '/EmptyDrop_obj.rds'))
+
+fdr = 0.01
+#filter.out = filter.out[filter.out$FDR <= fdr, ]
+kk = filter.out$Total>10^3
+sum(kk)
+
+filter.out = filter.out[kk, ]
+select.cells = rownames(filter.out)
+#length(select.cells)
+
+out_mat = mat[, colnames(mat) %in% select.cells]
+barcodes = colnames(out_mat)
+peaks = rownames(out_mat)
+
+peaks = t(sapply(peaks, FUN = function(x){
+  ccord = unlist(strsplit(as.character(x), "-"))
+  if(!startsWith(ccord[1], 'chr')){
+    return(c(paste0('chr', ccord[1]), ccord[-1]))
+  }else{
+    return(ccord)
+  }  
+}))
+
+#metrics$barcode = sapply(metrics$barcode, function(x) gsub('-1', '', x))
+#mm = match(barcodes, metrics$barcode)
+#metrics = metrics[]
+
+## save filtered matrix, peaks and barcodes
+system(paste('mkdir -p', filtered_mtx_dir))
+writeMM(out_mat, file = paste0(filtered_mtx_dir, '/matrix.mtx'))  
+
+write.table(barcodes, file = paste0(filtered_mtx_dir, '/barcodes.tsv'), sep = '\t', 
+            row.names = F, quote = F, col.names = F)
+write.table(peaks, file = paste0(filtered_mtx_dir, '/peaks.bed'), sep = '\t',
+            row.names = F, quote = F, col.names = F)
 
 
 ########################################################
@@ -55,8 +178,8 @@ source.my.script('scATAC_functions.R')
 ########################################################
 source.my.script('scATAC_functions.R')
 tenx.bmat = load_tenx_atac(paste0(filtered_mtx_dir, '/matrix.mtx'), 
-                                 paste0(filtered_mtx_dir, '/peaks.bed'), 
-                                 paste0(filtered_mtx_dir, '/barcodes.tsv'))
+                           paste0(filtered_mtx_dir, '/peaks.bed'), 
+                           paste0(filtered_mtx_dir, '/barcodes.tsv'))
 
 # select features showing in > 50 cells
 tenx.bmat = filter_features(tenx.bmat, cells=50)
@@ -142,133 +265,5 @@ barcode.cluster = data.frame(Barcode = colnames(seurat.cistopic),
 write.table(barcode.cluster, file = paste0(filtered_mtx_dir, '/barcodes_and_clusters.txt'), 
             col.names = TRUE, row.names = FALSE, quote = FALSE, sep = '\t')
 
-##########################################
-# compute gene activity score to annotate clusters
-##########################################
-peaks.chrM = grep('chrM', rownames(seurat.cistopic))
-seurat.cistopic = seurat.cistopic[-peaks.chrM, ]
-
-source.my.script('scATAC_functions.R')
-fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cellranger_atac_wbcel235/outs/fragments.tsv.gz'
-
-seurat.cistopic = compute.gene.acitivity.scores(seurat.cistopic, fragment.file = fragment.file)
-
-saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_geneActivity_object.rds'))
-#xx = seurat.cistopic
-#DefaultAssay(seurat.cistopic) <- 'peaks'
-#seurat.cistopic = FindClusters(seurat.cistopic,reduction='pca', n.start=20, resolution=0.8)
 
 
-DefaultAssay(seurat.cistopic) <- 'RNA'
-FeaturePlot(
-  object = seurat.cistopic,
-  features = c('tbx-37','tbx-38', 'lsy-6', "tbx-35","elt-2","med-1","med-2", 'pal-1', 'pha-4', 'tbx-7', 'end-1', 'mom-1',
-               'tbx-11', 'tbx-33', 'tbx-9'),
-  pt.size = 0.1,
-  #max.cutoff = 'q95',
-  #min.cutoff = 'q5',
-  ncol = 3
-)
-
-##########################################
-# find differentially accessible peaks and motif enrichment analysis  
-##########################################
-DefaultAssay(seurat.cistopic) <- 'peaks'
-
-seurat.cistopic = compute.motif.enrichment(seurat.cistopic)
-
-DefaultAssay(seurat.cistopic) <- 'chromvar'
-
-# tbx-38, med-2, elt-3, pal-1
-motifs2check = rownames(seurat.cistopic)[grep('tbx-35|tbx-38|MA0542.1|MA0924.1 pal-1|MA0546.1|end-1', rownames(seurat.cistopic))]
-
-FeaturePlot(
-  object = seurat.cistopic,
-  features = motifs2check,
-  pt.size = 0.1,
-  max.cutoff = 'q90',
-  min.cutoff = 'q10',
-  ncol = 3
-)
-
-saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneActivity_motifClassChromVar.rds'))
-
-##########################################
-# Integrating with scRNA-seq data 
-# see details in https://satijalab.org/signac/articles/mouse_brain_vignette.html#integrating-with-scrna-seq-data
-##########################################
-library(Signac)
-library(Seurat)
-
-seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneActivity_motifClassChromVar.rds'))
-DefaultAssay(seurat.cistopic) <- 'peaks'
-
-seurat.cistopic <- RunTFIDF(seurat.cistopic)
-seurat.cistopic <- FindTopFeatures(seurat.cistopic, min.cutoff = 'q25')
-seurat.cistopic <- RunSVD(
-  object = seurat.cistopic,
-  assay = 'peaks',
-  reduction.key = 'LSI_',
-  reduction.name = 'lsi'
-)
-
-#VariableFeatures(seurat.cistopic) <- names(which(Matrix::rowSums(seurat.cistopic) > 100))
-#seurat.cistopic <- RunLSI(seurat.cistopic, n = 50, scale.max = NULL)
-#seurat.cistopic <- RunUMAP(seurat.cistopic, reduction = "lsi", dims = 1:50)
-
-# Here, we process the gene activity matrix 
-# in order to find anchors between cells in the scATAC-seq dataset 
-# and the scRNA-seq dataset.
-DefaultAssay(seurat.cistopic) <- 'RNA'
-seurat.cistopic <- FindVariableFeatures(seurat.cistopic, nfeatures = 2000)
-seurat.cistopic <- NormalizeData(seurat.cistopic)
-seurat.cistopic <- ScaleData(seurat.cistopic)
-
-# Load the pre-processed scRNA-seq data 
-tintori <- readRDS(paste0(RdataDir, 'Tintori_et_al_highQualtiyCells.rds'))
-tintori <- FindVariableFeatures(
-  object = tintori,
-  nfeatures = 2000
-)
-
-transfer.anchors <- FindTransferAnchors(
-  reference = tintori,
-  query = seurat.cistopic,
-  features = VariableFeatures(object = tintori),
-  reference.assay = 'RNA',
-  query.assay = 'RNA',
-  reduction = 'cca',
-  dims = 1:30
-)
-
-predicted.labels <- TransferData(
-  anchorset = transfer.anchors,
-  refdata = tintori$lineage,
-  weight.reduction = seurat.cistopic[['pca']]
-)
-
-seurat.cistopic <- AddMetaData(object = seurat.cistopic, metadata = predicted.labels)
-
-DimPlot(seurat.cistopic, group.by = "predicted.id", label = TRUE, repel = TRUE) + ggtitle("scATAC-seq cells") + 
-  NoLegend() + scale_colour_hue(drop = FALSE)
-
-table(seurat.cistopic$prediction.score.max > 0.5)
-
-
-hist(seurat.cistopic$prediction.score.max)
-abline(v = 0.5, col = "red")
-
-seurat.cistopic.filtered <- subset(seurat.cistopic, subset = prediction.score.max > 0.5)
-seurat.cistopic.filtered$predicted.id <- factor(seurat.cistopic.filtered$predicted.id, levels = levels(tintori))  # to make the colors match
-DimPlot(seurat.cistopic.filtered, group.by = "predicted.id", label = TRUE, repel = TRUE) + ggtitle("scATAC-seq cells") + 
-  NoLegend() + scale_colour_hue(drop = FALSE)
-
-##########################################
-# test liger  
-##########################################
-library(SeuratData)
-library(SeuratWrappers)
-
-library(SeuratData)
-InstallData("pbmcsca")
-data("pbmcsca")
