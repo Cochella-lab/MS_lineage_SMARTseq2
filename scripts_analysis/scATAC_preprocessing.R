@@ -32,7 +32,8 @@ library(Matrix)
 library(tictoc)
 
 ## in this script the results are saved in the 
-scATACpro_output_path = '~/workspace/imp/scRNAseq_MS_lineage_dev/output_cellranger.ce11_scATACpro/preprocess_bin2kb'
+scATACpro_output_path = '~/workspace/imp/scRNAseq_MS_lineage_dev/output_cellranger.ce11_scATACpro'
+
 setwd(scATACpro_output_path)
 
 raw_mtx_file = paste0(scATACpro_output_path, '/raw_matrix/MACS2/matrix.mtx')
@@ -41,7 +42,7 @@ raw_mtx_dir = dirname(raw_mtx_file)
 
 if(!dir.exists(filtered_mtx_dir)){dir.create(filtered_mtx_dir)}
 
-Processing.window.based.matrix = TRUE
+Processing.window.based.matrix = FALSE
 ########################################################
 ########################################################
 # Section : prepare annotation files
@@ -115,8 +116,8 @@ saveRDS(filter.out, file = paste0(filtered_mtx_dir, '/EmptyDrop_obj.rds'))
 
 fdr = 0.01
 #filter.out = filter.out[filter.out$FDR <= fdr, ]
-kk = which(filter.out$Total>3*10^3 &  
-              filter.out$PValue < 0.0001)
+kk = which(filter.out$Total>10^3 &  
+              filter.out$PValue < 0.001)
 length(kk)
 
 filter.out = filter.out[kk, ]
@@ -127,6 +128,7 @@ out_mat = mat[, colnames(mat) %in% select.cells]
 barcodes = colnames(out_mat)
 
 peaks = rownames(out_mat)
+
 ## for peak.bed file
 peaks = t(sapply(peaks, FUN = function(x){
   ccord = unlist(strsplit(as.character(x), "-"))
