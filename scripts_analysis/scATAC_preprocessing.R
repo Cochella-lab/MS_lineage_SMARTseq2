@@ -191,74 +191,132 @@ if(Processing.window.based.matrix){
                              cluster_column1='peaks_snn_res.0.8',
                              cluster_column2='peaks_snn_res.0.8')
   
-  nb.pcs = 50; n.neighbors = 20; min.dist = 0.2;
-  
-  tenx.seurat.lsi_log <- RunUMAP(object = tenx.seurat.lsi_log, reduction = 'pca.l2', dims = 2:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-  DimPlot(object = tenx.seurat.lsi, label = TRUE, reduction = 'umap') + NoLegend()
-  
-  #DimPlot(object = tenx.seurat.lsi_log, label = TRUE, reduction = 'umap') + NoLegend()
   
   ##########################################
-  # compare LAD from cistopic with lsi-log
+  # select the transformation methods (lsi or lsi_log)
+  # tune the resolution for clustering 
+  # and save the crude clusters for making bam files and the peak calling in each cluster 
   ##########################################
-  source.my.script('scATAC_functions.R')
+  p1 = DimPlot(object = tenx.seurat.lsi, label = TRUE, reduction = 'umap') + NoLegend()
+  p2 = DimPlot(object = tenx.seurat.lsi_log, label = TRUE, reduction = 'umap') + NoLegend()
   
-  Run.cistopic_workflow = FALSE
-  if(Run.cistopic_workflow){
-    tic('run model for cisTopic')
-    tenx.cistopic = cistopic_workflow(tenx.bmat, topic = seq(20, 100, by=5))
-    saveRDS(tenx.cistopic, file =  paste0(RdataDir, 'atac_cisTopic_runWrapLDAModel_localRunning.rds'))
-    
-    toc 
-  }
+  p1 + p2
   
-  tenx.cistopic = readRDS(file =  paste0(RdataDir, 'atac_cisTopic_runWrapLDAModel_localRunning.rds'))
-  #tenx.cistopic = readRDS('data_downloads/atac_v1_adult_brain_fresh_5k.cistopic.rds')
+  ## refine parameters
+  tenx.seurat = tenx.seurat.lsi # select lsi transformation
   
-  cisTopicObject = tenx.cistopic
-  par(mfrow=c(3,3))
-  cisTopicObject <- selectModel(cisTopicObject, type='maximum')
-  cisTopicObject <- selectModel(cisTopicObject, type='perplexity')
-  #cisTopicObject <- selectModel(cisTopicObject, type='derivative')
+  tenx.seurat = FindNeighbors(object = tenx.seurat, 
+                                  reduction='pca', nn.eps=0.25, dims=2:50)
+  tenx.seurat = FindClusters(object = tenx.seurat, 
+                                 n.start=20, resolution=1.5,
+                                 algorithm = 3)
   
-  seurat.cistopic = seurat_workflow_on_cistopic(tenx.cistopic, resolution=0.8, method='Z-score')
-  # plot_clustering_comparison(tenx.seurat.lsi_log,
-  #                            seurat.cistopic,
-  #                            reduction='umap',
-  #                            description1='LSI logTF',
-  #                            description2='cisTopic',
-  #                            cluster_column1='RNA_snn_res.1.5',
-  #                            cluster_column2='RNA_snn_res.1.5')
+  nb.pcs = 40; n.neighbors = 20; min.dist = 0.2;
+  tenx.seurat <- RunUMAP(object = tenx.seurat, 
+                             reduction = 'pca', 
+                             dims = 2:nb.pcs, 
+                             n.neighbors = n.neighbors, 
+                             min.dist = min.dist)
+  DimPlot(object = tenx.seurat, label = TRUE, reduction = 'umap') + 
+    NoLegend()
   
-  nb.pcs = 35; n.neighbors = 30; min.dist = 0.25;
-  seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-  DimPlot(object = seurat.cistopic, label = TRUE, reduction = 'umap') + NoLegend()
-  
-  saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
-  
-  ########################################################
-  ########################################################
-  # Section : cluster annotations using cell-type specific features (motifs) or cis-regulatory elements 
-  # or using scRNA-seq data
-  ########################################################
-  ########################################################
-  #seurat.cistopic = load( file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
-  seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
-  
-  DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.1, label.size = 10) + NoLegend()
-  
-  nb.pcs = 35; n.neighbors = 30; min.dist = 0.4;
-  seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-  DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.1, label.size = 10) + NoLegend()
+  table(tenx.seurat$peaks_snn_res.1.5)
+  tenx.seurat = SetIdent(tenx.seurat, value='peaks_snn_res.1.5')
   
   ##########################################
   # generate bigwigs for each cluster for visualization
   ##########################################
-  barcode.cluster = data.frame(Barcode = colnames(seurat.cistopic),
-                               Cluster = seurat.cistopic$seurat_clusters, 
+  barcode.cluster = data.frame(Barcode = colnames(tenx.seurat),
+                               Cluster = tenx.seurat$peaks_snn_res.1.5, 
                                stringsAsFactors = FALSE)
+  # manually merge small clusters with nb.cells <200
+  barcode.cluster$Cluster[which(barcode.cluster$Cluster == '14')] = '0'
+  
   write.table(barcode.cluster, file = paste0(filtered_mtx_dir, '/barcodes_and_clusters.txt'), 
               col.names = TRUE, row.names = FALSE, quote = FALSE, sep = '\t')
+  
+  
+  ########################################################
+  ########################################################
+  # Section : Merge peaks for peaks files in crude clusters 
+  # 
+  ########################################################
+  ########################################################
+  Merge.peaks.for.each.clusters = FALSE
+  if(Merge.peaks.for.each.clusters){
+    
+    library(bedr)
+    library(data.table)
+    library(Signac) # blacklist_ce11 is included in this package
+    
+    peak_cluster_dir = '/Volumes/sshftps/scratch/jiwang/scATAC_pro_test/output/preprocess_bin2kb/peaks_by_cluster'
+    
+    files = dir(peak_cluster_dir)
+    files = files[grepl(files, pattern = "narrowPeak")]
+    
+    peaks = NULL
+    for(file0 in files){
+      peaks = rbind(peaks, fread(paste0(peak_cluster_dir, '/', file0)))
+    }
+    
+    # xx = peaks[!grepl(V1, pattern = 'random', ignore.case = T)]
+    peaks = peaks[!grepl(V1, pattern = 'random', ignore.case = T)]
+    peaks = peaks[!grepl(V1, pattern = 'Un', ignore.case = T)]
+    peaks = peaks[!grepl(V1, pattern = 'M', ignore.case = T)]
+    
+    regions = paste0(peaks$V1, ':', peaks$V2, '-', peaks$V3)
+    
+    blacklist = as.data.frame(blacklist_ce11)
+    blackregions = paste0(blacklist$seqnames, ':', 
+                          blacklist$start, '-', 
+                          blacklist$end)
+    
+    #xx = is.valid.region(regions, throw.error = TRUE, check.chr = FALSE)
+    a.sort   <- bedr.sort.region(regions, check.chr = FALSE,
+                                 chr.to.num = c('chrI' = 1, 
+                                                'chrII' = 2, 
+                                                'chrIII' = 3, 
+                                                'chrIV' = 4,
+                                                'chrV' = 5, 
+                                                'chrX' = 6))
+    b.sort   <- bedr.sort.region(blackregions, check.chr = FALSE,
+                                 chr.to.num = c('chrI' = 1, 
+                                                'chrII' = 2, 
+                                                'chrIII' = 3, 
+                                                'chrIV' = 4,
+                                                'chrV' = 5, 
+                                                'chrX' = 6))
+    
+    a.merged <- bedr.merge.region(a.sort, distance = 0, check.chr = FALSE)
+    
+    
+    if (check.binary("bedtools")) {
+      #a <- bedr(engine = "bedtools", input = list(i = a), method = "sort", params = "");
+      #b <- bedr(engine = "bedtools", input = list(i = b), method = "sort", params = "");
+      #d <- bedr.subtract.region(a,b);
+      dd = bedr.subtract.region(a.merged, b.sort, 
+                                remove.whole.feature = TRUE,
+                                check.chr = FALSE)
+    }
+    
+    
+    
+    dd = data.table('peak' = dd)
+    dd[, 'chr' := unlist(strsplit(peak, ':'))[1], by = peak]
+    dd[, 'range' := unlist(strsplit(peak, ':'))[2], by = peak]
+    dd[, 'start' := unlist(strsplit(range, '-'))[1], by = peak]
+    dd[, 'end' := unlist(strsplit(range, '-'))[2], by = peak]
+    
+    dd[, c('peak', 'range') := NULL]
+    
+    write.table(dd, file = paste0(peak_cluster_dir, '/merged_peaks.bed'), quote = F, 
+                row.names = F, col.names = F, sep = '\t')
+    
+  }
+  
+  
+  
+  
   
   
 }
