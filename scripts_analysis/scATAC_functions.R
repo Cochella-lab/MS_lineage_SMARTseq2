@@ -269,7 +269,7 @@ tenx_lsi_workflow = function(bmat, dims, metadata=NULL, reduction='pca.l2', reso
 #   topic (vector of int): topic numbers to generate models for
 # Returns:
 #   cisTopic object: cisTopic object with models generated
-cistopic_workflow = function(bmat, topic=seq(30, 80, by=10)) {
+cistopic_workflow = function(bmat, topic=seq(20, 120, by=10)) {
   coords = str_split_fixed(rownames(bmat), '_', 3)
   new_coords = paste0(coords[, 1], ':', coords[, 2], '-', coords[, 3])
   rownames(bmat) = new_coords

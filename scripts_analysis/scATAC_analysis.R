@@ -62,35 +62,26 @@ tenx.bmat@x[tenx.bmat@x > 1] = 1
 ##########################################
 # compare lsi and lsi_log
 ##########################################
-tenx.seurat.lsi = lsi_workflow(tenx.bmat, dims=2:50, log_scale_tf=FALSE, reduction='pca', resolution=1.5)
-tenx.seurat.lsi_log = lsi_workflow(tenx.bmat, dims=2:50, log_scale_tf=TRUE, reduction='pca.l2', resolution=1.5)
+tenx.seurat.lsi = lsi_workflow(tenx.bmat, dims=2:100, log_scale_tf=FALSE, reduction='pca', resolution=0.8)
+tenx.seurat.lsi_log = lsi_workflow(tenx.bmat, dims=2:100, log_scale_tf=TRUE, reduction='pca.l2', resolution=0.8)
 
 plot_clustering_comparison(tenx.seurat.lsi,
                            tenx.seurat.lsi_log,
                            reduction='umap',
                            description1='LSI',
                            description2='LSI logTF',
-                           cluster_column1='peaks_snn_res.1.5',
-                           cluster_column2='peaks_snn_res.1.5')
-
-
-nb.pcs = 30; n.neighbors = 20; min.dist = 0.25;
-tenx.seurat.lsi_log <- RunUMAP(object = tenx.seurat.lsi_log, 
-                               reduction = 'pca.l2', 
-                               dims = 2:nb.pcs, n.neighbors = n.neighbors, 
-                               min.dist = min.dist)
-DimPlot(object = tenx.seurat.lsi_log, label = TRUE, reduction = 'umap') + 
-  NoLegend()
+                           cluster_column1='peaks_snn_res.0.8',
+                           cluster_column2='peaks_snn_res.0.8')
 
 ##########################################
-# compare LAD from cistopic with lsi-log and lsi
+# compare LAD from cistopic with lsi-log
 ##########################################
 source.my.script('scATAC_functions.R')
 
 Run.cistopic_workflow = TRUE
 if(Run.cistopic_workflow){
   tic('run model for cisTopic')
-  tenx.cistopic = cistopic_workflow(tenx.bmat, topic = seq(20, 100, by=5))
+  tenx.cistopic = cistopic_workflow(tenx.bmat, topic = seq(25, 120, by=5))
   saveRDS(tenx.cistopic, file =  paste0(RdataDir, 
                                         'atac_cisTopic_runWrapLDAModel_localRunning.rds'))
   toc()
@@ -100,7 +91,7 @@ if(Run.cistopic_workflow){
   #                                      'atac_cisTopic_runWrapLDAModel_localRunning.rds'))
   tenx.cistopic = readRDS(file =  paste0(RdataDir, 
                                          'atac_cisTopic_runWrapLDAModel_localRunning.rds'))
-  #tenx.cistopic = readRDS('data_downloads/atac_v1_adult_brain_fresh_5k.cistopic.rds')
+  
 }
 
 cisTopicObject = tenx.cistopic
@@ -110,6 +101,7 @@ cisTopicObject <- selectModel(cisTopicObject, type='perplexity')
 cisTopicObject <- selectModel(cisTopicObject, type='derivative')
 
 seurat.cistopic = seurat_workflow_on_cistopic(tenx.cistopic, resolution=0.8, method='Z-score')
+
 plot_clustering_comparison(tenx.seurat.lsi,
                             seurat.cistopic,
                             reduction='umap',
@@ -118,10 +110,66 @@ plot_clustering_comparison(tenx.seurat.lsi,
                             cluster_column1='peaks_snn_res.1.5',
                             cluster_column2='peaks_snn_res.0.8')
 
-nb.pcs = 35; n.neighbors = 30; min.dist = 0.25;
-seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-DimPlot(object = seurat.cistopic, label = TRUE, reduction = 'umap') + NoLegend()
 
+##########################################
+# select transformation method 
+##########################################
+resolution = 0.8
+nb.pcs = 100; n.neighbors = 30; min.dist = 0.3;
+
+tenx.seurat.lsi = FindNeighbors(object = tenx.seurat.lsi, 
+                            reduction='pca', nn.eps=0.25, dims=2:nb.pcs)
+tenx.seurat.lsi = FindClusters(object = tenx.seurat.lsi, 
+                           n.start=20, resolution=resolution,
+                           algorithm = 3)
+tenx.seurat.lsi <- RunUMAP(object = tenx.seurat.lsi, 
+                               reduction = 'pca', 
+                               dims = 2:nb.pcs, n.neighbors = n.neighbors, 
+                               min.dist = min.dist)
+p1 = DimPlot(object = tenx.seurat.lsi_log, label = TRUE, reduction = 'umap') + 
+  NoLegend()
+
+tenx.seurat.lsi_log = FindNeighbors(object = tenx.seurat.lsi_log, 
+                            reduction='pca.l2', nn.eps=0.25, dims=2:nb.pcs)
+tenx.seurat.lsi_log = FindClusters(object = tenx.seurat.lsi_log, 
+                           n.start=20, resolution=resolution,
+                           algorithm = 3)
+
+#nb.pcs = 80; n.neighbors = 30; min.dist = 0.25;
+tenx.seurat.lsi_log <- RunUMAP(object = tenx.seurat.lsi_log, 
+                               reduction = 'pca.l2', 
+                               dims = 2:nb.pcs, n.neighbors = n.neighbors, 
+                               min.dist = min.dist)
+p2 = DimPlot(object = tenx.seurat.lsi_log, label = TRUE, reduction = 'umap') + 
+  NoLegend()
+
+nb.pcs = ncol(seurat.cistopic[['pca']])
+seurat.cistopic = FindNeighbors(object = seurat.cistopic,
+                            reduction='pca', nn.eps=0.25, dims=1:nb.pcs)
+seurat.cistopic = FindClusters(object = seurat.cistopic, 
+                           n.start=20, resolution=0.8,
+                           algorithm = 3)
+
+n.neighbors = 30; min.dist = 0.3;
+seurat.cistopic <- RunUMAP(object = seurat.cistopic, 
+                           reduction = 'pca', 
+                           dims = 1:nb.pcs, 
+                           n.neighbors = n.neighbors, 
+                           min.dist = min.dist)
+
+Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
+p1 = DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.5, label.size = 8) + 
+  NoLegend()
+
+Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.1
+p2 = DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.5, label.size = 8) + 
+  NoLegend()
+
+p1 + p2
+# nb.pcs = 35; n.neighbors = 30; min.dist = 0.25;
+# seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+# DimPlot(object = seurat.cistopic, label = TRUE, reduction = 'umap') + NoLegend()
+Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
 saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
 
 ########################################################
@@ -133,17 +181,21 @@ saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
 #seurat.cistopic = load( file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
 seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
 
-DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.1, label.size = 10) + NoLegend()
+DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.4, label.size = 8) + NoLegend()
 
-nb.pcs = 35; n.neighbors = 30; min.dist = 0.4;
-seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.5, label.size = 8) + NoLegend()
+nb.pcs = ncol(seurat.cistopic[['pca']]); 
+n.neighbors = 30; min.dist = 0.3;
+seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', 
+                           dims = 1:nb.pcs, 
+                           n.neighbors = n.neighbors, min.dist = min.dist)
+DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.5, label.size = 8) + 
+  NoLegend()
 
 ##########################################
 # generate bigwigs for each cluster for visualization
 ##########################################
 barcode.cluster = data.frame(Barcode = colnames(seurat.cistopic),
-                             Cluster = seurat.cistopic$seurat_clusters, 
+                             Cluster = seurat.cistopic$peaks_snn_res.0.8, 
                              stringsAsFactors = FALSE)
 write.table(barcode.cluster, file = paste0(filtered_mtx_dir, '/barcodes_and_clusters.txt'), 
             col.names = TRUE, row.names = FALSE, quote = FALSE, sep = '\t')
