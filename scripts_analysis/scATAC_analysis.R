@@ -23,16 +23,13 @@ tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
            path <-  rstudioapi::getSourceEditorContext()$path})
 source.path <- sub(basename(path), "", path)
 
-
 user <- "results_jiwang/"
 setwd(paste0("../", user))
 
 version.DATA = 'scATAC_earlyEmbryo'
 version.analysis =  paste0(version.DATA, '_20200302')
-dataDir = paste0("../data/gene_counts/")
 resDir = paste0("results/", version.analysis)
 tabDir = paste0("results/", version.analysis, "/tables/")
-
 RdataDir = paste0("results/", version.analysis, "/Rdata/")
 if(!dir.exists("results/")){dir.create("results/")}
 if(!dir.exists(resDir)){dir.create(resDir)}
@@ -41,15 +38,10 @@ if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 source.my.script('scATAC_functions.R')
 
-
-
-
-
-
-
+filtered_mtx_dir = paste0("../output_cellranger.ce11_scATACpro/filtered_matrix_peaks_barcodes")
 ########################################################
 ########################################################
-# Section :  lsi and lsi_log transform
+# Section : transformation comparison: lsi, lsi_log and LDA
 # 
 ########################################################
 ########################################################
@@ -59,11 +51,17 @@ tenx.bmat = load_tenx_atac(paste0(filtered_mtx_dir, '/matrix.mtx'),
                                  paste0(filtered_mtx_dir, '/barcodes.tsv'))
 
 # select features showing in > 50 cells
+ss = Matrix::rowSums(tenx.bmat)
+sum(ss>=50)
+
 tenx.bmat = filter_features(tenx.bmat, cells=50)
 
 # Binarize the matrix for consistency
 tenx.bmat@x[tenx.bmat@x > 1] = 1
 
+##########################################
+# compare lsi and lsi_log
+##########################################
 tenx.seurat.lsi = lsi_workflow(tenx.bmat, dims=2:50, log_scale_tf=FALSE, reduction='pca', resolution=1.5)
 tenx.seurat.lsi_log = lsi_workflow(tenx.bmat, dims=2:50, log_scale_tf=TRUE, reduction='pca.l2', resolution=1.5)
 
@@ -72,45 +70,53 @@ plot_clustering_comparison(tenx.seurat.lsi,
                            reduction='umap',
                            description1='LSI',
                            description2='LSI logTF',
-                           cluster_column1='RNA_snn_res.1.5',
-                           cluster_column2='RNA_snn_res.1.5')
+                           cluster_column1='peaks_snn_res.1.5',
+                           cluster_column2='peaks_snn_res.1.5')
 
 
-nb.pcs = 50; n.neighbors = 20; min.dist = 0.2;
-tenx.seurat.lsi_log <- RunUMAP(object = tenx.seurat.lsi_log, reduction = 'pca.l2', dims = 2:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-DimPlot(object = tenx.seurat.lsi_log, label = TRUE, reduction = 'umap') + NoLegend()
+nb.pcs = 30; n.neighbors = 20; min.dist = 0.25;
+tenx.seurat.lsi_log <- RunUMAP(object = tenx.seurat.lsi_log, 
+                               reduction = 'pca.l2', 
+                               dims = 2:nb.pcs, n.neighbors = n.neighbors, 
+                               min.dist = min.dist)
+DimPlot(object = tenx.seurat.lsi_log, label = TRUE, reduction = 'umap') + 
+  NoLegend()
 
 ##########################################
-# compare LAD from cistopic with lsi-log
+# compare LAD from cistopic with lsi-log and lsi
 ##########################################
 source.my.script('scATAC_functions.R')
 
-Run.cistopic_workflow = FALSE
+Run.cistopic_workflow = TRUE
 if(Run.cistopic_workflow){
   tic('run model for cisTopic')
   tenx.cistopic = cistopic_workflow(tenx.bmat, topic = seq(20, 100, by=5))
-  saveRDS(tenx.cistopic, file =  paste0(RdataDir, 'atac_cisTopic_runWrapLDAModel_localRunning.rds'))
+  saveRDS(tenx.cistopic, file =  paste0(RdataDir, 
+                                        'atac_cisTopic_runWrapLDAModel_localRunning.rds'))
+  toc()
   
-  toc 
+}else{
+  #tenx.cistopic = readRDS(file = paste0(RdataDir,
+  #                                      'atac_cisTopic_runWrapLDAModel_localRunning.rds'))
+  tenx.cistopic = readRDS(file =  paste0(RdataDir, 
+                                         'atac_cisTopic_runWrapLDAModel_localRunning.rds'))
+  #tenx.cistopic = readRDS('data_downloads/atac_v1_adult_brain_fresh_5k.cistopic.rds')
 }
-
-tenx.cistopic = readRDS(file =  paste0(RdataDir, 'atac_cisTopic_runWrapLDAModel_localRunning.rds'))
-#tenx.cistopic = readRDS('data_downloads/atac_v1_adult_brain_fresh_5k.cistopic.rds')
 
 cisTopicObject = tenx.cistopic
 par(mfrow=c(3,3))
 cisTopicObject <- selectModel(cisTopicObject, type='maximum')
 cisTopicObject <- selectModel(cisTopicObject, type='perplexity')
-#cisTopicObject <- selectModel(cisTopicObject, type='derivative')
+cisTopicObject <- selectModel(cisTopicObject, type='derivative')
 
 seurat.cistopic = seurat_workflow_on_cistopic(tenx.cistopic, resolution=0.8, method='Z-score')
-# plot_clustering_comparison(tenx.seurat.lsi_log,
-#                            seurat.cistopic,
-#                            reduction='umap',
-#                            description1='LSI logTF',
-#                            description2='cisTopic',
-#                            cluster_column1='RNA_snn_res.1.5',
-#                            cluster_column2='RNA_snn_res.1.5')
+plot_clustering_comparison(tenx.seurat.lsi,
+                            seurat.cistopic,
+                            reduction='umap',
+                            description1='LSI logTF',
+                            description2='cisTopic',
+                            cluster_column1='peaks_snn_res.1.5',
+                            cluster_column2='peaks_snn_res.0.8')
 
 nb.pcs = 35; n.neighbors = 30; min.dist = 0.25;
 seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
@@ -131,7 +137,7 @@ DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.1, label.size = 10) + NoLegen
 
 nb.pcs = 35; n.neighbors = 30; min.dist = 0.4;
 seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.1, label.size = 10) + NoLegend()
+DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.5, label.size = 8) + NoLegend()
 
 ##########################################
 # generate bigwigs for each cluster for visualization
