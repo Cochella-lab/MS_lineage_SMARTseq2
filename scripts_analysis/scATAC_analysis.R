@@ -200,6 +200,20 @@ barcode.cluster = data.frame(Barcode = colnames(seurat.cistopic),
 write.table(barcode.cluster, file = paste0(filtered_mtx_dir, '/barcodes_and_clusters.txt'), 
             col.names = TRUE, row.names = FALSE, quote = FALSE, sep = '\t')
 
+
+##########################################
+# manually annotate  
+##########################################
+Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
+new.cluster.ids <- c("P0", "c1.ABa", "c2", "c3", "c4", "c5.E",
+                     'c6.E', 'c7.E','c8.ABp', 'c9.ABa', 'c10', 
+                     'c11', 'c12.ABp', 'c13', 'c14', 'c15',
+                     'c16', 'c17', 'c18','c19', 'c20', 'c21')
+names(new.cluster.ids) <- levels(seurat.cistopic)
+
+seurat.cistopic <- RenameIdents(seurat.cistopic, new.cluster.ids)
+DimPlot(seurat.cistopic, reduction = "umap", label = TRUE, pt.size = 0.5,  label.size = 8) + NoLegend()
+
 ##########################################
 # compute gene activity score to annotate clusters
 ##########################################
@@ -227,29 +241,6 @@ FeaturePlot(
   #min.cutoff = 'q5',
   ncol = 3
 )
-
-##########################################
-# find differentially accessible peaks and motif enrichment analysis  
-##########################################
-DefaultAssay(seurat.cistopic) <- 'peaks'
-
-seurat.cistopic = compute.motif.enrichment(seurat.cistopic)
-
-DefaultAssay(seurat.cistopic) <- 'chromvar'
-
-# tbx-38, med-2, elt-3, pal-1
-motifs2check = rownames(seurat.cistopic)[grep('tbx-35|tbx-38|MA0542.1|MA0924.1 pal-1|MA0546.1|end-1', rownames(seurat.cistopic))]
-
-FeaturePlot(
-  object = seurat.cistopic,
-  features = motifs2check,
-  pt.size = 0.1,
-  max.cutoff = 'q90',
-  min.cutoff = 'q10',
-  ncol = 3
-)
-
-saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneActivity_motifClassChromVar.rds'))
 
 ##########################################
 # Integrating with scRNA-seq data 
@@ -330,3 +321,28 @@ library(SeuratWrappers)
 library(SeuratData)
 InstallData("pbmcsca")
 data("pbmcsca")
+
+##########################################
+# find differentially accessible peaks and motif enrichment analysis  
+##########################################
+DefaultAssay(seurat.cistopic) <- 'peaks'
+
+seurat.cistopic = compute.motif.enrichment(seurat.cistopic)
+
+DefaultAssay(seurat.cistopic) <- 'chromvar'
+
+# tbx-38, med-2, elt-3, pal-1
+motifs2check = rownames(seurat.cistopic)[grep('tbx-35|tbx-38|MA0542.1|MA0924.1 pal-1|MA0546.1|end-1', rownames(seurat.cistopic))]
+
+FeaturePlot(
+  object = seurat.cistopic,
+  features = motifs2check,
+  pt.size = 0.1,
+  max.cutoff = 'q90',
+  min.cutoff = 'q10',
+  ncol = 3
+)
+
+saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneActivity_motifClassChromVar.rds'))
+
+
