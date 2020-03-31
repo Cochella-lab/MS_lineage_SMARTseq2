@@ -567,6 +567,7 @@ compute.gene.acitivity.scores = function(seurat.cistopic, fragment.file = 'fragm
   #extract gene coordinates from Ensembl, and ensure name formatting is consistent with  Seurat object 
   gene.coords <- genes(TxDb.Celegans.UCSC.ce11.ensGene)
   seqlevelsStyle(gene.coords) <- 'Ensembl'
+  
   genebody.coords <- keepStandardChromosomes(gene.coords, pruning.mode = 'coarse')
   genebodyandpromoter.coords <- Extend(x = gene.coords, upstream = 2000, downstream = 0)
   
@@ -580,7 +581,9 @@ compute.gene.acitivity.scores = function(seurat.cistopic, fragment.file = 'fragm
       chunk = 10
     )
     toc()
+    
     saveRDS(gene.activities, file =  paste0(RdataDir, 'gene_activities_matrix.rds'))
+    
   }else{
     gene.activities = readRDS(file = paste0(RdataDir, 'gene_activities_matrix.rds'))
   }
@@ -614,6 +617,7 @@ compute.gene.acitivity.scores = function(seurat.cistopic, fragment.file = 'fragm
   )
   
   return(seurat.cistopic)
+  
 }
 
 compute.motif.enrichment = function(seurat.cistopic)

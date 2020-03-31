@@ -202,13 +202,15 @@ write.table(barcode.cluster, file = paste0(filtered_mtx_dir, '/barcodes_and_clus
 
 
 ##########################################
-# manually annotate  
+# Manually annotate cistopic-based clusters
+# mainly based on two papers:
+# Hashimshony et al. 2015 and Warner et al. 2019
 ##########################################
 Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
-new.cluster.ids <- c("P0", "c1.ABa", "c2", "c3", "c4", "c5.E",
-                     'c6.E', 'c7.E','c8.ABp', 'c9.ABa', 'c10', 
-                     'c11', 'c12.ABp', 'c13', 'c14', 'c15',
-                     'c16', 'c17', 'c18','c19', 'c20', 'c21')
+new.cluster.ids <- c("P0", "c1.ABa", "c2.MS", "c3.C", "c4.C", "c5.E",
+                     'c6.E', 'c7.E','c8.ABp', 'c9.ABa', 'c10.MS', 
+                     'c11.C', 'c12.ABp', 'c13.MS', 'c14.MS', 'c15.C',
+                     'c16.MS', 'c17.MS', 'c18.MS','c19.C', 'c20.AB', 'c21.P4')
 names(new.cluster.ids) <- levels(seurat.cistopic)
 
 seurat.cistopic <- RenameIdents(seurat.cistopic, new.cluster.ids)
@@ -218,17 +220,14 @@ DimPlot(seurat.cistopic, reduction = "umap", label = TRUE, pt.size = 0.5,  label
 # compute gene activity score to annotate clusters
 ##########################################
 peaks.chrM = grep('chrM', rownames(seurat.cistopic))
-seurat.cistopic = seurat.cistopic[-peaks.chrM, ]
+if(length(peaks.chrM)>0) seurat.cistopic = seurat.cistopic[-peaks.chrM, ]
 
 source.my.script('scATAC_functions.R')
 fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cellranger_atac_wbcel235/outs/fragments.tsv.gz'
 
-seurat.cistopic = compute.gene.acitivity.scores(seurat.cistopic, fragment.file = fragment.file)
+seurat.cistopic = compute.gene.acitivity.scores(seurat.cistopic, fragment.file = fragment.file, method = 'promoter.geneBody')
 
 saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_geneActivity_object.rds'))
-#xx = seurat.cistopic
-#DefaultAssay(seurat.cistopic) <- 'peaks'
-#seurat.cistopic = FindClusters(seurat.cistopic,reduction='pca', n.start=20, resolution=0.8)
 
 
 DefaultAssay(seurat.cistopic) <- 'RNA'
@@ -322,9 +321,12 @@ library(SeuratData)
 InstallData("pbmcsca")
 data("pbmcsca")
 
-##########################################
-# find differentially accessible peaks and motif enrichment analysis  
-##########################################
+########################################################
+########################################################
+# Section : Find differentially accessible peaks and motif enrichment analysis  
+# 
+########################################################
+########################################################
 DefaultAssay(seurat.cistopic) <- 'peaks'
 
 seurat.cistopic = compute.motif.enrichment(seurat.cistopic)
