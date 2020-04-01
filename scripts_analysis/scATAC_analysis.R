@@ -206,35 +206,43 @@ write.table(barcode.cluster, file = paste0(filtered_mtx_dir, '/barcodes_and_clus
 # mainly based on two papers:
 # Hashimshony et al. 2015 and Warner et al. 2019
 ##########################################
+seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
 Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
 new.cluster.ids <- c("P0", "c1.ABa", "c2.MS", "c3.C", "c4.C", "c5.E",
                      'c6.E', 'c7.E','c8.ABp', 'c9.ABa', 'c10.MS', 
                      'c11.C', 'c12.ABp', 'c13.MS', 'c14.MS', 'c15.C',
                      'c16.MS', 'c17.MS', 'c18.MS','c19.C', 'c20.AB', 'c21.P4')
 names(new.cluster.ids) <- levels(seurat.cistopic)
-
 seurat.cistopic <- RenameIdents(seurat.cistopic, new.cluster.ids)
+
 DimPlot(seurat.cistopic, reduction = "umap", label = TRUE, pt.size = 0.5,  label.size = 8) + NoLegend()
 
 ##########################################
 # compute gene activity score to annotate clusters
 ##########################################
-peaks.chrM = grep('chrM', rownames(seurat.cistopic))
-if(length(peaks.chrM)>0) seurat.cistopic = seurat.cistopic[-peaks.chrM, ]
-
-source.my.script('scATAC_functions.R')
-fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cellranger_atac_wbcel235/outs/fragments.tsv.gz'
-
-seurat.cistopic = compute.gene.acitivity.scores(seurat.cistopic, fragment.file = fragment.file, method = 'promoter.geneBody')
-
-saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_geneActivity_object.rds'))
-
+Compute.gene.activity.scores = FALSE
+if(Compute.gene.activity.scores){
+  peaks.chrM = grep('chrM', rownames(seurat.cistopic))
+  if(length(peaks.chrM)>0) seurat.cistopic = seurat.cistopic[-peaks.chrM, ]
+  source.my.script('scATAC_functions.R')
+  
+  fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cellranger_atac_wbcel235/outs/fragments.tsv.gz'
+  
+  seurat.cistopic = compute.gene.acitivity.scores(seurat.cistopic, fragment.file = fragment.file, method = 'promoter.geneBody')
+  
+  #saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_geneActivity_object.rds')) 
+}else{
+  
+}
 
 DefaultAssay(seurat.cistopic) <- 'RNA'
 FeaturePlot(
   object = seurat.cistopic,
-  features = c('tbx-37','tbx-38', 'lsy-6', "tbx-35","elt-2","med-1","med-2", 'pal-1', 'pha-4', 'tbx-7', 'end-1', 'mom-1',
-               'tbx-11', 'tbx-33', 'tbx-9'),
+  features = c('lsy-6', 'tbx-37','tbx-38', 'ceh-27', 'ceh-36', 'elt-1',
+               'dmd-4',
+               'dpy-31', 'elt-7', 'end-1', 'nrh-79', 
+                "mab-5","med-1","med-2", 'pal-1', 'pha-4', 
+                 'pes-1', 'nos-1', 'nos-2'),
   pt.size = 0.1,
   #max.cutoff = 'q95',
   #min.cutoff = 'q5',
@@ -248,7 +256,8 @@ FeaturePlot(
 library(Signac)
 library(Seurat)
 
-seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneActivity_motifClassChromVar.rds'))
+#seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds'))
+seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
 DefaultAssay(seurat.cistopic) <- 'peaks'
 
 seurat.cistopic <- RunTFIDF(seurat.cistopic)
@@ -267,8 +276,9 @@ seurat.cistopic <- RunSVD(
 # Here, we process the gene activity matrix 
 # in order to find anchors between cells in the scATAC-seq dataset 
 # and the scRNA-seq dataset.
+nb.variableFeatures = 2000
 DefaultAssay(seurat.cistopic) <- 'RNA'
-seurat.cistopic <- FindVariableFeatures(seurat.cistopic, nfeatures = 2000)
+seurat.cistopic <- FindVariableFeatures(seurat.cistopic, nfeatures = nb.variableFeatures)
 seurat.cistopic <- NormalizeData(seurat.cistopic)
 seurat.cistopic <- ScaleData(seurat.cistopic)
 
@@ -276,8 +286,22 @@ seurat.cistopic <- ScaleData(seurat.cistopic)
 tintori <- readRDS(paste0(RdataDir, 'Tintori_et_al_highQualtiyCells.rds'))
 tintori <- FindVariableFeatures(
   object = tintori,
-  nfeatures = 2000
+  nfeatures = nb.variableFeatures
 )
+
+DimPlot(tintori, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE)
+
+#Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
+new.cluster.ids <- c("P0/AB/P1", "P0/AB/P1", "P0/AB/P1","ABa/p/EMS", "ABa/p/EMS", "ABa/p/EMS",
+                     "P2/P3/C","ABa/pr/l",  "ABa/pr/l",  "ABa/pr/l", "ABa/pr/l",
+                    "P2/P3/C", "MS/E","P2/P3/C", "MS/E",
+                     "ABa/pr/lx", "ABa/pr/lx", "ABa/pr/lx", "ABa/pr/lx",
+                    "MSx1/2", "MSx1/2",  "Cx1/2",   
+                    "Ea/p",    "Ea/p",    "Cx1/2",   "P4/D",    "P4/D" )   
+names(new.cluster.ids) <- levels(tintori)
+tintori <- RenameIdents(tintori, new.cluster.ids)
+
+DimPlot(tintori, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE)
 
 transfer.anchors <- FindTransferAnchors(
   reference = tintori,
@@ -286,19 +310,21 @@ transfer.anchors <- FindTransferAnchors(
   reference.assay = 'RNA',
   query.assay = 'RNA',
   reduction = 'cca',
-  dims = 1:30
+  k.anchor = 30,
+  k.filter = 100,
+  dims = 1:50
 )
 
 predicted.labels <- TransferData(
   anchorset = transfer.anchors,
-  refdata = tintori$lineage,
-  weight.reduction = seurat.cistopic[['pca']]
+  refdata = Idents(tintori),
+  weight.reduction = seurat.cistopic[['pca']],
+  dims = 1:50,
+  k.weight = 30
 )
-
 seurat.cistopic <- AddMetaData(object = seurat.cistopic, metadata = predicted.labels)
-
-DimPlot(seurat.cistopic, group.by = "predicted.id", label = TRUE, repel = TRUE) + ggtitle("scATAC-seq cells") + 
-  NoLegend() + scale_colour_hue(drop = FALSE)
+DimPlot(seurat.cistopic, group.by = "predicted.id", label = TRUE, repel = FALSE) + ggtitle("scATAC-seq cells") + 
+  scale_colour_hue(drop = FALSE)
 
 table(seurat.cistopic$prediction.score.max > 0.5)
 
@@ -320,6 +346,7 @@ library(SeuratWrappers)
 library(SeuratData)
 InstallData("pbmcsca")
 data("pbmcsca")
+
 
 ########################################################
 ########################################################
