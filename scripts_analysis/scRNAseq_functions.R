@@ -94,13 +94,20 @@ aggrate.nf.QCs = function(dirs.all, modules2cat = c("star", "featureCounts"))
 # a) keep only rows for mapped transripts
 # b) map the gene names to the gene symbols
 ##########################################
-convertGeneNames.forCountTable = function(aa, discard.gene.with.zero.reads = TRUE)
+convertGeneNames.forCountTable = function(aa, discard.gene.with.zero.reads = TRUE, annot = NULL)
 {
   
   aa = aa[ grep("^__", aa$gene, invert = TRUE), ] ## remove features that are not well aligned
   
   ## load annotation and change the gene names
-  annot = read.csv(file = "/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
+  if(is.null(annot)){
+    annot = read.csv(file = 
+                       "/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/annotations/BioMart_WBcel235_noFilters.csv", 
+                     header = TRUE)
+  }else{
+    
+  }
+  
   gg.Mt = annot$Gene.name[which(annot$Chromosome.scaffold.name=="MtDNA")]
   gg.ribo = annot$Gene.name[which(annot$Gene.type=="rRNA")]
   
@@ -127,9 +134,14 @@ convertGeneNames.forCountTable = function(aa, discard.gene.with.zero.reads = TRU
   return(counts)
 }
 
-find.particular.geneSet = function(geneSet = "Mt")
+find.particular.geneSet = function(geneSet = "Mt", annot = NULL)
 {
-  annot = read.csv(file = "/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
+  if(is.null(annot)){
+    annot = read.csv(file = 
+                       "/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/annotations/BioMart_WBcel235_noFilters.csv", 
+                     header = TRUE)
+  }
+  
   if(geneSet == "Mt"){
     return(annot$Gene.name[which(annot$Chromosome.scaffold.name=="MtDNA")])
   }else{

@@ -96,37 +96,114 @@ process.scRNAseq.for.early.embryo.packer.et.al = function()
 }
 
 
-process.scRNAseq.for.early.embryo.Tintori.et.al = function()
+process.scRNAseq.for.early.embryo.Tintori.et.al = function(start.from.raw.counts = FALSE)
 {
-  cello.data.path = "../Celegans.Tintori.Cello/"
+  if(!start.from.raw.counts)
+  {
+    cello.data.path = "../Celegans.Tintori.Cello/"
+    
+    eset = readRDS(paste0(cello.data.path, 'eset.rds'))
+    saveRDS(eset, file =  paste0(RdataDir, 'VisCello_Tintori_et_al.rds'))
+    
+    pmeda = data.frame(pData(eset))
+    
+    library(Seurat)
+    sels = which(pmeda$Usable.Quality. == 'Yes')
+    
+    eset = eset[, sels]
+    
+    ee = CreateSeuratObject(counts = eset@assayData$exprs, assay = 'RNA', meta.data = pmeda)
+    ee@assays$RNA@data = eset@assayData$norm_exprs
+    
+    FeatureScatter(ee, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+    
+    # ee <- subset(ee, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
+    #al = subset(ee, cells = Usable.Quality. == 'Yes')
+    
+    al <- FindVariableFeatures(object = ee, nfeatures = 2000)
+    al <- ScaleData(object = al)
+    al <- RunPCA(object = al, npcs = 50, verbose = FALSE)
+    
+    Idents(al) = al$lineage
+    al <- RunUMAP(object = al, dims = 1:30, n.neighbors = 10, min.dist = 0.3)
+    
+    DimPlot(al, label = TRUE, 
+            pt.size = 2, label.size = 3, repel = TRUE)
+    
+    #ee = al[, which(al$Usable.Quality. == 'Yes')]
+    saveRDS(al, file =  paste0(RdataDir, 'Tintori_et_al_highQualtiyCells.rds'))
+  }else{
+    ##########################################
+    # process the count data
+    ##########################################
+    dataDir = paste0("../Celegans.Tintori.Cello/nf_output")
+    library(data.table)
+    # first concatenate the data
+    xlist <-list.files(path=dataDir, pattern = "*merged_gene_counts.txt", full.names = TRUE)
+    aa = NULL
+    
+    for(n in 1:length(xlist)){
+      # n = 1
+      cat(n, '\t')
+      cat(xlist[n], '\n')
+      
+      if(n==1){
+        aa = data.frame(fread(xlist[n], header=TRUE, sep="\t", stringsAsFactors=FALSE), stringsAsFactors = FALSE)
+      }else{
+        test = data.frame(fread(xlist[n], header=TRUE, sep="\t", stringsAsFactors=FALSE), stringsAsFactors = FALSE)
+        mm = match(aa$ENSEMBL_ID, test$ENSEMBL_ID)
+        aa = data.frame(aa, test[mm, -grep('ENSEMBL_ID', colnames(test))])
+      }
+    }
+    
+    colnames(aa)[1] = 'gene';
+    if(length(grep("out_gene.featureCounts.txt", colnames(aa)))>0) {
+      aa = aa[, -grep("out_gene.featureCounts.txt", colnames(aa))]
+    }
+    
+    library(SingleCellExperiment)
+    library(scater)
+    library(scRNA.seq.funcs)
+    library(scran)
+    options(stringsAsFactors = FALSE)
+    
+    source.my.script("scRNAseq_functions.R")
+    annot = read.csv(file = "data/annotations/BioMart_WBcel235_noFilters.csv",
+                     header = TRUE)
+    counts = convertGeneNames.forCountTable(aa = aa, annot = annot)
+    gg.Mt = find.particular.geneSet("Mt", annot = annot)
+    gg.ribo = find.particular.geneSet("ribo", annot = annot)
+    
+    ##########################################
+    # preprocess metadata 
+    ##########################################
+    design = read.delim(file = '../Celegans.Tintori.Cello/nf_output/PRJNA312176.txt', sep = '\t', header= TRUE)
+    
+    eset = readRDS(paste0('../Celegans.Tintori.Cello/eset.rds'))
+    pmeda = data.frame(pData(eset))
+    
+    mm = match(design$sample_title, pmeda$sample)
+    design = data.frame(design, pmeda, stringsAsFactors = FALSE)
+    
+    kk = match(colnames(counts), design$run_accession)
+    design = design[kk, ]
+    colnames(counts) = design$sample
+    rownames(design) = design$sample
+    design = data.frame(design)
+    
+    ## using scran and scater for QC and normalization 
+    
+    
+    
+    library(dplyr)
+    library(Seurat)
+    library(patchwork)
+    #pbmc <- CreateSeuratObject(counts = counts, project = "Tintori", min.cells = 3, min.features = 200, 
+                               meta.data = design)
+    #pbmc
+    
+  }
   
-  eset = readRDS(paste0(cello.data.path, 'eset.rds'))
-  saveRDS(eset, file =  paste0(RdataDir, 'VisCello_Tintori_et_al.rds'))
-  
-  pmeda = data.frame(pData(eset))
-  
-  library(Seurat)
-  sels = which(pmeda$Usable.Quality. == 'Yes')
-  
-  eset = eset[, sels]
-  
-  ee = CreateSeuratObject(counts = eset@assayData$exprs, assay = 'RNA', meta.data = pmeda)
-  ee@assays$RNA@data = eset@assayData$norm_exprs
-  
-  #al = subset(ee, cells = Usable.Quality. == 'Yes')
-  
-  al <- FindVariableFeatures(object = ee, nfeatures = 2000)
-  al <- ScaleData(object = al)
-  al <- RunPCA(object = al, npcs = 50, verbose = FALSE)
-  
-  Idents(al) = al$lineage
-  al <- RunUMAP(object = al, dims = 1:30, n.neighbors = 10, min.dist = 0.3)
-  
-  DimPlot(al, label = TRUE, 
-          pt.size = 2, label.size = 3, repel = TRUE)
-  
-  #ee = al[, which(al$Usable.Quality. == 'Yes')]
-  saveRDS(al, file =  paste0(RdataDir, 'Tintori_et_al_highQualtiyCells.rds'))
   
 }
 

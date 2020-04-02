@@ -250,14 +250,14 @@ FeaturePlot(
 )
 
 ##########################################
-# Integrating with scRNA-seq data 
+# label transferring from scRNA-seq data using seurat
 # see details in https://satijalab.org/signac/articles/mouse_brain_vignette.html#integrating-with-scrna-seq-data
 ##########################################
 library(Signac)
 library(Seurat)
 
-#seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds'))
-seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
+seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds'))
+#seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
 DefaultAssay(seurat.cistopic) <- 'peaks'
 
 seurat.cistopic <- RunTFIDF(seurat.cistopic)
@@ -276,7 +276,7 @@ seurat.cistopic <- RunSVD(
 # Here, we process the gene activity matrix 
 # in order to find anchors between cells in the scATAC-seq dataset 
 # and the scRNA-seq dataset.
-nb.variableFeatures = 2000
+nb.variableFeatures = 2500
 DefaultAssay(seurat.cistopic) <- 'RNA'
 seurat.cistopic <- FindVariableFeatures(seurat.cistopic, nfeatures = nb.variableFeatures)
 seurat.cistopic <- NormalizeData(seurat.cistopic)
@@ -284,6 +284,8 @@ seurat.cistopic <- ScaleData(seurat.cistopic)
 
 # Load the pre-processed scRNA-seq data 
 tintori <- readRDS(paste0(RdataDir, 'Tintori_et_al_highQualtiyCells.rds'))
+tintori = tintori[!is.na(match(rownames(tintori), rownames(seurat.cistopic)))] # select only protein-coding genes and miRNAs
+
 tintori <- FindVariableFeatures(
   object = tintori,
   nfeatures = nb.variableFeatures
@@ -306,11 +308,11 @@ DimPlot(tintori, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, 
 transfer.anchors <- FindTransferAnchors(
   reference = tintori,
   query = seurat.cistopic,
-  features = VariableFeatures(object = tintori),
+  features = unique(c(VariableFeatures(object = tintori), VariableFeatures(seurat.cistopic))),
   reference.assay = 'RNA',
   query.assay = 'RNA',
   reduction = 'cca',
-  k.anchor = 30,
+  k.anchor = 20,
   k.filter = 100,
   dims = 1:50
 )
@@ -338,15 +340,85 @@ DimPlot(seurat.cistopic.filtered, group.by = "predicted.id", label = TRUE, repel
   NoLegend() + scale_colour_hue(drop = FALSE)
 
 ##########################################
-# test liger  
+# test liger to transfer lables 
+# see details in https://macoskolab.github.io/liger/walkthrough_rna_atac.html
 ##########################################
-library(SeuratData)
-library(SeuratWrappers)
-
-library(SeuratData)
-InstallData("pbmcsca")
-data("pbmcsca")
-
+Test.liger.for.label.transferring = FALSE
+if(Test.liger.for.label.transferring){
+  #seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds'))
+  seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
+  DefaultAssay(seurat.cistopic) <- 'RNA'
+  
+  # Load the pre-processed scRNA-seq data 
+  tintori <- readRDS(paste0(RdataDir, 'Tintori_et_al_highQualtiyCells.rds'))
+  tintori <- FindVariableFeatures(
+    object = tintori,
+    nfeatures = nb.variableFeatures
+  )
+  
+  DimPlot(tintori, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE)
+  
+  #Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
+  new.cluster.ids <- c("P0/AB/P1", "P0/AB/P1", "P0/AB/P1","ABa/p/EMS", "ABa/p/EMS", "ABa/p/EMS",
+                       "P2/P3/C","ABa/pr/l",  "ABa/pr/l",  "ABa/pr/l", "ABa/pr/l",
+                       "P2/P3/C", "MS/E","P2/P3/C", "MS/E",
+                       "ABa/pr/lx", "ABa/pr/lx", "ABa/pr/lx", "ABa/pr/lx",
+                       "MSx1/2", "MSx1/2",  "Cx1/2",   
+                       "Ea/p",    "Ea/p",    "Cx1/2",   "P4/D",    "P4/D" )   
+  names(new.cluster.ids) <- levels(tintori)
+  tintori <- RenameIdents(tintori, new.cluster.ids)
+  
+  DimPlot(tintori, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE)
+  
+  
+  #rna_clusts = readRDS("../liger-rna-atac-vignette/rna_cluster_assignments.RDS")
+  #atac_clusts = readRDS("../liger-rna-atac-vignette/atac_cluster_assignments.RDS")
+  #pbmc.atac <- readRDS('../liger-rna-atac-vignette/pbmc.atac.expression.mat.RDS')
+  #pbmc.rna <- readRDS('../liger-rna-atac-vignette/pbmc.rna.expression.mat.RDS')
+  
+  atac_clusts = seurat.cistopic$peaks_snn_res.0.8
+  rna_clusts = Idents(tintori)
+  pbmc.atac = seurat.cistopic@assays$RNA@counts
+  pbmc.rna = tintori@assays$RNA@counts
+  
+  # data preprocessing
+  library(liger)
+  ggplot2::theme_set(theme_cowplot())
+  #xx = pbmc.atac[,names(atac_clusts)]
+  pbmc.data = list(atac=pbmc.atac[,names(atac_clusts)], rna=pbmc.rna[,names(rna_clusts)])
+  
+  
+  int.pbmc <- createLiger(pbmc.data)
+  
+  int.pbmc <- normalize(int.pbmc)
+  int.pbmc <- selectGenes(int.pbmc, datasets.use = 2)
+  int.pbmc <- scaleNotCenter(int.pbmc)
+  
+  # Factorization and Quantile Normalization
+  int.pbmc <- optimizeALS(int.pbmc, k=20)
+  
+  int.pbmc <- liger::runTSNE(int.pbmc, use.raw = T)
+  p1 <- plotByDatasetAndCluster(int.pbmc, return.plots = T)
+  print(p1[[1]])
+  
+  int.pbmc <- liger::quantile_norm(int.pbmc)
+  
+  # visualization
+  int.pbmc <- liger::runUMAP(int.pbmc)
+  plots <- plotByDatasetAndCluster(int.pbmc, return.plots = T,clusters=rna_clusts) 
+  print(plots[[1]])
+  
+  print(plots[[2]])
+    
+  calcAlignment(int.pbmc)
+  
+  NKG7 = plotGene(int.pbmc,gene="NKG7",return.plots=T)
+  MS4A1 = plotGene(int.pbmc,gene="MS4A1",return.plots=T)
+  plot_grid(NKG7[[2]],MS4A1[[2]],NKG7[[1]],MS4A1[[1]],ncol=2)
+  
+  #seurat_liger = ligerToSeurat(int.pbmc, use.liger.genes = T)
+  
+}
 
 ########################################################
 ########################################################
