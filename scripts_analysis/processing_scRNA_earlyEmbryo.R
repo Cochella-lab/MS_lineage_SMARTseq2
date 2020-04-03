@@ -343,6 +343,30 @@ process.scRNAseq.for.early.embryo.Tintori.et.al = function(start.from.raw.counts
     DimPlot(ms, reduction = "umap", group.by = 'lineage',  label = TRUE, pt.size = 2, label.size = 5, repel = TRUE) + 
     scale_colour_hue(drop = FALSE) + ggtitle('Tintori (size factor)')
     
+    saveRDS(ms, file = paste0(RdataDir, 'Tintori.et.al_rawCounts_processed_sizefactorNormalization.rds'))
+    
+    ms <- FindNeighbors(ms, dims = 1:30)
+    ms <- FindClusters(ms, resolution = 10) 
+    DimPlot(ms, reduction = "umap")
+    
+    lineages = unique(ms$lineage)
+    lineages.index = match(ms$lineage, lineages)
+    ms$seurat_clusters = lineages.index - 1
+    Idents(ms) = ms$seurat_clusters
+    DimPlot(ms, reduction = "umap")
+    
+    # find all markers of cluster 1
+    cluster1.markers <- FindMarkers(ms, ident.1 = 1, min.pct = 0.25, test.use = 'MAST')
+    head(cluster1.markers, n = 5)
+    
+    # find markers for every cluster compared to all remaining cells, report only the positive ones
+    pbmc = ms
+    pbmc.markers <- FindAllMarkers(pbmc, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+    #pbmc.markers %>% group_by(cluster) %>% top_n(n = 2, wt = avg_logFC)
+    
+    pbmc.markers$cluster = lineages[(1+as.integer(pbmc.markers$cluster))]
+    top10 <- pbmc.markers %>% group_by(cluster) %>% top_n(n = 5, wt = avg_logFC)
+    DoHeatmap(pbmc, features = top10$gene, size = 5) 
   }
   
   
