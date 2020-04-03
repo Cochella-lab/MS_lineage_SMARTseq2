@@ -364,13 +364,25 @@ process.scRNAseq.for.early.embryo.Tintori.et.al = function(start.from.raw.counts
     pbmc.markers <- FindAllMarkers(pbmc, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
     #pbmc.markers %>% group_by(cluster) %>% top_n(n = 2, wt = avg_logFC)
     
+    saveRDS(pbmc.markers, file = paste0(RdataDir, 'Tintori.et.al_rawCounts_processed_sizefactorNormalization_markerGenes.rds'))
+    
+    
     pbmc.markers$cluster = lineages[(1+as.integer(pbmc.markers$cluster))]
     top10 <- pbmc.markers %>% group_by(cluster) %>% top_n(n = 5, wt = avg_logFC)
-    DoHeatmap(pbmc, features = top10$gene, size = 5) 
+    
+    Idents(pbmc) = pbmc$lineage
+    DoHeatmap(pbmc, features = top10$gene, size = 5, hjust = 0) + 
+      theme(axis.text.y = element_text(size = 8))
+    
   }
-  
-  
 }
+
+
+process.scRNAseq.for.early.embryo.AleksData = function()
+{
+  ee = readRDS(file = '')
+}
+
 
 
 
