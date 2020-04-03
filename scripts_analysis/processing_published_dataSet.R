@@ -192,15 +192,156 @@ process.scRNAseq.for.early.embryo.Tintori.et.al = function(start.from.raw.counts
     design = data.frame(design)
     
     ## using scran and scater for QC and normalization 
+    library(SingleCellExperiment)
+    library(scater)
+    options(stringsAsFactors = FALSE)
+    
+    #load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged.Rdata'))
+    sce <- SingleCellExperiment(assays = list(counts = counts),
+                                colData = as.data.frame(design),
+                                rowData = data.frame(gene_names = rownames(counts), feature_symbol = rownames(counts)))
+    
+    keep_feature <- rowSums(counts(sce) > 0) > 0
+    sce <- sce[keep_feature, ]
+    
+    #is.spike <- grepl("^ERCC", rownames(sce))
+    is.mito <- rownames(sce) %in% gg.Mt;
+    is.ribo <- rownames(sce) %in% gg.ribo;
+    summary(is.mito)
+    summary(is.ribo)
+    
+    sce <- calculateQCMetrics(sce, feature_controls=list(Mt=is.mito, Ribo=is.ribo))
     
     
+    pdfname = paste0(resDir, "/Tintori.et.al_scRNAseq_QCs_cells_filterting.pdf")
+    pdf(pdfname, width=12, height = 6)
+    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
     
-    library(dplyr)
+    # some general statistics for each request and lane
+    plotColData(sce, y="pct_counts_Ribo", x="total_counts") + ggtitle("% of rRNA contamination")
+    plotColData(sce, y="pct_counts_Mt", x="total_counts") + ggtitle("% of Mt")
+    
+    plotColData(sce, y="log10_total_counts", x="total_counts") + ggtitle("total nb of reads mapped to transcripts")
+    
+    plotColData(sce, y="total_features_by_counts", x="total_counts") + ggtitle("total nb of genes")
+    
+    plotColData(sce, y="Number.of.ERCC.reads", x="total_counts") + ggtitle("total nb of genes")
+    
+    plotColData(sce,
+                x = "log10_total_counts",
+                y = "log10_total_features_by_counts",
+                #colour_by = "percent_mapped",
+                colour_by = "Usable.Quality.",
+                size_by = "pct_counts_Mt"
+    ) + scale_x_continuous(limits=c(4, 7)) +
+      scale_y_continuous(limits = c(2.5, 4.1)) +
+      geom_hline(yintercept=log10(c(500, 1000, 5000)) , linetype="dashed", color = "darkgray", size=0.5) +
+      geom_vline(xintercept = c(4:6), linetype="dotted", color = "black", size=0.5)
+    
+    dev.off()
+    
+    
+    threshod.total.counts.per.cell = 10^5
+    threshod.nb.detected.genes.per.cell = 750 # Adjust the number for each batch
+    
+    filter_by_total_counts <- (sce$total_counts > threshod.total.counts.per.cell)
+    table(filter_by_total_counts)
+    filter_by_expr_features <- (sce$total_features_by_counts > threshod.nb.detected.genes.per.cell)
+    table(filter_by_expr_features)
+    filter_by_MT = sce$pct_counts_Mt < 10 # Adjust the number for each batch
+    table(filter_by_MT)
+    filter_by_Ribo = sce$pct_counts_Ribo < 50
+    
+    sce$use <- (
+      filter_by_expr_features & # sufficient features (genes)
+        filter_by_total_counts & # sufficient molecules counted
+        filter_by_Ribo & # sufficient endogenous RNA
+        filter_by_MT # remove cells with unusual number of reads in MT genes
+    )
+    table(sce$use)
+    
+    sce = sce[, sce$use]
+    
+    
+    pdfname = paste0(resDir, "/Tintori.et.al_scRNAseq_QCs_genes_filterting_", version.analysis, ".pdf")
+    pdf(pdfname, width=16, height = 10)
+    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    #plotQC(reads, type = "highest-expression", n=20)
+    fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
+    plotHighestExprs(sce, n=50) + fontsize
+    
+    #fontsize <- theme(axis.text=element_text(size=16), axis.title=element_text(size=16))
+    #plotHighestExprs(sce, n=30) + fontsize
+    
+    ave.counts <- calcAverage(sce)
+    hist(log10(ave.counts), breaks=100, main="", col="grey80",
+         xlab=expression(Log[10]~"average count"))
+    
+    num.cells <- nexprs(sce, byrow=TRUE)
+    smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
+                  xlab=expression(Log[10]~"average count"))
+    dev.off()
+    
+    genes.to.keep <- num.cells > 5 & ave.counts >= 1     # detected in >= 5 cells, ave.counts >=5 but not too high
+    summary(genes.to.keep)
+    
+    # remove mt and ribo genes
+    genes.to.keep = genes.to.keep & ! rownames(sce) %in% gg.Mt & ! rownames(sce) %in% gg.ribo
+    summary(genes.to.keep)
+    
+    sce <- sce[genes.to.keep, ]
+    
+    ##########################################
+    #  normalization
+    ##########################################
+    plotColData(sce,
+                x = "log10_total_counts",
+                y = "log10_total_features_by_counts",
+                colour_by = "Usable.Quality.",
+                #colour_by = "",
+                size_by = "pct_counts_Mt"
+    ) + scale_x_continuous(limits=c(4, 7)) +
+      scale_y_continuous(limits = c(2.5, 4.1)) +
+      geom_hline(yintercept=log10(c(500, 1000, 5000)) , linetype="dashed", color = "darkgray", size=0.5) +
+      geom_vline(xintercept = c(4:6), linetype="dotted", color = "black", size=0.5)
+    
+    sce$library.size = apply(counts(sce), 2, sum)
+    qclust <- quickCluster(sce)
+    sce <- computeSumFactors(sce, clusters = qclust)
+    sce <- logNormCounts(sce, log = TRUE, pseudo_count = 1)
+    
+    par(mfrow = c(1, 2))
+    plot(sizeFactors(sce), sce$library.size/1e6, log="xy", ylab="Library size (millions)", xlab="Size factor")
+    plot(sizeFactors(sce), 1/sce$Number.of.ERCC.reads*10^6,  log = 'xy', 
+         ylab="1/ERCC", xlab="Size factor")
+    
     library(Seurat)
-    library(patchwork)
-    #pbmc <- CreateSeuratObject(counts = counts, project = "Tintori", min.cells = 3, min.features = 200, 
-                               meta.data = design)
-    #pbmc
+    library(ggplot2)
+    
+    ms = as.Seurat(sce, counts = 'counts', data = 'logcounts', assay = "RNA") # scran normalized data were kept in Seurat
+    ms = ms[, which(ms$Usable.Quality. == 'Yes')]
+    
+    nfeatures = 2000
+    ms <- FindVariableFeatures(ms, selection.method = "vst", nfeatures = nfeatures)
+    
+    #top10 <- head(VariableFeatures(ms), 10) # Identify the 10 most highly variable genes
+    #plot1 <- VariableFeaturePlot(ms)
+    #plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+    #CombinePlots(plots = list(plot1, plot2)) # plot variable features with and without labels
+    
+    ms = ScaleData(ms, features = rownames(ms))
+    
+    # new normalization from Seurat
+    # tried regress out the pct_counts_Mt but works less well
+    #ms <- SCTransform(object = ms, variable.features.n = nfeatures) 
+    ms <- RunPCA(object = ms, features = VariableFeatures(ms), verbose = FALSE)
+    ElbowPlot(ms)
+    
+    nb.pcs = 30; n.neighbors = 20; min.dist = 0.2;
+    ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+    DimPlot(ms, reduction = "umap", group.by = 'lineage',  label = TRUE, pt.size = 2, label.size = 5, repel = TRUE) + 
+    scale_colour_hue(drop = FALSE) + ggtitle('Tintori (size factor)')
     
   }
   
