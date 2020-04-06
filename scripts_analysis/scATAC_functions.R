@@ -688,9 +688,8 @@ compute.motif.enrichment = function(seurat.cistopic)
     write_jaspar(pwm.meme, file = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015.pfm')
   }
   
-  pfm = readJASPARMatrix(fn = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015.pfm', 
+  pfm = readJASPARMatrix(fn = 'data/motifs/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015.pfm', 
                          matrixClass = 'PFM')
-  
   
   # Scan the DNA sequence of each peak for the presence of each motif
   tic('scan the motif for peak regions')

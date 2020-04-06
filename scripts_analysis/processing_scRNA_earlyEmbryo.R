@@ -380,8 +380,137 @@ process.scRNAseq.for.early.embryo.Tintori.et.al = function(start.from.raw.counts
 
 process.scRNAseq.for.early.embryo.AleksData = function()
 {
-  ee = readRDS(file = '')
+  ee = readRDS(file = 'data/Early_cells/ms_early_subsample.rds')
+  
+  DefaultAssay(ee) = 'RNA'
+  
+  #DimPlot(ee, reduction = "umap")
+  
+  # redo normalization using scran 
+  library(SingleCellExperiment)
+  library(scater)
+  options(stringsAsFactors = FALSE)
+  
+  #load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged.Rdata'))
+  counts = ee@assays$RNA@counts
+  design = ee@meta.data
+  sce <- SingleCellExperiment(assays = list(counts = counts),
+                              colData = as.data.frame(design),
+                              rowData = data.frame(gene_names = rownames(counts), feature_symbol = rownames(counts)))
+  
+  keep_feature <- rowSums(counts(sce) > 0) > 0
+  sce <- sce[keep_feature, ]
+  
+  
+  sce$library.size = apply(counts(sce), 2, sum)
+  qclust <- quickCluster(sce)
+  sce <- computeSumFactors(sce, clusters = qclust)
+  sce <- logNormCounts(sce, log = TRUE, pseudo_count = 1)
+  
+  par(mfrow = c(1, 1))
+  plot(sizeFactors(sce), sce$library.size/1e6, log="xy", ylab="Library size (millions)", xlab="Size factor")
+    
+  library(Seurat)
+  library(ggplot2)
+  
+  ee = as.Seurat(sce, counts = 'counts', data = 'logcounts', assay = "RNA") # scran normalized data were kept in Seurat
+  
+  nfeatures = 2000
+  ee <- FindVariableFeatures(ee, selection.method = "vst", nfeatures = nfeatures)
+  
+  ee = ScaleData(ee, features = rownames(ms))
+  ee <- RunPCA(object = ee, features = VariableFeatures(ee), verbose = FALSE)
+  ElbowPlot(ee)
+  
+  nb.pcs = 30; n.neighbors = 20; min.dist = 0.2;
+  ee <- RunUMAP(object = ee, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+  DimPlot(ee, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE) + 
+    scale_colour_hue(drop = FALSE) + ggtitle('Aleks (size factor)')
+  
+  saveRDS(ee, file = paste0(RdataDir, 'EE_Aleks_rawCounts_processed_sizefactorNormalization.rds'))
+  
+  
+  ##########################################
+  # Aleks' code 
+  ##########################################
+  # HoverLocator(plot = DimPlot(ms, pt.size =4, reduction = 'umap_mnn') , information = FetchData(ms, vars = 'timingEst'), pt.size =4 )
+  # interactive_plot <- DimPlot(ms[,c(ms$timingEst == 0) | c(ms$timingEst == 30) | c(ms$timingEst == 40)| c(ms$timingEst == 60)| c(ms$timingEst == 70)| c(ms$timingEst == 80)| c(ms$timingEst == 90)| c(ms$timingEst == 120)], pt.size =4, reduction = 'umap_mnn')
+  # 
+  # #select only nicely grouped cells
+  # select.cells <- CellSelector(plot = interactive_plot)
+  # ms_early_subsample <- ms[,select.cells]
+  # rr = 3
+  # ms_early_subsample <- FindNeighbors(object = ms_early_subsample, reduction = "mnn", k.param = 20, dims = 1:20)
+  # ms_early_subsample <- FindClusters(ms_early_subsample, resolution = rr, algorithm = 3)
+  # interactive_plot <- DimPlot(ms_early_subsample, pt.size =4, reduction = "umap_mnn")
+  # HoverLocator(plot = interactive_plot, information = FetchData(ms_early_subsample, vars = 'ident'), pt.size =4 )
+  # FeaturePlot(ms_early_subsample, features = c("pal-1","hnd-1"))
+  # FeaturePlot(ms_early_subsample, features = c("unc-130"))
+  # FeaturePlot(ms_early_subsample, features = c("sdz-1","sdz-31"))
+  # FeaturePlot(ms_early_subsample, features = c("apx-1", "mom-2"))
+  # FeaturePlot(ms_early_subsample, features = c("skn-1"))
+  # FeaturePlot(ms_early_subsample, features = c("abi-1"))
+  # 
+  # ms_early_subsample.markers <- FindAllMarkers(ms_early_subsample, min.pct = 0.25, logfc.threshold = 0.25)
+  # top10 <- ms_early_subsample.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+  # DoHeatmap(ms_early_subsample, slot = 'data', features = as.character(top10$gene))
+  # DimPlot(ms_early_subsample ,group.by = c("ident", "timingEst"), pt.size =4, label = TRUE)
+  
 }
+
+EE_integration_Aleks_Tintori = function(ee, tt, Method = c('seurat', 'liger'))
+{
+  
+  ee = readRDS(file = paste0(RdataDir, 'EE_Aleks_rawCounts_processed_sizefactorNormalization.rds'))
+  tt = readRDS(file = paste0(RdataDir, 'Tintori.et.al_rawCounts_processed_sizefactorNormalization.rds'))
+  ee$dataSet = 'Aleks'
+  tt$dataSet = 'Tintori'
+  
+  if(Method == 'seurat'){
+    
+    ee.list = list( Aleks = ee, Tintori = tt)
+    library(Seurat)
+    library(ggplot2)
+    
+    for (i in 1:length(ee.list)) {
+      ee.list[[i]] <- Seurat::NormalizeData(ee.list[[i]], verbose = FALSE)
+      ee.list[[i]] <- FindVariableFeatures(ee.list[[i]], selection.method = "vst", 
+                                                 nfeatures = 2000, verbose = FALSE)
+    }
+    
+    reference.list <- ee.list[c("Tintori", 'Aleks')]
+    #reference.list <- ee.list[c('Aleks', "Tintori")]
+    ee.anchors <- FindIntegrationAnchors(object.list = reference.list, dims = 1:30)
+    
+    ee.integrated <- IntegrateData(anchorset = ee.anchors, dims = 1:30)
+    
+    library(ggplot2)
+    library(cowplot)
+    library(patchwork)
+    # switch to integrated assay. The variable features of this assay are automatically
+    # set during IntegrateData
+    DefaultAssay(ee.integrated) <- "integrated"
+    
+    # Run the standard workflow for visualization and clustering
+    ee.integrated <- ScaleData(ee.integrated, verbose = FALSE)
+    ee.integrated <- RunPCA(ee.integrated, npcs = 50, verbose = FALSE)
+    
+    nb.pcs = 30; n.neighbors = 20; min.dist = 0.2;
+    ee.integrated <- RunUMAP(ee.integrated, reduction = "pca", dims = 1:nb.pcs,
+                             n.neighbors = n.neighbors, min.dist = min.dist)
+    
+    p1 <- DimPlot(ee.integrated, reduction = "umap", group.by = "dataSet", pt.size = 2, label.size = 5)
+    p2 <- DimPlot(ee.integrated, reduction = "umap", group.by = "lineage", label = TRUE, pt.size = 2, label.size = 5,
+                  repel = TRUE) 
+    p1 + p2
+    
+  }
+  
+}
+
+
+
+
 
 
 
