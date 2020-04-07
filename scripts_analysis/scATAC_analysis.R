@@ -428,6 +428,7 @@ if(Test.liger.for.label.transferring){
   seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
   DefaultAssay(seurat.cistopic) <- 'RNA'
   
+  nb.variableFeatures = 2500
   # Load the pre-processed scRNA-seq data 
   tintori <- readRDS(paste0(RdataDir, 'Tintori_et_al_highQualtiyCells.rds'))
   tintori <- FindVariableFeatures(
@@ -451,20 +452,34 @@ if(Test.liger.for.label.transferring){
   
   Run.liger.through.seurat = FALSE
   if(Run.liger.through.seurat){
+    
     library(liger)
     library(Seurat)
     library(SeuratData)
     library(SeuratWrappers)
     
-    InstallData("pbmcsca")
-    data("pbmcsca")
+    #InstallData("pbmcsca")
+    #data("pbmcsca")
+    pbmc.atac = seurat.cistopic@assays$RNA@counts
+    pbmc.rna = tintori@assays$RNA@counts
+    design.atac = seurat.cistopic@meta.data
+    design.atac$Method = 'atac'
+    design.rna = tintori@meta.data
+    design.rna$Method = 'rna'
+    
+    pbmc.atac = CreateSeuratObject(counts = pbmc.atac, meta.data = design.atac)
+    pbmc.rna = CreateSeuratObject(counts = pbmc.rna, meta.data = design.rna)
+    
+    pbmcsca =  merge(x = pbmc.atac, y =pbmc.rna)
+    
     pbmcsca <- NormalizeData(pbmcsca)
     pbmcsca <- FindVariableFeatures(pbmcsca)
     pbmcsca <- ScaleData(pbmcsca, split.by = "Method", do.center = FALSE)
-    pbmcsca <- RunOptimizeALS(pbmcsca, k = 20, lambda = 5, split.by = "Method")
-    pbmcsca <- RunQuantileAlignSNF(pbmcsca, split.by = "Method")
+    pbmcsca <- SeuratWrappers::RunOptimizeALS(pbmcsca, k = 20, lambda = 5, split.by = "Method")
+    pbmcsca <- SeuratWrappers::RunQuantileAlignSNF(pbmcsca, split.by = "Method", reduction = 'iNMF_raw')
     pbmcsca <- RunUMAP(pbmcsca, dims = 1:ncol(pbmcsca[["iNMF"]]), reduction = "iNMF")
     DimPlot(pbmcsca, group.by = c("Method", "ident", "CellType"), ncol = 3)
+    
     
   }else{
     #rna_clusts = readRDS("../liger-rna-atac-vignette/rna_cluster_assignments.RDS")
@@ -482,34 +497,42 @@ if(Test.liger.for.label.transferring){
     ggplot2::theme_set(theme_cowplot())
     #xx = pbmc.atac[,names(atac_clusts)]
     pbmc.data = list(atac=pbmc.atac[,names(atac_clusts)], rna=pbmc.rna[,names(rna_clusts)])
-    
     int.pbmc <- createLiger(pbmc.data)
     
-    int.pbmc <- normalize(int.pbmc)
-    int.pbmc <- selectGenes(int.pbmc, datasets.use = 2)
+    int.pbmc <- liger::normalize(int.pbmc)
+    par(mfrow=c(1,2))
+    int.pbmc <- selectGenes(int.pbmc, datasets.use = 1, 
+                            num.genes = 5000, do.plot = TRUE)
+    cat('nb of HVGs : ', length(int.pbmc@var.genes), '\n')
+    
     int.pbmc <- scaleNotCenter(int.pbmc)
     
     # Factorization and Quantile Normalization
-    int.pbmc <- optimizeALS(int.pbmc, k=20)
+    int.pbmc <- optimizeALS(int.pbmc, k=50, lambda = 10)
     
-    int.pbmc <- liger::runTSNE(int.pbmc, use.raw = T)
+    int.pbmc <- liger::runUMAP(int.pbmc, use.raw = T)
     p1 <- plotByDatasetAndCluster(int.pbmc, return.plots = T)
     print(p1[[1]])
     
     int.pbmc <- liger::quantile_norm(int.pbmc)
     
     # visualization
-    int.pbmc <- liger::runUMAP(int.pbmc)
-    plots <- plotByDatasetAndCluster(int.pbmc, return.plots = T,clusters=rna_clusts) 
-    print(plots[[1]])
+    int.pbmc <- liger::runUMAP(int.pbmc, use.raw = FALSE,  dims.use = 1:50, distance = 'cosine', n_neighbors = 50, min_dist = 0.5)
     
-    print(plots[[2]])
+    plots1 <- plotByDatasetAndCluster(int.pbmc, return.plots = T, clusters=rna_clusts) 
+    #print(plots1[[1]])
+    p1 =  print(plots1[[2]])
+    plots2 <- plotByDatasetAndCluster(int.pbmc, return.plots = T, clusters=atac_clusts) 
+    #print(plots2[[1]])
+    p2 = print(plots2[[2]])
+    
+    p1 + p2
     
     calcAlignment(int.pbmc)
     
-    NKG7 = plotGene(int.pbmc,gene="NKG7",return.plots=T)
-    MS4A1 = plotGene(int.pbmc,gene="MS4A1",return.plots=T)
-    plot_grid(NKG7[[2]],MS4A1[[2]],NKG7[[1]],MS4A1[[1]],ncol=2)
+    # NKG7 = plotGene(int.pbmc,gene="NKG7",return.plots=T)
+    # MS4A1 = plotGene(int.pbmc,gene="MS4A1",return.plots=T)
+    # plot_grid(NKG7[[2]],MS4A1[[2]],NKG7[[1]],MS4A1[[1]],ncol=2)
     
     #seurat_liger = ligerToSeurat(int.pbmc, use.liger.genes = T)
   }
