@@ -668,6 +668,108 @@ compute.gene.acitivity.scores = function(seurat.cistopic, fragment.file = 'fragm
   
 }
 
+
+# do cicero given a Seurat object, output gene activity score
+doCicero_gascore <- function(seurat.obj, reduction = 'tsne', chr_sizes,
+                             gene_ann, npc = 30, coaccess_thr = 0.25){
+  ## gene_ann: the first four columns: chr, start, end, gene name
+  set.seed(2019)
+  
+  mtx = GetAssayData(seurat.obj, slot = 'counts')
+  # change rownames using _ to delimited
+  rnames = rownames(mtx)
+  new.rnames = sapply(rnames, function(x) unlist(strsplit(x, ','))[1])
+  new.rnames = sapply(new.rnames, function(x) gsub('-', '_', x))
+  rownames(mtx) <- new.rnames
+  
+  dt = reshape2::melt(as.matrix(mtx), value.name = 'count')
+  rm(mtx)
+  dt = dt[dt$count > 0, ]
+  names(dt) = c('Peak', 'Cell', 'Count')
+  dt$Cell = as.character(dt$Cell)
+  dt$Peak = as.character(dt$Peak)
+  
+  input_cds <- make_atac_cds(dt, binarize = T)
+  rm(dt)
+  input_cds <- detectGenes(input_cds)
+  input_cds <- estimateSizeFactors(input_cds)
+  
+  if(reduction == 'tsne') {
+    if(is.null(seurat.obj@reductions$tsne))
+      seurat.obj <- RunTSNE(seurat.obj, dims = 1:npc, check_duplicates = F)
+    redu.coords = seurat.obj@reductions$tsne@cell.embeddings
+  }
+  if(reduction == 'umap') {
+    if(is.null(seurat.obj@reductions$umap))
+      seurat.object <- RunUMAP(seurat.object, dims = 1:npc)
+    redu.coords = seurat.obj@reductions$umap@cell.embeddings
+  }
+  
+  #make the cell id consistet
+  
+  cicero_cds <- make_cicero_cds(input_cds, reduced_coordinates = redu.coords)
+  
+  ## get connections
+  
+  conns <- run_cicero(cicero_cds, chr_sizes)
+  
+  ## get cicero gene activity score
+  names(gene_ann)[4] <- "gene"
+  
+  input_cds <- annotate_cds_by_site(input_cds, gene_ann)
+  
+  # generate unnormalized gene activity matrix
+  unnorm_ga <- build_gene_activity_matrix(input_cds, conns)
+  
+  # make a list of num_genes_expressed
+  num_genes <- pData(input_cds)$num_genes_expressed
+  names(num_genes) <- row.names(pData(input_cds))
+  
+  # normalize
+  cicero_gene_activities <- normalize_gene_activities(unnorm_ga, num_genes)
+  
+  # if you had two datasets to normalize, you would pass both:
+  # num_genes should then include all cells from both sets
+  #unnorm_ga2 <- unnorm_ga
+  #cicero_gene_activities <- normalize_gene_activities(list(unnorm_ga, unnorm_ga2), num_genes)
+  conns = data.table(conns)
+  conns = conns[coaccess > coaccess_thr, ]
+  res = list('conns' = conns, 'ga_score' = cicero_gene_activities)
+  return(res)  
+}
+
+compute.cicero.gene.activity.scores = function(seuratObj, output_dir, tss_file, genome_size_file)
+{
+  #args = commandArgs(T)
+  #seuratObj_file = args[1]
+  #output_dir = args[2]
+  #tss_file = args[3]
+  #genome_size_file = args[4]
+  
+  seurat.obj = readRDS(seuratObj_file)
+  
+  tss_ann <- fread(tss_file, header = F)
+  names(tss_ann)[c(1:4,7)] <- c('chr', 'start', 'end', 'gene_name', 'gene_type')
+  tss_ann <- tss_ann[gene_type %in% c('miRNA', 'lincRNA', 'protein_coding'), ]
+  
+  seurat.obj$active_clusters = as.character(seurat.obj$active_clusters)
+  
+  res = doCicero_gascore(seurat.obj, reduction = 'umap', genome_size_file, tss_ann, npc = 30)
+  
+  ga_score = log1p(res$ga_score * 10000)
+  
+  conns = res$conns
+  
+  saveRDS(ga_score, file = paste0(output_dir, '/cicero_gene_activity.rds'))
+  
+  #conns$Peak1 = assignGene2Peak_coords(conns$Peak1, tss_ann)
+  #conns$Peak2 = assignGene2Peak_coords(conns$Peak2, tss_ann)
+  write.table(conns, file = paste0(output_dir, '/cicero_interactions.txt'), row.names = F,
+              sep = '\t', quote = F)
+  
+}
+
+
 compute.motif.enrichment = function(seurat.cistopic)
 {
   library(Signac)
@@ -755,6 +857,9 @@ compute.motif.enrichment = function(seurat.cistopic)
   return(seurat.cistopic)
   
 }
+
+
+
 
 ##########################################
 # integrate scRNA-seq data from published dataset in https://github.com/qinzhu/VisCello.celegans

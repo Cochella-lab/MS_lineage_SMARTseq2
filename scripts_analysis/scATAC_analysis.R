@@ -424,11 +424,42 @@ if(label.transferring){
 ##########################################
 Test.liger.for.label.transferring = FALSE
 if(Test.liger.for.label.transferring){
-  #seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds'))
-  seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
-  DefaultAssay(seurat.cistopic) <- 'RNA'
-  
+  seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds'))
+  #seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
+    
   nb.variableFeatures = 2500
+  DefaultAssay(seurat.cistopic) <- 'RNA'
+  seurat.cistopic <- FindVariableFeatures(seurat.cistopic, nfeatures = nb.variableFeatures)
+  seurat.cistopic <- NormalizeData(seurat.cistopic)
+  seurat.cistopic <- ScaleData(seurat.cistopic)
+  
+  seurat.cistopic <- RunPCA(seurat.cistopic, npcs = 50, verbose = FALSE, reduction.name = 'pca.ga')
+  
+  nb.pcs = 30; n.neighbors = 20; min.dist = 0.3;
+  seurat.cistopic <- RunUMAP(seurat.cistopic, reduction = "pca.ga", dims = 1:nb.pcs,
+                           n.neighbors = n.neighbors, min.dist = min.dist, reduction.name = "umap.ga")
+  
+  #DimPlot(seurat.cistopic, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE)
+  DimPlot(seurat.cistopic, reduction = "umap.ga", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE)
+  
+  Refine.HGV.Gene.Activity = FALSE
+  if(Refine.HGV.Gene.Activity){
+    #lineages = unique(ms$lineage)
+    #lineages.index = match(ms$lineage, lineages)
+    #ms$seurat_clusters = lineages.index - 1
+    labels = Idents(seurat.cistopic)
+    Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
+    
+    DimPlot(seurat.cistopic, reduction = "umap.ga", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE)
+    
+    # find all markers of cluster 1
+    markers.ga <- FindAllMarkers(seurat.cistopic, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
+    top100 <- markers.ga %>% group_by(cluster) %>% top_n(n = 5, wt = avg_logFC)
+    
+  }
+  
+  
+  
   # Load the pre-processed scRNA-seq data 
   tintori <- readRDS(paste0(RdataDir, 'Tintori_et_al_highQualtiyCells.rds'))
   tintori <- FindVariableFeatures(
@@ -450,38 +481,9 @@ if(Test.liger.for.label.transferring){
   
   DimPlot(tintori, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE)
   
-  Run.liger.through.seurat = FALSE
-  if(Run.liger.through.seurat){
+  Run.liger.directly = FALSE
+  if(Run.liger.directly){
     
-    library(liger)
-    library(Seurat)
-    library(SeuratData)
-    library(SeuratWrappers)
-    
-    #InstallData("pbmcsca")
-    #data("pbmcsca")
-    pbmc.atac = seurat.cistopic@assays$RNA@counts
-    pbmc.rna = tintori@assays$RNA@counts
-    design.atac = seurat.cistopic@meta.data
-    design.atac$Method = 'atac'
-    design.rna = tintori@meta.data
-    design.rna$Method = 'rna'
-    
-    pbmc.atac = CreateSeuratObject(counts = pbmc.atac, meta.data = design.atac)
-    pbmc.rna = CreateSeuratObject(counts = pbmc.rna, meta.data = design.rna)
-    
-    pbmcsca =  merge(x = pbmc.atac, y =pbmc.rna)
-    
-    pbmcsca <- NormalizeData(pbmcsca)
-    pbmcsca <- FindVariableFeatures(pbmcsca)
-    pbmcsca <- ScaleData(pbmcsca, split.by = "Method", do.center = FALSE)
-    pbmcsca <- SeuratWrappers::RunOptimizeALS(pbmcsca, k = 20, lambda = 5, split.by = "Method")
-    pbmcsca <- SeuratWrappers::RunQuantileAlignSNF(pbmcsca, split.by = "Method", reduction = 'iNMF_raw')
-    pbmcsca <- RunUMAP(pbmcsca, dims = 1:ncol(pbmcsca[["iNMF"]]), reduction = "iNMF")
-    DimPlot(pbmcsca, group.by = c("Method", "ident", "CellType"), ncol = 3)
-    
-    
-  }else{
     #rna_clusts = readRDS("../liger-rna-atac-vignette/rna_cluster_assignments.RDS")
     #atac_clusts = readRDS("../liger-rna-atac-vignette/atac_cluster_assignments.RDS")
     #pbmc.atac <- readRDS('../liger-rna-atac-vignette/pbmc.atac.expression.mat.RDS')
@@ -489,26 +491,40 @@ if(Test.liger.for.label.transferring){
     
     atac_clusts = seurat.cistopic$peaks_snn_res.0.8
     rna_clusts = Idents(tintori)
+   
     pbmc.atac = seurat.cistopic@assays$RNA@counts
     pbmc.rna = tintori@assays$RNA@counts
     
     # data preprocessing
     library(liger)
-    ggplot2::theme_set(theme_cowplot())
-    #xx = pbmc.atac[,names(atac_clusts)]
-    pbmc.data = list(atac=pbmc.atac[,names(atac_clusts)], rna=pbmc.rna[,names(rna_clusts)])
-    int.pbmc <- createLiger(pbmc.data)
     
-    int.pbmc <- liger::normalize(int.pbmc)
-    par(mfrow=c(1,2))
-    int.pbmc <- selectGenes(int.pbmc, datasets.use = 1, 
-                            num.genes = 5000, do.plot = TRUE)
-    cat('nb of HVGs : ', length(int.pbmc@var.genes), '\n')
+    convertSeurt_toLiger = FALSE
+    if(convertSeurt_toLiger){
+      ligerex2 <- seuratToLiger(list(seurat.cistopic, tintori), assays.use = c('RNA', 'RNA'), num.hvg.info = 2500, renormalize = TRUE)
+      
+      cat('nb of HVGs : ', length(ligerex2@var.genes), '\n')
+      int.pbmc = ligerex2
+      
+    }else{
+      
+      ggplot2::theme_set(theme_cowplot())
+      #xx = pbmc.atac[,names(atac_clusts)]
+      
+      pbmc.data = list(atac=pbmc.atac[,names(atac_clusts)], rna=pbmc.rna[,names(rna_clusts)])
+      int.pbmc <- createLiger(pbmc.data)
+      
+      int.pbmc <- liger::normalize(int.pbmc)
+      par(mfrow=c(1,2))
+      int.pbmc <- selectGenes(int.pbmc, datasets.use = 1, 
+                              num.genes = 2500, do.plot = TRUE)
+      cat('nb of HVGs : ', length(int.pbmc@var.genes), '\n')
+      
+    }
     
     int.pbmc <- scaleNotCenter(int.pbmc)
     
     # Factorization and Quantile Normalization
-    int.pbmc <- optimizeALS(int.pbmc, k=50, lambda = 10)
+    int.pbmc <- optimizeALS(int.pbmc, k=30, lambda = 10)
     
     int.pbmc <- liger::runUMAP(int.pbmc, use.raw = T)
     p1 <- plotByDatasetAndCluster(int.pbmc, return.plots = T)
@@ -517,7 +533,7 @@ if(Test.liger.for.label.transferring){
     int.pbmc <- liger::quantile_norm(int.pbmc)
     
     # visualization
-    int.pbmc <- liger::runUMAP(int.pbmc, use.raw = FALSE,  dims.use = 1:50, distance = 'cosine', n_neighbors = 50, min_dist = 0.5)
+    int.pbmc <- liger::runUMAP(int.pbmc, use.raw = FALSE,  dims.use = 1:30, distance = 'euclidean', n_neighbors = 10, min_dist = 0.1)
     
     plots1 <- plotByDatasetAndCluster(int.pbmc, return.plots = T, clusters=rna_clusts) 
     #print(plots1[[1]])
@@ -530,11 +546,55 @@ if(Test.liger.for.label.transferring){
     
     calcAlignment(int.pbmc)
     
+    xx = ligerToSeurat(int.pbmc, use.liger.genes = T)
+    
     # NKG7 = plotGene(int.pbmc,gene="NKG7",return.plots=T)
     # MS4A1 = plotGene(int.pbmc,gene="MS4A1",return.plots=T)
     # plot_grid(NKG7[[2]],MS4A1[[2]],NKG7[[1]],MS4A1[[1]],ncol=2)
     
     #seurat_liger = ligerToSeurat(int.pbmc, use.liger.genes = T)
+  }else{
+    
+    ##########################################
+    # some error returned :
+    # Error: 'SNF' is not an exported object from 'namespace:liger'
+    ##########################################
+    
+    # library(liger)
+    # library(Seurat)
+    # library(SeuratData)
+    # library(SeuratWrappers)
+    # 
+    # #InstallData("pbmcsca")
+    # #data("pbmcsca")
+    # pbmcsca <- NormalizeData(pbmcsca)
+    # pbmcsca <- FindVariableFeatures(pbmcsca)
+    # pbmcsca <- ScaleData(pbmcsca, split.by = "Method", do.center = FALSE)
+    # pbmcsca <- RunOptimizeALS(pbmcsca, k = 20, lambda = 5, split.by = "Method")
+    # pbmcsca <- SeuratWrappers::RunQuantileAlignSNF(pbmcsca, split.by = "Method")
+    # pbmcsca <- RunUMAP(pbmcsca, dims = 1:ncol(pbmcsca[["iNMF"]]), reduction = "iNMF")
+    # DimPlot(pbmcsca, group.by = c("Method", "ident", "CellType"), ncol = 3)
+    # 
+    # pbmc.atac = seurat.cistopic@assays$RNA@counts
+    # pbmc.rna = tintori@assays$RNA@counts
+    # design.atac = seurat.cistopic@meta.data
+    # design.atac$Method = 'atac'
+    # design.rna = tintori@meta.data
+    # design.rna$Method = 'rna'
+    # 
+    # pbmc.atac = CreateSeuratObject(counts = pbmc.atac, meta.data = design.atac)
+    # pbmc.rna = CreateSeuratObject(counts = pbmc.rna, meta.data = design.rna)
+    # 
+    # pbmcsca =  merge(x = pbmc.atac, y =pbmc.rna)
+    # 
+    # pbmcsca <- NormalizeData(pbmcsca)
+    # pbmcsca <- FindVariableFeatures(pbmcsca)
+    # pbmcsca <- ScaleData(pbmcsca, split.by = "Method", do.center = FALSE)
+    # pbmcsca <- SeuratWrappers::RunOptimizeALS(pbmcsca, k = 20, lambda = 5, split.by = "Method")
+    # pbmcsca <- SeuratWrappers::RunQuantileAlignSNF(pbmcsca, split.by = "Method", reduction = 'iNMF_raw')
+    # pbmcsca <- RunUMAP(pbmcsca, dims = 1:ncol(pbmcsca[["iNMF"]]), reduction = "iNMF")
+    # DimPlot(pbmcsca, group.by = c("Method", "ident", "CellType"), ncol = 3)
+    
   }
   
   
