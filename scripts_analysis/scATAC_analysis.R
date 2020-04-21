@@ -38,7 +38,6 @@ if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 source.my.script('scATAC_functions.R')
 
-
 ########################################################
 ########################################################
 # Section : transformation comparison: lsi, lsi_log and LDA
@@ -258,13 +257,15 @@ if(Compute.gene.activity.scores){
   source.my.script('scATAC_functions.R')
   
   fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cellranger_atac_wbcel235/outs/fragments.tsv.gz'
-  
-  seurat.cistopic = compute.gene.acitivity.scores(seurat.cistopic, fragment.file = fragment.file, method = 'promoter.geneBody')
-  
-  #saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_geneActivity_object.rds')) 
-}else{
+  seurat.cistopic = compute.gene.acitivity.scores(seurat.cistopic, 
+                                                  method = 'seurat',
+                                                  fragment.file = fragment.file,
+                                                  regions = 'promoter.geneBody')
   
 }
+
+seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds'))
+#seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
 
 DefaultAssay(seurat.cistopic) <- 'RNA'
 FeaturePlot(
