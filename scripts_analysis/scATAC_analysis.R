@@ -260,7 +260,10 @@ if(Compute.gene.activity.scores){
   seurat.cistopic = compute.gene.acitivity.scores(seurat.cistopic, 
                                                   method = 'seurat',
                                                   fragment.file = fragment.file,
-                                                  regions = 'promoter.geneBody')
+                                                  regions = 'promoter.geneBody',
+                                                  size.promoter.upstream = 2000,
+                                                  saveDir = RdataDir
+                                                  )
   
 }
 
