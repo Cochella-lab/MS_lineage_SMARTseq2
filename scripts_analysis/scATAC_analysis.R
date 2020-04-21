@@ -38,13 +38,15 @@ if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 source.my.script('scATAC_functions.R')
 
-filtered_mtx_dir = paste0("../output_cellranger.ce11_scATACpro/filtered_matrix_peaks_barcodes")
+
 ########################################################
 ########################################################
 # Section : transformation comparison: lsi, lsi_log and LDA
 # 
 ########################################################
 ########################################################
+filtered_mtx_dir = paste0("../output_cellranger.ce11_scATACpro/filtered_matrix_peaks_barcodes")
+
 source.my.script('scATAC_functions.R')
 tenx.bmat = load_tenx_atac(paste0(filtered_mtx_dir, '/matrix.mtx'), 
                                  paste0(filtered_mtx_dir, '/peaks.bed'), 
@@ -252,6 +254,7 @@ Compute.gene.activity.scores = FALSE
 if(Compute.gene.activity.scores){
   peaks.chrM = grep('chrM', rownames(seurat.cistopic))
   if(length(peaks.chrM)>0) seurat.cistopic = seurat.cistopic[-peaks.chrM, ]
+  
   source.my.script('scATAC_functions.R')
   
   fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cellranger_atac_wbcel235/outs/fragments.tsv.gz'
@@ -278,7 +281,7 @@ FeaturePlot(
 )
 
 ##########################################
-# label transferring from scRNA-seq data using seurat
+# label transferring from scRNA-seq data using liger and seurat 
 # see details in https://satijalab.org/signac/articles/mouse_brain_vignette.html#integrating-with-scrna-seq-data
 ##########################################
 library(Signac)
@@ -286,8 +289,8 @@ library(Seurat)
 
 seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds'))
 #seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
-DefaultAssay(seurat.cistopic) <- 'peaks'
 
+DefaultAssay(seurat.cistopic) <- 'peaks'
 seurat.cistopic <- RunTFIDF(seurat.cistopic)
 seurat.cistopic <- FindTopFeatures(seurat.cistopic, min.cutoff = 'q25')
 seurat.cistopic <- RunSVD(
@@ -304,11 +307,39 @@ seurat.cistopic <- RunSVD(
 # Here, we process the gene activity matrix 
 # in order to find anchors between cells in the scATAC-seq dataset 
 # and the scRNA-seq dataset.
-nb.variableFeatures = 2500
 DefaultAssay(seurat.cistopic) <- 'RNA'
+nb.variableFeatures = 2500
 seurat.cistopic <- FindVariableFeatures(seurat.cistopic, nfeatures = nb.variableFeatures)
 seurat.cistopic <- NormalizeData(seurat.cistopic)
 seurat.cistopic <- ScaleData(seurat.cistopic)
+
+Refine.HGV.Gene.Activity = FALSE
+if(Refine.HGV.Gene.Activity){
+  
+  labels = Idents(seurat.cistopic)
+  Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
+  
+  seurat.cistopic <- RunPCA(seurat.cistopic, npcs = 50, verbose = FALSE, reduction.name = 'pca.ga')
+  
+  nb.pcs = 30; n.neighbors = 20; min.dist = 0.3;
+  seurat.cistopic <- RunUMAP(seurat.cistopic, reduction = "pca.ga", dims = 1:nb.pcs,
+                             n.neighbors = n.neighbors, min.dist = min.dist, reduction.name = "umap.ga")
+  DimPlot(seurat.cistopic, reduction = "umap.ga", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE)
+  
+  
+  # find all markers of cluster 1
+  markers.ga <- FindAllMarkers(seurat.cistopic, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+  tops <- markers.ga %>% group_by(cluster) %>% top_n(n = 50, wt = avg_logFC)
+  #length(intersect(tops$gene, VariableFeatures(seurat.cistopic)))
+  #VariableFeatures(seurat.cistopic) = tops$gene
+  seurat.cistopic <- RunPCA(seurat.cistopic, npcs = 50, verbose = FALSE, reduction.name = 'pca.ga',  features = tops$gene)
+  
+  nb.pcs = 30; n.neighbors = 20; min.dist = 0.3;
+  seurat.cistopic <- RunUMAP(seurat.cistopic, reduction = "pca.ga", dims = 1:nb.pcs,
+                             n.neighbors = n.neighbors, min.dist = min.dist, reduction.name = "umap.ga")
+  DimPlot(seurat.cistopic, reduction = "umap.ga", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE)
+  
+}
 
 # Load the pre-processed scRNA-seq data 
 tintori <- readRDS(paste0(RdataDir, 'Tintori_et_al_highQualtiyCells.rds'))
@@ -333,6 +364,7 @@ tintori <- RenameIdents(tintori, new.cluster.ids)
 
 DimPlot(tintori, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE)
 
-
+source.my.script('scATAC_functions.R')
+transfer.labels.from.scRNA.to.scATAC(seurat.cistopic, tintori, method = 'liger')
 
 

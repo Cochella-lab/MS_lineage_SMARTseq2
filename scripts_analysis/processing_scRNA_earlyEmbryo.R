@@ -466,6 +466,56 @@ EE_integration_Aleks_Tintori = function(ee, tt, Method = c('seurat', 'liger'))
   ee$dataSet = 'Aleks'
   tt$dataSet = 'Tintori'
   
+  if(Method == 'liger'){
+    
+    alex_clusts = ee$seurat_clusters
+    tintori_clusts = tt$lineage
+    pbmc.alex = ee@assays$RNA@counts
+    pbmc.tintori = tt@assays$RNA@counts
+    
+    # data preprocessing
+    library(liger)
+    
+    ggplot2::theme_set(theme_cowplot())
+    #xx = pbmc.atac[,names(atac_clusts)]
+    pbmc.data = list(alex=pbmc.alex[,names(alex_clusts)], tintori=pbmc.tintori[,names(tintori_clusts)])
+    int.pbmc <- createLiger(pbmc.data)
+    
+    int.pbmc <- liger::normalize(int.pbmc)
+    par(mfrow=c(1,2))
+    int.pbmc <- selectGenes(int.pbmc, datasets.use = 1:2, 
+                            num.genes = 2000, do.plot = TRUE)
+    cat('nb of HVGs : ', length(int.pbmc@var.genes), '\n')
+    
+    int.pbmc <- scaleNotCenter(int.pbmc)
+    
+    Suggest.k.lambda = FALSE
+    if(Suggest.k.lambda){
+      suggestK(int.pbmc) # plot entropy metric to find an elbow that can be used to select the number of factors
+      suggestLambda(int.pbmc, k = 30, num.cores = 5) # plot alignment metric to find an elbow that can be used to select the value of lambda
+    }
+    
+    # Factorization and Quantile Normalization
+    int.pbmc <- optimizeALS(int.pbmc, k=30, lambda = 25)
+    
+    #int.pbmc <- liger::runUMAP(int.pbmc, use.raw = T)
+    int.pbmc <- liger::quantile_norm(int.pbmc)
+    
+    # visualization
+    int.pbmc <- liger::runUMAP(int.pbmc, use.raw = FALSE,  dims.use = 1:20, distance = 'euclidean', n_neighbors = 10, min_dist = 0.1)
+    
+    plots1 <- plotByDatasetAndCluster(int.pbmc, return.plots = T, clusters=alex_clusts) 
+    #print(plots1[[1]])
+    p1 =  print(plots1[[2]])
+    plots2 <- plotByDatasetAndCluster(int.pbmc, return.plots = T, clusters=tintori_clusts)
+    #print(plots2[[1]])
+    p2 = print(plots2[[2]])
+    
+    par(mfrow=c(1,2))
+    p1 + p2
+    
+    
+  }
   if(Method == 'seurat'){
     
     ee.list = list( Aleks = ee, Tintori = tt)
