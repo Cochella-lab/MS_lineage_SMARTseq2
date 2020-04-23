@@ -32,6 +32,68 @@ library(stringr)
 library(GenomicRanges)
 library(cisTopic)
 
+########################################################
+########################################################
+# Section : scATAC-seq peak annotation
+# here using ChIPseeker
+########################################################
+########################################################
+run_scATAC_peak_annotation = function(peak.file)
+{
+  ## loading packages
+  library(ChIPseeker)
+  library(TxDb.Celegans.UCSC.ce11.ensGene)
+  #library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+  txdb <- TxDb.Celegans.UCSC.ce11.ensGene
+  library(clusterProfiler)
+  
+  # peak.file = paste0(filtered_mtx_dir, '/peaks.bed')
+  peak <- readPeakFile(peakfile = peak.file, as = 'GRanges')
+  
+  promoter <- getPromoters(TxDb=txdb, upstream=2000, downstream=200, by = 'gene')
+  tagMatrix <- getTagMatrix(peak, windows=promoter)
+  
+  plotAvgProf(tagMatrix, xlim=c(-3000, 3000),
+              xlab="Genomic Region (5'->3')", ylab = "Read Count Frequency")
+  
+  tagHeatmap(tagMatrix, xlim=c(-2000, 200), color="red")
+  
+  ## to speed up the compilation of this vignettes, we use a precalculated tagMatrix
+  #data("tagMatrixList")
+  #tagMatrix <- tagMatrixList[[4]]
+  #promoter <- getPromoters(TxDb=txdb, upstream=5000, downstream=5000) #ChIPseeker method
+  #tagMatrixList <- lapply(allPeaks, getTagMatrix, windows=promoter)
+  
+  #tagMatrixList <- tagMatrixList[!sapply(lapply(tagMatrixList, nrow), is.null)]
+  #tagMatrixList[sapply(tagMatrixList, nrow) == 0] <- NULL
+  
+  #promoter <- promoters(genes(txdb), upstream=5000, downstream=5000) #GRanges
+  #tagMatrixList <- lapply(allPeaks, getTagMatrix, windows=promoter)
+  #plotAvgProf(tagMatrixList, xlim=c(-5000, 5000))
+  #tagHeatmap(tagMatrixList, xlim=c(-5000, 5000), color=NULL)
+  
+  peakAnnoList <- lapply(allPeaks, annotatePeak, TxDb=txdb, tssRegion=c(-2000, 200), verbose=FALSE)
+  
+  allPeaks <- allPeaksList[[1]]
+  allPeaks.50 <- allPeaksList[[2]]
+  peakAnnoList <- allPeaksList[[3]]
+  tagMatrixList <- allPeaksList[[4]]
+  
+  print(plotAnnoBar(peakAnnoList))
+  print(plotDistToTSS(peakAnnoList))
+  
+  for (n in names(peakAnnoList))
+  {
+    par(mfrow=c(1,1))
+    vennpie(peakAnnoList[[n]])
+    text(x=0, y=-1, n)
+    par(mfrow=c(1,1))
+    plotAnnoPie(peakAnnoList[[n]])
+    #        par(mfrow=c(1,1))
+    #        upsetplot(peakAnnoList[[n]]) #only in TB-3.2.1-dev #  vennpie=TRUE,
+  }
+  
+}
 
 ########################################
 # Utility functions

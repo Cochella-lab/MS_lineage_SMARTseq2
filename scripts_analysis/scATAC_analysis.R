@@ -38,14 +38,24 @@ if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 source.my.script('scATAC_functions.R')
 
+filtered_mtx_dir = paste0("../output_cellranger.ce11_scATACpro/filtered_matrix_peaks_barcodes")
+
+########################################################
+########################################################
+# Section : peak annotatoin to have overview and QC for scATAC-seq peaks
+# 
+########################################################
+########################################################
+source.my.script('scATAC_functions.R')
+
+run_scATAC_peak_annotation(paste0(filtered_mtx_dir, '/peaks.bed'))
+
 ########################################################
 ########################################################
 # Section : transformation comparison: lsi, lsi_log and LDA
 # 
 ########################################################
 ########################################################
-filtered_mtx_dir = paste0("../output_cellranger.ce11_scATACpro/filtered_matrix_peaks_barcodes")
-
 source.my.script('scATAC_functions.R')
 tenx.bmat = load_tenx_atac(paste0(filtered_mtx_dir, '/matrix.mtx'), 
                                  paste0(filtered_mtx_dir, '/peaks.bed'), 
@@ -111,7 +121,6 @@ plot_clustering_comparison(tenx.seurat.lsi,
                             cluster_column1='peaks_snn_res.1.5',
                             cluster_column2='peaks_snn_res.0.8')
 
-
 ##########################################
 # select transformation method 
 ##########################################
@@ -172,6 +181,8 @@ p1 + p2
 # DimPlot(object = seurat.cistopic, label = TRUE, reduction = 'umap') + NoLegend()
 Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
 saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
+
+
 
 ########################################################
 ########################################################
