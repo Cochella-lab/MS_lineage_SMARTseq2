@@ -50,14 +50,21 @@ run_scATAC_peak_annotation = function(peak.file)
   # peak.file = paste0(filtered_mtx_dir, '/peaks.bed')
   peak <- readPeakFile(peakfile = peak.file, as = 'GRanges')
   
-  promoter <- getPromoters(TxDb=txdb, upstream=2000, downstream=200, by = 'gene')
+  upstream = 5000; downstream = 5000
+  promoter <- getPromoters(TxDb=txdb, upstream=upstream, downstream=downstream, by = 'gene')
   tagMatrix <- getTagMatrix(peak, windows=promoter)
   
-  plotAvgProf(tagMatrix, xlim=c(-3000, 3000),
+  plotAvgProf(tagMatrix, xlim=c(-upstream, downstream),
               xlab="Genomic Region (5'->3')", ylab = "Read Count Frequency")
   
-  tagHeatmap(tagMatrix, xlim=c(-2000, 200), color="red")
+  tagHeatmap(tagMatrix, xlim=c(-upstream, downstream), color="red")
   
+  peakAnno <- annotatePeak(peak = peak, tssRegion=c(-5000, 5000), level = 'gene', TxDb=txdb)
+  
+  #par(mfrow=c(1,2))
+  plotAnnoPie(peakAnno)
+  #plotDistToTSS(peakAnno, title="Distribution of transcription factor-binding loci\nrelative to TSS")
+  #p1 + p2
   ## to speed up the compilation of this vignettes, we use a precalculated tagMatrix
   #data("tagMatrixList")
   #tagMatrix <- tagMatrixList[[4]]
@@ -72,27 +79,19 @@ run_scATAC_peak_annotation = function(peak.file)
   #plotAvgProf(tagMatrixList, xlim=c(-5000, 5000))
   #tagHeatmap(tagMatrixList, xlim=c(-5000, 5000), color=NULL)
   
-  peakAnnoList <- lapply(allPeaks, annotatePeak, TxDb=txdb, tssRegion=c(-2000, 200), verbose=FALSE)
+  #peakAnnoList <- lapply(allPeaks, annotatePeak, TxDb=txdb, tssRegion=c(-2000, 200), verbose=FALSE)
   
-  allPeaks <- allPeaksList[[1]]
-  allPeaks.50 <- allPeaksList[[2]]
-  peakAnnoList <- allPeaksList[[3]]
-  tagMatrixList <- allPeaksList[[4]]
-  
-  print(plotAnnoBar(peakAnnoList))
-  print(plotDistToTSS(peakAnnoList))
-  
-  for (n in names(peakAnnoList))
-  {
-    par(mfrow=c(1,1))
-    vennpie(peakAnnoList[[n]])
-    text(x=0, y=-1, n)
-    par(mfrow=c(1,1))
-    plotAnnoPie(peakAnnoList[[n]])
-    #        par(mfrow=c(1,1))
-    #        upsetplot(peakAnnoList[[n]]) #only in TB-3.2.1-dev #  vennpie=TRUE,
-  }
-  
+  # for (n in names(peakAnnoList))
+  # {
+  #   par(mfrow=c(1,1))
+  #   vennpie(peakAnnoList[[n]])
+  #   text(x=0, y=-1, n)
+  #   par(mfrow=c(1,1))
+  #   plotAnnoPie(peakAnnoList[[n]])
+  #   #        par(mfrow=c(1,1))
+  #   #        upsetplot(peakAnnoList[[n]]) #only in TB-3.2.1-dev #  vennpie=TRUE,
+  # }
+  # 
 }
 
 ########################################
@@ -658,7 +657,6 @@ compare.methods.for.gene.activity.matrix = function()
   ##########################################
   source.my.script('scATAC_functions.R')
   compute.cicero.gene.activity.scores(seuratObj, output_dir, tss_file, genome_size_file)
-  
   
 }
 
