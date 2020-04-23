@@ -256,7 +256,8 @@ if(Compute.gene.activity.scores){
   
   source.my.script('scATAC_functions.R')
   
-  fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cellranger_atac_wbcel235/outs/fragments.tsv.gz'
+  #fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cellranger_atac_wbcel235/outs/fragments.tsv.gz'
+  fragment.file = '../output_cellranger.ce11_scATACpro/cellranger_atac_ce11/fragments.tsv.gz'
   seurat.cistopic = compute.gene.acitivity.scores(seurat.cistopic, 
                                                   method = 'seurat',
                                                   fragment.file = fragment.file,
@@ -265,6 +266,14 @@ if(Compute.gene.activity.scores){
                                                   saveDir = RdataDir
                                                   )
   
+  # normalize the gene activity matrix
+  seurat.cistopic <- NormalizeData(
+    object = seurat.cistopic,
+    assay = 'RNA',
+    normalization.method = 'CLR',
+    scale.factor = median(seurat.cistopic$nCount_RNA)
+  )
+
 }
 
 seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds'))

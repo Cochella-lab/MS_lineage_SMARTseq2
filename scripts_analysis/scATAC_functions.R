@@ -554,6 +554,52 @@ plot_clustering_comparison = function(seurat_obj1, seurat_obj2, reduction, descr
 # 3) integrate scRNA-seq data 
 ########################################################
 ########################################################
+compare.methods.for.gene.activity.matrix = function()
+{
+  seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
+  
+  DefaultAssay(seurat.cistopic) <- 'peaks'
+  Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
+  new.cluster.ids <- c("P0", "1.ABaxx", "2.MS", "3.AB", "4.ABa/p/MS/E", "5.E",
+                       '6.E', '7.AB/EMS','8.ABp', '9.ABaxx', '10.MS', 
+                       '11.ABp', '12.AB', '13.MS', '14.MS', '15.ABp',
+                       '16.MS', '17.ABp', '18.AB','19.C/Ea', '20.ABa/p/MS/E', '21.P4')
+  names(new.cluster.ids) <- levels(seurat.cistopic)
+  seurat.cistopic <- RenameIdents(seurat.cistopic, new.cluster.ids)
+  
+  DimPlot(seurat.cistopic, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 10, repel = TRUE) + NoLegend()
+  
+  ##########################################
+  # computing gene body and promoter activities using seurat
+  ##########################################
+  source.my.script('scATAC_functions.R')
+  fragment.file = '../output_cellranger.ce11_scATACpro/cellranger_atac_ce11/fragments.tsv.gz'
+  
+  for (promoter.size in c(500, 1000, 2000, 4000, 5000, 10000))
+  {
+    for (regions in c('promoter'))
+    {
+      #promoter.size = 5000
+      #regions = 'promoter'
+      compute.gene.acitivity.scores(seurat.cistopic, 
+                                    method = 'seurat',
+                                    fragment.file = fragment.file,
+                                    regions = regions,
+                                    size.promoter.upstream = promoter.size,
+                                    saveDir = RdataDir)
+    }
+    
+  }
+  
+  ##########################################
+  # compute gene activity matrix using cicero
+  ##########################################
+  source.my.script('scATAC_functions.R')
+  compute.cicero.gene.activity.scores(seuratObj, output_dir, tss_file, genome_size_file)
+  
+  
+}
+
 compute.gene.acitivity.scores = function(seurat.cistopic, 
                                          method = 'seurat',
                                          fragment.file = 'fragments.tsv.gz',
@@ -562,7 +608,7 @@ compute.gene.acitivity.scores = function(seurat.cistopic,
                                          saveDir = "results/scATAC_earlyEmbryo_20200302/Rdata/")
 {
   if(method == 'cicero'){
-    seurat.cistopic  = compute.gene.activity.matrix.using.cicero(seurat.cistopic, saveDir = saveDir)
+    seurat.cistopic  = compute.cicero.gene.activity.scores(seuratObj = seurat.cistopic)
   }
   
   if(method == 'seurat')
@@ -574,107 +620,110 @@ compute.gene.acitivity.scores = function(seurat.cistopic,
     library(ggplot2)
     set.seed(1234)
     
+    cat('method : ', method, ', regions: ', regions, ',  promoter.size: ', size.promoter.upstream, '\n')
     #fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cellranger_atac_wbcel235/outs/fragments.tsv.gz'
-    fragment.file = '../output_cellranger.ce11_scATACpro/cellranger_atac_ce11/fragments.tsv.gz'
+    #fragment.file = '../output_cellranger.ce11_scATACpro/cellranger_atac_ce11/fragments.tsv.gz'
     
-    annot = read.csv(file = "data/annotations/BioMart_WBcel235_noFilters.csv",
-                     header = TRUE)
-    annot = annot[which(annot$Gene.type == 'miRNA' | annot$Gene.type == 'protein_coding'), ]
+    annot = read.csv(file = "data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
+    annot = annot[which((annot$Gene.type == 'miRNA' | annot$Gene.type == 'protein_coding') 
+                        & annot$Chromosome.scaffold.name != 'MtDNA'), ]
     
     #extract gene coordinates from Ensembl, and ensure name formatting is consistent with  Seurat object 
-    if( ! promoter.only){
-      gene.coords <- genes(TxDb.Celegans.UCSC.ce11.ensGene)
+    if(regions == 'promoter.geneBody'){
+      gene.coords <- GenomicFeatures::genes(TxDb.Celegans.UCSC.ce11.ensGene)
       seqlevelsStyle(gene.coords) <- 'UCSC'
       
       mm = match(gene.coords$gene_id, annot$Gene.stable.ID)
       gene.coords = gene.coords[which(!is.na(mm))]
       
       genebody.coords <- keepStandardChromosomes(gene.coords, pruning.mode = 'coarse')
-      genebodyandpromoter.coords <- Extend(x = gene.coords, upstream = 2000, downstream = 0)
+      genebodyandpromoter.coords <- Extend(x = gene.coords, upstream = size.promoter.upstream, downstream = 0)
+      #features.coords = genebodyandpromoter.coords
+      
+      seqends <- seqlengths(genebodyandpromoter.coords)[as.character(seqnames(genebodyandpromoter.coords))]
+      kk = which(start(genebodyandpromoter.coords) > 1L & end(genebodyandpromoter.coords) <= seqends)
+      genebodyandpromoter.coords = genebodyandpromoter.coords[kk, ]
       
     }else{
-      gene.coords = promoters(TxDb.Celegans.UCSC.ce11.ensGene, upstream = 2000, downstream = 200)
+      promoter.ens = GenomicRanges::promoters(TxDb.Celegans.UCSC.ce11.ensGene, upstream = size.promoter.upstream, downstream = 200)
+      
+      # only select promoter overlapped with refseq annotation
+      promoter.refseq = GenomicFeatures::promoters(TxDb.Celegans.UCSC.ce11.refGene, upstream = size.promoter.upstream, downstream = 200)
+      ii = findOverlaps(promoter.ens, promoter.refseq,
+                   maxgap=-1L, minoverlap=0L,
+                   type=c("equal"),
+                   select=c("all"),
+                   ignore.strand=FALSE)
+      gene.coords = promoter.ens[unique(ii@from), ]
+      
+      # select promoters for protein coding genes and miRNAs
       mm = match(gene.coords$tx_name, annot$Transcript.stable.ID)
       gene.coords = gene.coords[which(!is.na(mm))]
       
+      # random choose one promoter for 
+      #mm = match(rownames(gene.activities), annot$Transcript.stable.ID)
+      #mapNames = data.frame(c(1:nrow(gene.activities)), mm, geneNames = annot$Gene.name[mm], stringsAsFactors = FALSE)
+      #genes.names = unique(mapNames$geneNames[!is.na(mapNames$geneNames)])
+      #kk = match(genes.names, mapNames$geneNames)
+      
+      seqends <- seqlengths(gene.coords)[as.character(seqnames(gene.coords))]
+      gene.coords = gene.coords[which(start(gene.coords) > 1L & end(gene.coords) <= seqends), ]
+      #which(end(gene.coords) > seqlengths(gene.coords)[as.character(seqnames(gene.coords))])
+      
       genebody.coords <- keepStandardChromosomes(gene.coords, pruning.mode = 'coarse')
       genebodyandpromoter.coords <- Extend(x = gene.coords, upstream = 0, downstream = 0)
-      
+      #features.coords = genebodyandpromoter.coords
     }
     
-    if(calculate.feature.matrix){
-      # build a gene by cell matrix
-      tic('counting fragments for gene body and promoter')
-      gene.activities <- FeatureMatrix(
-        fragments = fragment.file,
-        features = genebodyandpromoter.coords,
-        cells = colnames(seurat.cistopic),
-        chunk = 20
-      )
-      toc()
+    # build a gene by cell matrix
+    tic('counting fragments for gene body and promoter')
+    gene.activities <- FeatureMatrix(
+      fragments = fragment.file,
+      features = genebodyandpromoter.coords,
+      cells = colnames(seurat.cistopic),
+      chunk = 20
+    )
+    toc()
+    
+    if(regions == 'promoter.geneBody'){
+      # convert rownames from chromsomal coordinates into gene names
+      gene.key <- genebodyandpromoter.coords$gene_id
+      names(gene.key) <- GRangesToString(grange = genebodyandpromoter.coords)
+      rownames(gene.activities) <- make.unique(gene.key[rownames(gene.activities)])
+      gene.activities <- gene.activities[rownames(gene.activities)!="",]
       
-      if(! promoter.only){
-        saveRDS(gene.activities, file =  paste0(RdataDir, 'gene_activities_matrix_geneBodyandPromoter.rds'))
-        
-        # convert rownames from chromsomal coordinates into gene names
-        gene.key <- genebodyandpromoter.coords$gene_id
-        names(gene.key) <- GRangesToString(grange = genebodyandpromoter.coords)
-        rownames(gene.activities) <- make.unique(gene.key[rownames(gene.activities)])
-        gene.activities <- gene.activities[rownames(gene.activities)!="",]
-        
-        mm = match(rownames(gene.activities), annot$Gene.stable.ID)
-        gene.activities = gene.activities[which(!is.na(mm)), ]
-        rownames(gene.activities) = annot$Gene.name[match(rownames(gene.activities), annot$Gene.stable.ID) ]
-        
-        #Add the gene activity matrix to the Seurat object as a new assay, and normalize it
-        seurat.cistopic[['RNA']] <- CreateAssayObject(counts = gene.activities)
-        seurat.cistopic <- NormalizeData(
-          object = seurat.cistopic,
-          assay = 'RNA',
-          normalization.method = 'CLR',
-          scale.factor = median(seurat.cistopic$nCount_RNA)
-        )
-        
-        saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
-        
-        
-      }else{
-        saveRDS(gene.activities, file =  paste0(RdataDir, 'gene_activities_matrix_Promoter.rds'))
-        
-        gene.activities = readRDS(file = paste0(RdataDir, 'gene_activities_matrix_Promoter.rds'))
-        
-        # convert rownames from chromsomal coordinates into gene names
-        gene.key <- genebodyandpromoter.coords$tx_name
-        names(gene.key) <- GRangesToString(grange = genebodyandpromoter.coords)
-        rownames(gene.activities) <- make.unique(gene.key[rownames(gene.activities)])
-        gene.activities <- gene.activities[rownames(gene.activities)!="",]
-        
-        #xx = data.frame(transcript = rownames(gene.activities), gene.activities, stringsAsFactors = FALSE)
-        
-        mm = match(rownames(gene.activities), annot$Transcript.stable.ID)
-        mapNames = data.frame(c(1:nrow(gene.activities)), mm, geneNames = annot$Gene.name[mm], stringsAsFactors = FALSE)
-        genes.names = unique(mapNames$geneNames[!is.na(mapNames$geneNames)])
-        kk = match(genes.names, mapNames$geneNames)
-        
-        gene.activities = gene.activities[mapNames[kk, 1], ]
-        rownames(gene.activities) = genes.names
-        
-        #Add the gene activity matrix to the Seurat object as a new assay, and normalize it
-        seurat.cistopic[['RNA']] <- CreateAssayObject(counts = gene.activities)
-        seurat.cistopic <- NormalizeData(
-          object = seurat.cistopic,
-          assay = 'RNA',
-          normalization.method = 'CLR',
-          scale.factor = median(seurat.cistopic$nCount_RNA)
-        )
-        
-        saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds'))
-        
-      }
+      mm = match(rownames(gene.activities), annot$Gene.stable.ID)
+      gene.activities = gene.activities[which(!is.na(mm)), ]
+      rownames(gene.activities) = annot$Gene.name[match(rownames(gene.activities), annot$Gene.stable.ID) ]
       
+      #Add the gene activity matrix to the Seurat object as a new assay, and normalize it
+      seurat.cistopic[['RNA']] <- CreateAssayObject(counts = gene.activities)
+      
+    }else{
+      #saveRDS(gene.activities, file =  paste0(RdataDir, 'gene_activities_matrix_Promoter.rds'))
+      
+      # convert rownames from chromsomal coordinates into gene names
+      gene.key <- genebodyandpromoter.coords$tx_name
+      names(gene.key) <- GRangesToString(grange = genebodyandpromoter.coords)
+      rownames(gene.activities) <- make.unique(gene.key[rownames(gene.activities)])
+      gene.activities <- gene.activities[rownames(gene.activities)!="",]
+      
+      mm = match(rownames(gene.activities), annot$Transcript.stable.ID)
+      mapNames = data.frame(c(1:nrow(gene.activities)), mm, geneNames = annot$Gene.name[mm], stringsAsFactors = FALSE)
+      genes.names = unique(mapNames$geneNames[!is.na(mapNames$geneNames)])
+      kk = match(genes.names, mapNames$geneNames)
+      
+      gene.activities = gene.activities[mapNames[kk, 1], ]
+      rownames(gene.activities) = genes.names
+      
+      #Add the gene activity matrix to the Seurat object as a new assay, and normalize it
+      seurat.cistopic[['RNA']] <- CreateAssayObject(counts = gene.activities)
     }
     
-    return(seurat.cistopic)
+    saveRDS(seurat.cistopic, file =  paste0(saveDir, 'atac_LDA_seurat_object_geneActivityMatrix_', method, '_',
+                                            regions,  '_', size.promoter.upstream, 'bp.rds'))
+    #saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
+    #return(seurat.cistopic)
   }
   
 }
@@ -682,6 +731,54 @@ compute.gene.acitivity.scores = function(seurat.cistopic,
 ##########################################
 # do cicero given a Seurat object, output gene activity score
 ##########################################
+compute.cicero.gene.activity.scores = function(seuratObj, output_dir, tss_file, genome_size_file)
+{
+  library(cicero)
+  #args = commandArgs(T)
+  #seuratObj_file = args[1]
+  #output_dir = args[2]
+  #tss_file = args[3]
+  #genome_size_file = args[4]
+  source.my.script('scATAC_functions.R')
+  
+  seurat.obj = seurat.cistopic
+  output_dir = RdataDir
+  reduction = 'umap'
+  npc = 30
+  
+  tss_file = 'data/annotations/ce11_tss.bed'
+  genome_size_file = 'data/annotations/ce11.chrom.sizes'
+  chr_sizes = genome_size_file
+    
+  # process tss annotation
+  tss_ann <- fread(tss_file, header = F)
+  names(tss_ann)[c(1:4)] <- c('chr', 'start', 'end', 'gene_name')
+  annot = read.csv(file = "data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
+  annot = annot[which((annot$Gene.type == 'miRNA' | annot$Gene.type == 'protein_coding') 
+                      & annot$Chromosome.scaffold.name != 'MtDNA'), ]
+  mm = match(tss_ann$gene_name, annot$Gene.stable.ID)
+  tss_ann$gene_name = annot$Gene.name[mm]
+  tss_ann = tss_ann[which(!is.na(tss_ann$gene_name)), ]
+  #tss_ann <- tss_ann[gene_type %in% c('miRNA', 'lincRNA', 'protein_coding'), ]
+  
+  seurat.obj$active_clusters = as.character(seurat.obj$seurat_clusters)
+  
+  # main function calling Cicero
+  res = doCicero_gascore(seurat.obj, reduction = 'umap', genome_size_file, tss_ann, npc = 30)
+  
+  ga_score = log1p(res$ga_score * 10000)
+  
+  conns = res$conns
+  
+  saveRDS(ga_score, file = paste0(output_dir, '/cicero_gene_activity.rds'))
+  
+  #conns$Peak1 = assignGene2Peak_coords(conns$Peak1, tss_ann)
+  #conns$Peak2 = assignGene2Peak_coords(conns$Peak2, tss_ann)
+  write.table(conns, file = paste0(output_dir, '/cicero_interactions.txt'), row.names = F,
+              sep = '\t', quote = F)
+  
+}
+
 doCicero_gascore <- function(seurat.obj, reduction = 'tsne', chr_sizes,
                              gene_ann, npc = 30, coaccess_thr = 0.25){
   ## gene_ann: the first four columns: chr, start, end, gene name
@@ -701,11 +798,14 @@ doCicero_gascore <- function(seurat.obj, reduction = 'tsne', chr_sizes,
   dt$Cell = as.character(dt$Cell)
   dt$Peak = as.character(dt$Peak)
   
-  input_cds <- make_atac_cds(dt, binarize = T)
+  # The output of make_atac_cds is a valid CDS object ready to be input into downstream Cicero functions.
+  input_cds <- make_atac_cds(dt, binarize = TRUE)
   rm(dt)
+  
   input_cds <- detectGenes(input_cds)
   input_cds <- estimateSizeFactors(input_cds)
   
+  # Next, we access the tsne or umap coordinates from the input CDS object where they are stored by Monocle and run make_cicero_cds:
   if(reduction == 'tsne') {
     if(is.null(seurat.obj@reductions$tsne))
       seurat.obj <- RunTSNE(seurat.obj, dims = 1:npc, check_duplicates = F)
@@ -713,17 +813,18 @@ doCicero_gascore <- function(seurat.obj, reduction = 'tsne', chr_sizes,
   }
   if(reduction == 'umap') {
     if(is.null(seurat.obj@reductions$umap))
-      seurat.object <- RunUMAP(seurat.object, dims = 1:npc)
+      seurat.obj <- RunUMAP(seurat.obj, dims = 1:npc)
     redu.coords = seurat.obj@reductions$umap@cell.embeddings
   }
   
-  #make the cell id consistet
   
-  cicero_cds <- make_cicero_cds(input_cds, reduced_coordinates = redu.coords)
+  #make the cell id consistet
+  cicero_cds <- make_cicero_cds(input_cds, reduced_coordinates = redu.coords, k = 100)
   
   ## get connections
-  
-  conns <- run_cicero(cicero_cds, chr_sizes)
+  #conns <- run_cicero(cicero_cds, chr_sizes, sample_num = 2)
+  distance_parameters = estimate_distance_parameter(cicero_cds, genomic_coords = chr_sizes, 
+                                                    window = 100000, s = 0.8, distance_constraint = 50000, sample_num = 100)
   
   ## get cicero gene activity score
   names(gene_ann)[4] <- "gene"
@@ -750,37 +851,9 @@ doCicero_gascore <- function(seurat.obj, reduction = 'tsne', chr_sizes,
   return(res)  
 }
 
-compute.cicero.gene.activity.scores = function(seuratObj, output_dir, tss_file, genome_size_file)
-{
-  #args = commandArgs(T)
-  #seuratObj_file = args[1]
-  #output_dir = args[2]
-  #tss_file = args[3]
-  #genome_size_file = args[4]
-  
-  seurat.obj = readRDS(seuratObj_file)
-  
-  tss_ann <- fread(tss_file, header = F)
-  names(tss_ann)[c(1:4,7)] <- c('chr', 'start', 'end', 'gene_name', 'gene_type')
-  tss_ann <- tss_ann[gene_type %in% c('miRNA', 'lincRNA', 'protein_coding'), ]
-  
-  seurat.obj$active_clusters = as.character(seurat.obj$active_clusters)
-  
-  res = doCicero_gascore(seurat.obj, reduction = 'umap', genome_size_file, tss_ann, npc = 30)
-  
-  ga_score = log1p(res$ga_score * 10000)
-  
-  conns = res$conns
-  
-  saveRDS(ga_score, file = paste0(output_dir, '/cicero_gene_activity.rds'))
-  
-  #conns$Peak1 = assignGene2Peak_coords(conns$Peak1, tss_ann)
-  #conns$Peak2 = assignGene2Peak_coords(conns$Peak2, tss_ann)
-  write.table(conns, file = paste0(output_dir, '/cicero_interactions.txt'), row.names = F,
-              sep = '\t', quote = F)
-  
-}
-
+##########################################
+# motif analysis 
+##########################################
 compute.motif.enrichment = function(seurat.cistopic)
 {
   library(Signac)
