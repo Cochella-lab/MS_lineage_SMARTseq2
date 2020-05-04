@@ -85,11 +85,30 @@ process.scRNAseq.for.early.embryo.packer.et.al = function()
     lineage_markers <-  read.xlsx("data/Supplementary_Tables_190611.xlsx",sheet=4, startRow=7)
     
   }else{
+    library(VisCello.celegans)
     eset = readRDS(file = paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
     pmeda = data.frame(pData(eset))
     
-    sels = which(pmeda$embryo.time.bin == '< 100')
+    ee = eset@assayData$exprs
     
+    sels = sample(c(1:ncol(ee)), size = 20000, replace = FALSE)
+    ss = apply(ee[, sels], 2, function(x) sum(x >0) )
+    
+    Compare.Murray.vs.Aleks.scRNA = FALSE
+    if(Compare.Murray.vs.Aleks.scRNA){
+      load(file=paste0("data/R_processed_data/all_batches_QCed_cells_genes_filtered_SCE.Rdata"))
+      xx = 10^sce$log10_total_features_by_counts
+      
+      hist(ss, breaks = 100, freq = FALSE, xlab = 'nb of genes detected per cell', main = 'Murray data')
+      
+      hist(xx, breaks = 100, freq = FALSE, xlab = 'nb of genes detected per cell', main = 'ALeks data')
+      median(xx)
+      median(ss)
+      
+      boxplot(list(murray= ss, aleks= xx))
+    }
+    
+    sels = which(pmeda$embryo.time.bin == '< 100')
     pp = pmeda[sels, ]
      
   }

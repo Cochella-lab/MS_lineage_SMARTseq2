@@ -308,21 +308,23 @@ FeaturePlot(
 # label transferring from scRNA-seq data using liger and seurat 
 # see details in https://satijalab.org/signac/articles/mouse_brain_vignette.html#integrating-with-scrna-seq-data
 ##########################################
-library(Signac)
-library(Seurat)
+#library(Signac)
+#library(Seurat)
 
-seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds'))
+#seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds'))
 #seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
+gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter_2000bpUpstream.500bpDownstream.rds')
+seurat.cistopic = readRDS(file =  gamat)
 
-DefaultAssay(seurat.cistopic) <- 'peaks'
-seurat.cistopic <- RunTFIDF(seurat.cistopic)
-seurat.cistopic <- FindTopFeatures(seurat.cistopic, min.cutoff = 'q25')
-seurat.cistopic <- RunSVD(
-  object = seurat.cistopic,
-  assay = 'peaks',
-  reduction.key = 'LSI_',
-  reduction.name = 'lsi'
-)
+# DefaultAssay(seurat.cistopic) <- 'peaks'
+# seurat.cistopic <- RunTFIDF(seurat.cistopic)
+# seurat.cistopic <- FindTopFeatures(seurat.cistopic, min.cutoff = 'q25')
+# seurat.cistopic <- RunSVD(
+#   object = seurat.cistopic,
+#   assay = 'peaks',
+#   reduction.key = 'LSI_',
+#   reduction.name = 'lsi'
+# )
 
 #VariableFeatures(seurat.cistopic) <- names(which(Matrix::rowSums(seurat.cistopic) > 100))
 #seurat.cistopic <- RunLSI(seurat.cistopic, n = 50, scale.max = NULL)
@@ -332,7 +334,7 @@ seurat.cistopic <- RunSVD(
 # in order to find anchors between cells in the scATAC-seq dataset 
 # and the scRNA-seq dataset.
 DefaultAssay(seurat.cistopic) <- 'RNA'
-nb.variableFeatures = 2500
+nb.variableFeatures = nrow(seurat.cistopic)
 seurat.cistopic <- FindVariableFeatures(seurat.cistopic, nfeatures = nb.variableFeatures)
 seurat.cistopic <- NormalizeData(seurat.cistopic)
 seurat.cistopic <- ScaleData(seurat.cistopic)
@@ -371,7 +373,7 @@ tintori = tintori[!is.na(match(rownames(tintori), rownames(seurat.cistopic)))] #
 
 tintori <- FindVariableFeatures(
   object = tintori,
-  nfeatures = nb.variableFeatures
+  nfeatures = 5000
 )
 
 DimPlot(tintori, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE)
