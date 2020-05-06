@@ -1473,6 +1473,11 @@ transfer.labels.from.scRNA.to.scATAC.with.liger = function(seurat.cistopic, tint
 annotate.scATAC.clusters.with.marker.genes = function(seurat.cistopic)
 {
   
+}
+
+manually.edit.table_marker.genes_tf.motif_peaks = function(seurat.cistopic)
+{
+  
   # processed from raw data
   tintori = readRDS(file = paste0(RdataDir, 'Tintori.et.al_rawCounts_processed_sizefactorNormalization.rds')) 
   tintori = tintori[!is.na(match(rownames(tintori), rownames(seurat.cistopic)))] # select only protein-coding genes and miRNAs
@@ -1490,17 +1495,34 @@ annotate.scATAC.clusters.with.marker.genes = function(seurat.cistopic)
   
   DimPlot(tintori, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = FALSE)
   
+  ## import peak, RNA (gene activity matrix) as Assays
   gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter.geneBody_2000bp.rds')
   #gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter_2000bpUpstream.500bpDownstream.rds')
   seurat.cistopic = readRDS(file = gamat)
   
+  # add motif activities into seurat.cistopic 
+  xx = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_motifClassChromVar.rds'))
   
-  DefaultAssay(seurat.cistopic) <- 'RNA'
+  seurat.cistopic[['chromvar']] = CreateAssayObject(data = xx@assays$chromvar@data)
+  
+  DefaultAssay(seurat.cistopic) <- 'peaks'
+  
+  FeaturePlot(
+    object = seurat.cistopic,
+    features = "chrV:10647260-10647485",
+    pt.size = 0.1,
+    #max.cutoff = ,
+    #min.cutoff = 'q20',
+    ncol = 1
+  )
+  
+  
   #seurat.cistopic <- NormalizeData(seurat.cistopic, 
   #                                 #normalization.method = 'CLR'
   #                                 scale.factor = median(Matrix::colSums(seurat.cistopic@assays$RNA@counts))
   #                                 )
   #seurat.cistopic <- ScaleData(seurat.cistopic)
+  
   features.to.plot = c('erm-1', # AB enriched
     'cpg-2',
     'med-2', # marker for EMS
@@ -1532,17 +1554,38 @@ annotate.scATAC.clusters.with.marker.genes = function(seurat.cistopic)
     pt.size = 0.1,
     #max.cutoff = 2,
     #min.cutoff = 'q5',
-    ncol = 4
+    ncol = 1
   )
   
-  FeaturePlot(
+  features.to.plot = 'pal-1'
+  
+  DefaultAssay(seurat.cistopic) <- 'RNA'
+  p1 = FeaturePlot(
     object = seurat.cistopic,
     features = features.to.plot,
     pt.size = 0.1,
-    max.cutoff = 1.,
-    #min.cutoff = 'q5',
-    ncol = 4
+    max.cutoff = 'q90',
+    min.cutoff = 'q25',
+    ncol = 1
   )
+  
+  DefaultAssay(seurat.cistopic) <- 'chromvar'
+  motifs2check = rownames(seurat.cistopic)[grep('tbx-35|tbx-38|MA0542.1|MA0924.1 pal-1|MA0546.1|end-1|MA0547.1 skn-1|
+                                                hnd|unc-130|mom-2|med-2|ref', 
+                                                rownames(seurat.cistopic))]
+  motifs2check = rownames(seurat.cistopic)[grep(features.to.plot, rownames(seurat.cistopic))]
+  p2 = FeaturePlot(
+    object = seurat.cistopic,
+    features = motifs2check,
+    pt.size = 0.1,
+    #cols = c('red', 'blue'),
+    #max.cutoff = 1,
+    min.cutoff = 0.5,
+    ncol = 1
+  )
+  
+  p1 + p2
+  
   
   ##########################################
   # test tf normalization and clustering 
@@ -1561,21 +1604,6 @@ annotate.scATAC.clusters.with.marker.genes = function(seurat.cistopic)
   #   ncol = 4
   # )
   
-  # motif activities 
-  seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_motifClassChromVar.rds'))
-  
-  motifs2check = rownames(seurat.cistopic)[grep('tbx-35|tbx-38|MA0542.1|MA0924.1 pal-1|MA0546.1|end-1|MA0547.1 skn-1|
-                                                hnd|unc-130|mom-2|med-2|ref', 
-                                                rownames(seurat.cistopic))]
-  FeaturePlot(
-    object = seurat.cistopic,
-    features = motifs2check,
-    pt.size = 0.1,
-    #cols = c('red', 'blue'),
-    #max.cutoff = 1,
-    min.cutoff = 0,
-    ncol = 3
-  )
   
 }
 
