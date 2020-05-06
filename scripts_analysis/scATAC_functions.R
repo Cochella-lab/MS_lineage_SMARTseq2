@@ -1028,9 +1028,8 @@ compute.motif.enrichment = function(seurat.cistopic)
     sep = c(":", "-")
   )
   
-  
   ##########################################
-  # Finding overrepresented motifs for differentially accessible peaks
+  # motif analysis 1) :Finding overrepresented motifs for differentially accessible peaks
   ##########################################
   da_peaks <- FindMarkers(
     object = seurat.cistopic,
@@ -1052,13 +1051,14 @@ compute.motif.enrichment = function(seurat.cistopic)
   head(enriched.motifs, 20)
   
   ##########################################
-  # run ChromVAR
+  # motif analysis 2): run ChromVAR
   ##########################################
   seurat.cistopic <- RunChromVAR(
     object = seurat.cistopic,
     genome = BSgenome.Celegans.UCSC.ce11
     
   )
+  
   return(seurat.cistopic)
   
 }
@@ -1077,8 +1077,9 @@ transfer.labels.from.scRNA.to.scATAC = function(seurat.cistopic, tintori, method
   if(method == 'seurat'){
     
     # process.tintori.et.al()
-    
-    tintori <- readRDS(paste0(RdataDir, 'Tintori_et_al_highQualtiyCells.rds'))
+    # processed raw data
+    tintori = readRDS(file = paste0(RdataDir, 'Tintori.et.al_rawCounts_processed_sizefactorNormalization.rds')) 
+    #xx <- readRDS(paste0(RdataDir, 'Tintori_et_al_highQualtiyCells.rds')) # processed data from cello 
     tintori = tintori[!is.na(match(rownames(tintori), rownames(seurat.cistopic)))] # select only protein-coding genes and miRNAs
     
     tintori <- FindVariableFeatures(
@@ -1114,7 +1115,7 @@ transfer.labels.from.scRNA.to.scATAC = function(seurat.cistopic, tintori, method
     
     resolution = 0.8;
     
-    pdfname = paste0(resDir, "/label_transferring_seurat_resolution_mergedTintoriLineage_", resolution,  ".pdf")
+    pdfname = paste0(resDir, "/label_transferring_seurat_resolution_rawTintoriLineage_", resolution,  ".pdf")
     pdf(pdfname, width=12, height = 8)
     par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
     
@@ -1196,9 +1197,9 @@ transfer.labels.from.scRNA.to.scATAC = function(seurat.cistopic, tintori, method
     tintori <- AddMetaData(object = tintori, metadata = predicted.labels)
     
     p1 = DimPlot(tintori, group.by = "predicted.id",reduction = 'umap', pt.size = 2,  label.size = 6,
-                 label = TRUE, repel = TRUE) + ggtitle("scRNA-seq cells") + 
+                 label = TRUE, repel = FALSE) + ggtitle("scRNA-seq cells") + 
       scale_colour_hue(drop = FALSE)
-    p2 = DimPlot(tintori,reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2,  label.size = 6) + 
+    p2 = DimPlot(tintori,reduction = 'umap', label = TRUE, repel = FALSE, pt.size = 2,  label.size = 6) + 
       ggtitle("scRNA-seq cells") + 
       scale_colour_hue(drop = FALSE)
     
@@ -1368,7 +1369,7 @@ process.tintori.et.al = function()
 # test liger to transfer lables 
 # see details in https://macoskolab.github.io/liger/walkthrough_rna_atac.html
 ##########################################
-transfer.labels.from.scRNA.to.scATAC.with.liger = function()
+transfer.labels.from.scRNA.to.scATAC.with.liger = function(seurat.cistopic, tintori)
 {
   
   # rna_clusts = readRDS("../liger-rna-atac-vignette/rna_cluster_assignments.RDS")
@@ -1459,6 +1460,122 @@ transfer.labels.from.scRNA.to.scATAC.with.liger = function()
   
   #seurat_liger = ligerToSeurat(int.pbmc, use.liger.genes = T)
   
+  
+}
+
+
+########################################################
+########################################################
+# Section : functions for scATAC-seq cluster annotation
+# 
+########################################################
+########################################################
+annotate.scATAC.clusters.with.marker.genes = function(seurat.cistopic)
+{
+  
+  # processed from raw data
+  tintori = readRDS(file = paste0(RdataDir, 'Tintori.et.al_rawCounts_processed_sizefactorNormalization.rds')) 
+  tintori = tintori[!is.na(match(rownames(tintori), rownames(seurat.cistopic)))] # select only protein-coding genes and miRNAs
+  
+  tintori <- FindVariableFeatures(
+    object = tintori,
+    nfeatures = 5000
+  )
+  
+  tintori <- ScaleData(object = tintori)
+  tintori <- RunPCA(object = tintori, npcs = 50, verbose = FALSE)
+  
+  Idents(tintori) = tintori$lineage
+  tintori <- RunUMAP(object = tintori, dims = 1:30, n.neighbors = 10, min.dist = 0.2)
+  
+  DimPlot(tintori, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = FALSE)
+  
+  gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter.geneBody_2000bp.rds')
+  #gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter_2000bpUpstream.500bpDownstream.rds')
+  seurat.cistopic = readRDS(file = gamat)
+  
+  
+  DefaultAssay(seurat.cistopic) <- 'RNA'
+  #seurat.cistopic <- NormalizeData(seurat.cistopic, 
+  #                                 #normalization.method = 'CLR'
+  #                                 scale.factor = median(Matrix::colSums(seurat.cistopic@assays$RNA@counts))
+  #                                 )
+  #seurat.cistopic <- ScaleData(seurat.cistopic)
+  features.to.plot = c('erm-1', # AB enriched
+    'cpg-2',
+    'med-2', # marker for EMS
+    'era-1', #'W02F12.3',
+    'tbx-35',
+    'end-3',
+    'mex-5',
+    'pigv-1', #'T09B4.1'
+    'ceh-51',
+    'end-1',
+    'pal-1',
+    'hlh-27',
+    'ref-1',
+    'tbx-38',
+    'sdz-38',
+    'pha-4', 'hnd-1',
+    'lsy-6' # marker for ABaxx
+    #'tbx-37','tbx-38', 'ceh-27',
+    #'ceh-36', 'elt-1'
+    #'dmd-4', 
+    #'dpy-31', 'elt-7', 'end-1', 'nrh-79', 
+    #  "mab-5","med-1","med-2", 'pal-1', 'pha-4', 
+    #   'pes-1', 'nos-1', 'nos-2'
+  )
+  
+  FeaturePlot(
+    object = tintori,
+    features = features.to.plot,
+    pt.size = 0.1,
+    #max.cutoff = 2,
+    #min.cutoff = 'q5',
+    ncol = 4
+  )
+  
+  FeaturePlot(
+    object = seurat.cistopic,
+    features = features.to.plot,
+    pt.size = 0.1,
+    max.cutoff = 1.,
+    #min.cutoff = 'q5',
+    ncol = 4
+  )
+  
+  ##########################################
+  # test tf normalization and clustering 
+  ##########################################
+  # seurat.lsi = tenx.seurat.lsi
+  # gene.activity = GetAssayData(object = seurat.cistopic, slot = "counts", assay = 'RNA')  
+  # seurat.lsi[['RNA']] = CreateAssayObject(counts = gene.activity)
+  # 
+  # 
+  # FeaturePlot(
+  #   object = seurat.lsi,
+  #   features = features.to.plot,
+  #   pt.size = 0.1,
+  #   max.cutoff = 1.,
+  #   #min.cutoff = 'q5',
+  #   ncol = 4
+  # )
+  
+  # motif activities 
+  seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_motifClassChromVar.rds'))
+  
+  motifs2check = rownames(seurat.cistopic)[grep('tbx-35|tbx-38|MA0542.1|MA0924.1 pal-1|MA0546.1|end-1|MA0547.1 skn-1|
+                                                hnd|unc-130|mom-2|med-2|ref', 
+                                                rownames(seurat.cistopic))]
+  FeaturePlot(
+    object = seurat.cistopic,
+    features = motifs2check,
+    pt.size = 0.1,
+    #cols = c('red', 'blue'),
+    #max.cutoff = 1,
+    min.cutoff = 0,
+    ncol = 3
+  )
   
 }
 

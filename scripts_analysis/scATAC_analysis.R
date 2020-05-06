@@ -84,6 +84,9 @@ plot_clustering_comparison(tenx.seurat.lsi,
                            cluster_column1='peaks_snn_res.0.8',
                            cluster_column2='peaks_snn_res.0.8')
 
+saveRDS(tenx.seurat.lsi, file =  paste0(RdataDir, 'atac_lsi_seurat_object.rds'))
+saveRDS(tenx.seurat.lsi_log, file =  paste0(RdataDir, 'atac_lsi.log_seurat_object.rds'))
+
 ##########################################
 # compare LAD from cistopic with lsi-log
 ##########################################
@@ -145,7 +148,7 @@ tenx.seurat.lsi_log = FindClusters(object = tenx.seurat.lsi_log,
                            n.start=20, resolution=resolution,
                            algorithm = 3)
 
-#nb.pcs = 80; n.neighbors = 30; min.dist = 0.25;
+nb.pcs = 50; n.neighbors = 30; min.dist = 0.3;
 tenx.seurat.lsi_log <- RunUMAP(object = tenx.seurat.lsi_log, 
                                reduction = 'pca.l2', 
                                dims = 2:nb.pcs, n.neighbors = n.neighbors, 
@@ -181,7 +184,6 @@ p1 + p2
 # DimPlot(object = seurat.cistopic, label = TRUE, reduction = 'umap') + NoLegend()
 Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
 saveRDS(seurat.cistopic, file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
-
 
 
 ########################################################
@@ -287,47 +289,22 @@ if(Compute.gene.activity.scores){
 
 }
 
+########################################################
+########################################################
+# Section : scATAC-seq cluster annotation
+# 
+########################################################
+########################################################
+
+##########################################
+# using marker genes 
+##########################################
 gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter_2000bpUpstream.500bpDownstream.rds')
 seurat.cistopic = readRDS(file = gamat)
 #seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
-DefaultAssay(seurat.cistopic) <- 'RNA'
 
-#seurat.cistopic <- NormalizeData(seurat.cistopic, 
-#                                 #normalization.method = 'CLR'
-#                                 scale.factor = median(Matrix::colSums(seurat.cistopic@assays$RNA@counts))
-#                                 )
-#seurat.cistopic <- ScaleData(seurat.cistopic)
-
-FeaturePlot(
-  object = seurat.cistopic,
-  features = c('erm-1', # AB enriched
-               'cpg-2',
-              'med-2', # marker for EMS
-              'era-1', #'W02F12.3',
-              'tbx-35',
-              'end-3',
-              'mex-5',
-              'pigv-1', #'T09B4.1'
-              'ceh-51',
-              'end-1',
-              'pal-1',
-              'hlh-27',
-              'ref-1',
-              'tbx-38',
-              'sdz-38',
-              'lsy-6' # marker for ABaxx
-               #'tbx-37','tbx-38', 'ceh-27',
-               #'ceh-36', 'elt-1'
-               #'dmd-4', 
-               #'dpy-31', 'elt-7', 'end-1', 'nrh-79', 
-              #  "mab-5","med-1","med-2", 'pal-1', 'pha-4', 
-              #   'pes-1', 'nos-1', 'nos-2'
-              ),
-  pt.size = 0.1,
-  max.cutoff = 2,
-  #min.cutoff = 'q5',
-  ncol = 4
-)
+source.my.script('scATAC_functions.R')
+annotate.scATAC.clusters.with.marker.genes = function(seurat.cistopic)
 
 ##########################################
 # label transferring from scRNA-seq data using liger and seurat 
@@ -341,5 +318,7 @@ seurat.cistopic = readRDS(file =  gamat)
 
 source.my.script('scATAC_functions.R')
 transfer.labels.from.scRNA.to.scATAC(seurat.cistopic, tintori, method = 'liger')
+
+
 
 

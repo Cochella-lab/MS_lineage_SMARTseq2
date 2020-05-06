@@ -151,6 +151,7 @@ process.scRNAseq.for.early.embryo.Tintori.et.al = function(start.from.raw.counts
     
     #ee = al[, which(al$Usable.Quality. == 'Yes')]
     saveRDS(al, file =  paste0(RdataDir, 'Tintori_et_al_highQualtiyCells.rds'))
+    
   }else{
     ##########################################
     # process the count data
@@ -363,6 +364,7 @@ process.scRNAseq.for.early.embryo.Tintori.et.al = function(start.from.raw.counts
     scale_colour_hue(drop = FALSE) + ggtitle('Tintori (size factor)')
     
     saveRDS(ms, file = paste0(RdataDir, 'Tintori.et.al_rawCounts_processed_sizefactorNormalization.rds'))
+    ms = readRDS(file = paste0(RdataDir, 'Tintori.et.al_rawCounts_processed_sizefactorNormalization.rds'))
     
     ms <- FindNeighbors(ms, dims = 1:30)
     ms <- FindClusters(ms, resolution = 10) 
@@ -372,7 +374,9 @@ process.scRNAseq.for.early.embryo.Tintori.et.al = function(start.from.raw.counts
     lineages.index = match(ms$lineage, lineages)
     ms$seurat_clusters = lineages.index - 1
     Idents(ms) = ms$seurat_clusters
-    DimPlot(ms, reduction = "umap")
+    Idents(ms) = ms$lineage
+    DimPlot(ms, reduction = "umap", )
+    
     
     # find all markers of cluster 1
     cluster1.markers <- FindMarkers(ms, ident.1 = 1, min.pct = 0.25, test.use = 'MAST')
@@ -485,6 +489,46 @@ EE_integration_Aleks_Tintori = function(ee, tt, Method = c('seurat', 'liger'))
   ee$dataSet = 'Aleks'
   tt$dataSet = 'Tintori'
   
+  if(Method == 'seurat'){
+    
+    ee.list = list( Aleks = ee, Tintori = tt)
+    library(Seurat)
+    library(ggplot2)
+    
+    for (i in 1:length(ee.list)) {
+      ee.list[[i]] <- Seurat::NormalizeData(ee.list[[i]], verbose = FALSE)
+      ee.list[[i]] <- FindVariableFeatures(ee.list[[i]], selection.method = "vst", 
+                                           nfeatures = 2000, verbose = FALSE)
+    }
+    
+    reference.list <- ee.list[c("Tintori", 'Aleks')]
+    #reference.list <- ee.list[c('Aleks', "Tintori")]
+    ee.anchors <- FindIntegrationAnchors(object.list = reference.list, dims = 1:30)
+    
+    ee.integrated <- IntegrateData(anchorset = ee.anchors, dims = 1:30)
+    
+    library(ggplot2)
+    library(cowplot)
+    library(patchwork)
+    # switch to integrated assay. The variable features of this assay are automatically
+    # set during IntegrateData
+    DefaultAssay(ee.integrated) <- "integrated"
+    
+    # Run the standard workflow for visualization and clustering
+    ee.integrated <- ScaleData(ee.integrated, verbose = FALSE)
+    ee.integrated <- RunPCA(ee.integrated, npcs = 50, verbose = FALSE)
+    
+    nb.pcs = 30; n.neighbors = 20; min.dist = 0.2;
+    ee.integrated <- RunUMAP(ee.integrated, reduction = "pca", dims = 1:nb.pcs,
+                             n.neighbors = n.neighbors, min.dist = min.dist)
+    
+    p1 <- DimPlot(ee.integrated, reduction = "umap", group.by = "dataSet", pt.size = 2, label.size = 5)
+    p2 <- DimPlot(ee.integrated, reduction = "umap", group.by = "lineage", label = TRUE, pt.size = 2, label.size = 5,
+                  repel = TRUE) 
+    p1 + p2
+    
+  }
+  
   if(Method == 'liger'){
     
     alex_clusts = ee$seurat_clusters
@@ -535,45 +579,7 @@ EE_integration_Aleks_Tintori = function(ee, tt, Method = c('seurat', 'liger'))
     
     
   }
-  if(Method == 'seurat'){
-    
-    ee.list = list( Aleks = ee, Tintori = tt)
-    library(Seurat)
-    library(ggplot2)
-    
-    for (i in 1:length(ee.list)) {
-      ee.list[[i]] <- Seurat::NormalizeData(ee.list[[i]], verbose = FALSE)
-      ee.list[[i]] <- FindVariableFeatures(ee.list[[i]], selection.method = "vst", 
-                                                 nfeatures = 2000, verbose = FALSE)
-    }
-    
-    reference.list <- ee.list[c("Tintori", 'Aleks')]
-    #reference.list <- ee.list[c('Aleks', "Tintori")]
-    ee.anchors <- FindIntegrationAnchors(object.list = reference.list, dims = 1:30)
-    
-    ee.integrated <- IntegrateData(anchorset = ee.anchors, dims = 1:30)
-    
-    library(ggplot2)
-    library(cowplot)
-    library(patchwork)
-    # switch to integrated assay. The variable features of this assay are automatically
-    # set during IntegrateData
-    DefaultAssay(ee.integrated) <- "integrated"
-    
-    # Run the standard workflow for visualization and clustering
-    ee.integrated <- ScaleData(ee.integrated, verbose = FALSE)
-    ee.integrated <- RunPCA(ee.integrated, npcs = 50, verbose = FALSE)
-    
-    nb.pcs = 30; n.neighbors = 20; min.dist = 0.2;
-    ee.integrated <- RunUMAP(ee.integrated, reduction = "pca", dims = 1:nb.pcs,
-                             n.neighbors = n.neighbors, min.dist = min.dist)
-    
-    p1 <- DimPlot(ee.integrated, reduction = "umap", group.by = "dataSet", pt.size = 2, label.size = 5)
-    p2 <- DimPlot(ee.integrated, reduction = "umap", group.by = "lineage", label = TRUE, pt.size = 2, label.size = 5,
-                  repel = TRUE) 
-    p1 + p2
-    
-  }
+  
   
 }
 
