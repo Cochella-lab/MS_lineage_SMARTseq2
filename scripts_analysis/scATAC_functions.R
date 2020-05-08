@@ -1140,30 +1140,6 @@ transfer.labels.from.scRNA.to.scATAC = function(seurat.cistopic, tintori, method
     seurat.cistopic <- NormalizeData(seurat.cistopic)
     seurat.cistopic <- ScaleData(seurat.cistopic)
     
-    # features.to.use = unique(c('erm-1', # AB enriched
-    #                     'cpg-2',
-    #                     'med-2', # marker for EMS
-    #                     'era-1', #'W02F12.3',
-    #                     'tbx-35',
-    #                     'end-3',
-    #                     'mex-5',
-    #                     'pigv-1', #'T09B4.1'
-    #                     'ceh-51',
-    #                     'end-1',
-    #                     'pal-1',
-    #                     'hlh-27',
-    #                     'ref-1',
-    #                     'tbx-38',
-    #                     'sdz-38',
-    #                     'lsy-6', # marker for ABaxx
-    #                     'tbx-37','tbx-38', 'ceh-27',
-    #                     'ceh-36', 'elt-1',
-    #                     'dmd-4', 
-    #                     'dpy-31', 'elt-7', 'end-1', 'nrh-79', 
-    #                       "mab-5","med-1","med-2", 'pal-1', 'pha-4', 
-    #                        'pes-1', 'nos-1', 'nos-2'
-    # ))
-    
     transfer.anchors <- FindTransferAnchors(
       reference = seurat.cistopic,
       query = tintori,
@@ -1475,10 +1451,8 @@ annotate.scATAC.clusters.with.marker.genes = function(seurat.cistopic)
   
 }
 
-manually.edit.table_marker.genes_tf.motif_peaks = function(seurat.cistopic)
+import.tintori.et.al.dataset = function(nfeatures = 5000, npcs = 30, n.neighbors = 10, min.dist = 0.2)
 {
-  
-  # processed from raw data
   tintori = readRDS(file = paste0(RdataDir, 'Tintori.et.al_rawCounts_processed_sizefactorNormalization.rds')) 
   tintori = tintori[!is.na(match(rownames(tintori), rownames(seurat.cistopic)))] # select only protein-coding genes and miRNAs
   
@@ -1493,98 +1467,169 @@ manually.edit.table_marker.genes_tf.motif_peaks = function(seurat.cistopic)
   Idents(tintori) = tintori$lineage
   tintori <- RunUMAP(object = tintori, dims = 1:30, n.neighbors = 10, min.dist = 0.2)
   
-  DimPlot(tintori, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = FALSE)
+  #DimPlot(tintori, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = FALSE)
   
+  return(tintori)
+}
+
+plot.feature.example.scRNA.scATAC.tf.motif = function(seurat.cistopic, feature.example, tintori, aleks)
+{
+  plots = list()
+  if(length(which(rownames(tintori) == feature.example))>0){
+    p01 = FeaturePlot(tintori, features = feature.example, ncol = NULL, by.col = FALSE,
+                      label = TRUE, label.size = 4, pt.size = 2, 
+                      reduction = 'umap', repel = TRUE) + 
+      ggtitle(paste0('tintori - ' , feature.example))
+    plots[['tintori']] = p01
+  }  
+  if(length(which(rownames(aleks) == feature.example))>0){
+    p02 = FeaturePlot(aleks, features = feature.example, ncol = NULL, by.col = FALSE) +
+      ggtitle(paste0('aleks - ', feature.example))
+    plots[['aleks']] = p02
+  }
+  DefaultAssay(seurat.cistopic) <- 'RNA'
+  p1 = FeaturePlot(
+    object = seurat.cistopic,
+    features = feature.example,
+    pt.size = 0.5,
+    #max.cutoff = 'q90',
+    #min.cutoff = 'q5',
+    ncol = 1
+  )
+  
+  plots[['scatac']] = p1
+  DefaultAssay(seurat.cistopic) <- 'chromvar'
+  
+  motifs2check = rownames(seurat.cistopic)[grep(feature.example, rownames(seurat.cistopic))]
+  if(length(motifs2check)>0){
+    p2 = FeaturePlot(
+      object = seurat.cistopic,
+      features = motifs2check[1],
+      pt.size = 0.1,
+      #cols = c('red', 'blue'),
+      #max.cutoff = 1,
+      min.cutoff = 0.2,
+      ncol = 1
+    )
+   plots[['tf.motif']] = p2 
+  }
+  
+  CombinePlots(plots, ncol = 2)
+}
+
+manually.edit.table_marker.genes_tf.motif_peaks = function(seurat.cistopic)
+{
+  # xx = levels(tintori)
+  # xx = data.frame(cell.types = xx)
+  # write.csv(xx, file = 'data/curated_markerGenes.csv', row.names = FALSE)
+  # 
   ## import peak, RNA (gene activity matrix) as Assays
-  gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter.geneBody_2000bp.rds')
+  # gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter.geneBody_2000bp.rds')
   #gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter_2000bpUpstream.500bpDownstream.rds')
+  gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter_2000bpUpstream.2000bpDownstream.rds')
   seurat.cistopic = readRDS(file = gamat)
   
-  # add motif activities into seurat.cistopic 
-  xx = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_motifClassChromVar.rds'))
+  # import processed tintori from raw data
+  tintori = import.tintori.et.al.dataset(nfeatures = 3000, npcs = 30)
   
-  seurat.cistopic[['chromvar']] = CreateAssayObject(data = xx@assays$chromvar@data)
+  # import Aleks' scRNA-seq data
+  aleks = readRDS(file = paste0(RdataDir, 'EE_Aleks_rawCounts_processed_sizefactorNormalization.rds'))
+  
+  nb.pcs = ncol(seurat.cistopic[['pca']]); 
+  #nb.pcs = 
+  n.neighbors = 30; min.dist = 0.25;
+  seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', 
+                             dims = 1:nb.pcs, 
+                             n.neighbors = n.neighbors, min.dist = min.dist)
+  DimPlot(seurat.cistopic, label = TRUE, pt.size = 1, label.size = 7) + 
+    NoLegend()
+  
+  Manual.modify.cluster.annotation = FALSE
+  if(Manual.modify.cluster.annotation){
+    
+    DefaultAssay(seurat.cistopic) <- 'peaks'
+    Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
+    new.cluster.ids <- c("0.?", "1.ABaxx", "2.MSx", "3.ABxx", "4.ABa/p", "5.Ea/p",
+                         '6.Ea/p', '7.P0/AB/P1/ABa/p','8.ABp', '9.ABax/MS/E', '10.MS', 
+                         '11.Cx', '12.AB', '13.MSx', '14.MSx', '15.Cx',
+                         '16.MSx', '17.ABp', '18.ABxx','19.ABxx', '20.EMS', '21.P4')
+    names(new.cluster.ids) <- levels(seurat.cistopic)
+    seurat.cistopic <- RenameIdents(seurat.cistopic, new.cluster.ids)
+    
+    DimPlot(seurat.cistopic, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 5, repel = FALSE) + NoLegend()
+    
+  }
   
   DefaultAssay(seurat.cistopic) <- 'peaks'
-  
   FeaturePlot(
     object = seurat.cistopic,
-    features = "chrV:10647260-10647485",
+    features = "chrV:10647260-10647485", # lsy-6 downstream peaks specific for ABaxx
     pt.size = 0.1,
     #max.cutoff = ,
     #min.cutoff = 'q20',
     ncol = 1
   )
   
+  # add motif activities into seurat.cistopic
+  xx = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_motifClassChromVar.rds'))
+  seurat.cistopic[['chromvar']] = CreateAssayObject(data = xx@assays$chromvar@data)
   
-  #seurat.cistopic <- NormalizeData(seurat.cistopic, 
-  #                                 #normalization.method = 'CLR'
-  #                                 scale.factor = median(Matrix::colSums(seurat.cistopic@assays$RNA@counts))
-  #                                 )
-  #seurat.cistopic <- ScaleData(seurat.cistopic)
+  Normalize.Gene.Activity.Matrix = TRUE
+  if(Normalize.Gene.Activity.Matrix){
+    DefaultAssay(seurat.cistopic) = 'RNA'
+    seurat.cistopic <- NormalizeData(seurat.cistopic, 
+                                     #normalization.method = 'CLR',
+                                     scale.factor = median(Matrix::colSums(seurat.cistopic@assays$RNA@counts))
+                                     )
+    seurat.cistopic <- ScaleData(seurat.cistopic)
+  }
+  
+  options(warn=-1)
+  
+  feature.example = 'cnd-1'
+  plot.feature.example.scRNA.scATAC.tf.motif(seurat.cistopic, feature.example = feature.example,  tintori, aleks)
+  
+  
+  DefaultAssay(seurat.cistopic) = 'RNA'
+  cluster9.markers <- FindMarkers(seurat.cistopic, ident.1 = "6.E", only.pos = TRUE,
+                                  min.pct = 0.05, logfc.threshold = 0.1, test.use = 'MAST')
+  head(cluster9.markers, n = 20)
+  cluster9.markers[grep('end-1', rownames(cluster9.markers)), ]
+  # find markers for every cluster compared to all remaining cells, report only the positive ones
+  pbmc = ms
+  pbmc.markers <- FindAllMarkers(pbmc, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+  
+  
   
   features.to.plot = c('erm-1', # AB enriched
-    'cpg-2',
-    'med-2', # marker for EMS
-    'era-1', #'W02F12.3',
-    'tbx-35',
-    'end-3',
-    'mex-5',
-    'pigv-1', #'T09B4.1'
-    'ceh-51',
-    'end-1',
-    'pal-1',
-    'hlh-27',
-    'ref-1',
-    'tbx-38',
-    'sdz-38',
-    'pha-4', 'hnd-1',
-    'lsy-6' # marker for ABaxx
-    #'tbx-37','tbx-38', 'ceh-27',
-    #'ceh-36', 'elt-1'
-    #'dmd-4', 
-    #'dpy-31', 'elt-7', 'end-1', 'nrh-79', 
-    #  "mab-5","med-1","med-2", 'pal-1', 'pha-4', 
-    #   'pes-1', 'nos-1', 'nos-2'
+                       'cpg-2',
+                       'med-2', # marker for EMS
+                       'era-1', #'W02F12.3',
+                       'tbx-35',
+                       'end-3',
+                       'mex-5',
+                       'pigv-1', #'T09B4.1'
+                       'ceh-51',
+                       'end-1',
+                       'pal-1',
+                       'hlh-27',
+                       'ref-1',
+                       'tbx-38',
+                       'sdz-38',
+                       'pha-4', 'hnd-1',
+                       'lsy-6' # marker for ABaxx
+                       #'tbx-37','tbx-38', 'ceh-27',
+                       #'ceh-36', 'elt-1'
+                       #'dmd-4', 
+                       #'dpy-31', 'elt-7', 'end-1', 'nrh-79', 
+                       #  "mab-5","med-1","med-2", 'pal-1', 'pha-4', 
+                       #   'pes-1', 'nos-1', 'nos-2'
   )
   
-  FeaturePlot(
-    object = tintori,
-    features = features.to.plot,
-    pt.size = 0.1,
-    #max.cutoff = 2,
-    #min.cutoff = 'q5',
-    ncol = 1
-  )
-  
-  features.to.plot = 'pal-1'
-  
-  DefaultAssay(seurat.cistopic) <- 'RNA'
-  p1 = FeaturePlot(
-    object = seurat.cistopic,
-    features = features.to.plot,
-    pt.size = 0.1,
-    max.cutoff = 'q90',
-    min.cutoff = 'q25',
-    ncol = 1
-  )
-  
-  DefaultAssay(seurat.cistopic) <- 'chromvar'
   motifs2check = rownames(seurat.cistopic)[grep('tbx-35|tbx-38|MA0542.1|MA0924.1 pal-1|MA0546.1|end-1|MA0547.1 skn-1|
                                                 hnd|unc-130|mom-2|med-2|ref', 
                                                 rownames(seurat.cistopic))]
-  motifs2check = rownames(seurat.cistopic)[grep(features.to.plot, rownames(seurat.cistopic))]
-  p2 = FeaturePlot(
-    object = seurat.cistopic,
-    features = motifs2check,
-    pt.size = 0.1,
-    #cols = c('red', 'blue'),
-    #max.cutoff = 1,
-    min.cutoff = 0.5,
-    ncol = 1
-  )
   
-  p1 + p2
   
   
   ##########################################
