@@ -642,8 +642,7 @@ compare.methods.for.gene.activity.matrix = function()
     {
       # method = 'seurat'; regions = 'promoter'; promoter.upstream = 2000; promoter.downstream = 500
       #
-      compute.gene.acitivity.scores(seurat.cistopic, 
-                                    method = 'seurat',
+      compute.gene.acitivity.scores.seurat(seurat.cistopic, 
                                     fragment.file = fragment.file,
                                     regions = regions,
                                     promoter.upstream = promoter.size,
@@ -711,92 +710,196 @@ compare.methods.for.gene.activity.matrix = function()
   
 }
 
-compute.gene.acitivity.scores = function(seurat.cistopic, 
-                                         method = 'seurat',
+compute.gene.acitivity.scores.seurat = function(seurat.cistopic,
                                          fragment.file = 'fragments.tsv.gz',
                                          regions = 'promoter.geneBody',
                                          promoter.upstream = 2000,
                                          promoter.downstream = 2000, 
                                          saveDir = "results/scATAC_earlyEmbryo_20200302/Rdata/")
 {
-  if(method == 'cicero'){
-    seurat.cistopic  = compute.cicero.gene.activity.scores(seuratObj = seurat.cistopic)
-  }
+  library(Signac)
+  library(Seurat)
+  library(GenomeInfoDb)
+  library(TxDb.Celegans.UCSC.ce11.ensGene)
+  library(ggplot2)
+  library(RcppArmadillo)
+  set.seed(1234)
+  source.my.script('scATAC_functions.R')
   
-  if(method == 'seurat')
-  {
-    library(Signac)
-    library(Seurat)
-    library(GenomeInfoDb)
-    library(TxDb.Celegans.UCSC.ce11.ensGene)
-    #library(TxDb.Celegans.UCSC.ce11.refGene)
-    library(ggplot2)
-    set.seed(1234)
+  seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
+  DefaultAssay(seurat.cistopic) <- 'peaks'
+  
+  source.my.script('scATAC_functions.R')
+  fragment.file = '../output_cellranger.ce11_scATACpro/cellranger_atac_ce11/fragments.tsv.gz'
+  
+  regions = 'promoter.geneBody'; promoter.upstream = 2000; promoter.downstream = 500
+  
+  cat('regions: ', regions, '- promoter.upstream: ', promoter.upstream, '- promoter.downstream: ', 
+      promoter.downstream, '\n')
     
-    cat('method : ', method, '- regions: ', regions, '- promoter.upstream: ', promoter.upstream, '- promoter.downstream: ', 
-        promoter.downstream, '\n')
-    #fragment.file = '/Volumes/groups/cochella/jiwang/Projects/Aleks/R8898_scATAC/cellranger_atac_wbcel235/outs/fragments.tsv.gz'
-    #fragment.file = '../output_cellranger.ce11_scATACpro/cellranger_atac_ce11/fragments.tsv.gz'
+  annot = read.csv(file = "data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
+  annot = annot[which((annot$Gene.type == 'protein_coding') 
+                      & annot$Chromosome.scaffold.name != 'MtDNA'), ] # prepre only protein coding genes
+  
+  #extract gene coordinates from Ensembl, and ensure name formatting is consistent with  Seurat object 
+  if(regions == 'promoter.geneBody'){
+    gr <- GenomicFeatures::genes(TxDb.Celegans.UCSC.ce11.ensGene, columns = c('gene_id'))
+    seqlevelsStyle(gr) <- 'UCSC'
     
-    annot = read.csv(file = "data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
-    annot = annot[which((annot$Gene.type == 'protein_coding') 
-                        & annot$Chromosome.scaffold.name != 'MtDNA'), ]
+    mm = match(gr$gene_id, annot$Gene.stable.ID)
+    gr = gr[which(!is.na(mm))]
+    gr$gene_id = annot$Gene.name[mm[which(!is.na(mm))]]
+    names(gr) = gr$gene_id
     
-    #extract gene coordinates from Ensembl, and ensure name formatting is consistent with  Seurat object 
-    if(regions == 'promoter.geneBody'){
-      gene.coords <- GenomicFeatures::genes(TxDb.Celegans.UCSC.ce11.refGene, columns = c('gene_id', 'tx_id', 'tx_name'))
-      txdb = TxDb.Celegans.UCSC.ce11.refGene
-      id2name(txdb, feature.type = 'tx')
-      seqlevelsStyle(gene.coords) <- 'UCSC'
+    gr <- sortSeqlevels(gr)
+    gr <- sort(gr)
+    
+    xx.coords <- keepStandardChromosomes(gr, pruning.mode = 'coarse')
+    genebodyandpromoter.coords <- Extend(x = xx.coords, upstream = promoter.upstream, downstream = 0)
+    
+    seqends <- seqlengths(genebodyandpromoter.coords)[as.character(seqnames(genebodyandpromoter.coords))]
+    
+    index.start = which(start(genebodyandpromoter.coords) < 1L)
+    if(length(index.start)>0) start(genebodyandpromoter.coords[index.start]) = 1L
+    index.end = which(end(genebodyandpromoter.coords) > seqends)
+    if(length(index.end)>0) end(genebodyandpromoter.coords[index.end]) = seqends[index.end]
+    
+    ## try to deal with the promoter and gene body regions overlapping with upstream gene or other genes in the opposite strand
+    ol = GenomicRanges::findOverlaps(query = genebodyandpromoter.coords, 
+                                     subject = gr,  ignore.strand = TRUE)
+    #ol
+    counts.overlap = table(queryHits(ol))
+    index.overlap = as.integer(names(counts.overlap[which(counts.overlap>1)]))
+    
+    promoter.body = genebodyandpromoter.coords[-index.overlap]
+    #promoter.body = promoter.body[1:10]
+    ol.df = as.data.frame(ol)
+    
+    geneName.mapping = data.frame(gene_id = promoter.body$gene_id, gene.name =  promoter.body$gene_id, 
+                                  stringsAsFactors = FALSE)
+    
+    for(n in 1:length(index.overlap))
+    {
+      ii = index.overlap[n]
+      jj.over = ol.df$subjectHits[which(ol.df$queryHits== ii)]
+      jj.over = setdiff(jj.over, ii)
       
-      mm = match(gene.coords$gene_id, annot$Gene.stable.ID)
-      gene.coords = gene.coords[which(!is.na(mm))]
+      if(n%%500 == 0) 
+        cat('nb of genes overlapped :', n, '-',  length(jj.over), "\n")
       
-      genebody.coords <- keepStandardChromosomes(gene.coords, pruning.mode = 'coarse')
-      genebodyandpromoter.coords <- Extend(x = gene.coords, upstream = promoter.upstream, downstream = 0)
-      #features.coords = genebodyandpromoter.coords
-      
-      seqends <- seqlengths(genebodyandpromoter.coords)[as.character(seqnames(genebodyandpromoter.coords))]
-      kk = which(start(genebodyandpromoter.coords) > 1L & end(genebodyandpromoter.coords) <= seqends)
-      genebodyandpromoter.coords = genebodyandpromoter.coords[kk, ]
-      
-    }else{
-      promoter.ens = GenomicRanges::promoters(TxDb.Celegans.UCSC.ce11.ensGene, 
-                                              upstream = promoter.upstream, downstream = promoter.downstream)
-      
-      # only select promoter overlapped with refseq annotation
-      select.only.promoter.overlapped.by.Refseq = FALSE
-      if(select.only.promoter.overlapped.by.Refseq){
-        promoter.refseq = GenomicFeatures::promoters(TxDb.Celegans.UCSC.ce11.refGene, 
-                                                     upstream = promoter.upstream, downstream = promoter.downstream)
-        ii = findOverlaps(promoter.ens, promoter.refseq,
-                          maxgap=-1L, minoverlap=0L,
-                          type=c("equal"),
-                          select=c("all"),
-                          ignore.strand=FALSE)
-        gene.coords = promoter.ens[unique(ii@from), ] 
-      }else{
-        gene.coords = promoter.ens
+      # test if quereid region is entierly covered by genes in opposite regions
+      if(!overlapsAny(genebodyandpromoter.coords[ii], gr[jj.over], type=c("within"), ignore.strand = TRUE) & 
+         !overlapsAny(genebodyandpromoter.coords[ii], gr[jj.over], type=c("equal"), ignore.strand = TRUE)){
+        
+        #genebodyandpromoter.coords[ii]%within% gr[jj.over]
+        gr.diff = GenomicRanges::setdiff(genebodyandpromoter.coords[ii], gr[jj.over], ignore.strand = TRUE)
+        
+        strand(gr.diff) = strand(genebodyandpromoter.coords[ii])
+        #gr.diff$gene_id = genebodyandpromoter.coords[ii]$gene_id
+        promoter.body = c(promoter.body, gr.diff)
+        
+        if(length(gr.diff)>1){
+          geneName.mapping = rbind(geneName.mapping, 
+                                   data.frame(gene_id = paste0(genebodyandpromoter.coords[ii]$gene_id, '_', c(1:length(gr.diff))), 
+                                              gene.name = rep(genebodyandpromoter.coords[ii]$gene_id, length(gr.diff)), 
+                                              stringsAsFactors = FALSE))
+        }
+        if(length(gr.diff)==1){
+          geneName.mapping = rbind(geneName.mapping, 
+                                   data.frame(gene_id = genebodyandpromoter.coords[ii]$gene_id, 
+                                              gene.name = genebodyandpromoter.coords[ii]$gene_id, 
+                                              stringsAsFactors = FALSE))
+        }
       }
-      
-      # select promoters for protein coding genes and miRNAs
-      mm = match(gene.coords$tx_name, annot$Transcript.stable.ID)
-      gene.coords = gene.coords[which(!is.na(mm))]
-      
-      # random choose one promoter for 
-      #mm = match(rownames(gene.activities), annot$Transcript.stable.ID)
-      #mapNames = data.frame(c(1:nrow(gene.activities)), mm, geneNames = annot$Gene.name[mm], stringsAsFactors = FALSE)
-      #genes.names = unique(mapNames$geneNames[!is.na(mapNames$geneNames)])
-      #kk = match(genes.names, mapNames$geneNames)
-      
-      seqends <- seqlengths(gene.coords)[as.character(seqnames(gene.coords))]
-      gene.coords = gene.coords[which(start(gene.coords) > 1L & end(gene.coords) <= seqends), ]
-      #which(end(gene.coords) > seqlengths(gene.coords)[as.character(seqnames(gene.coords))])
-      
-      genebody.coords <- keepStandardChromosomes(gene.coords, pruning.mode = 'coarse')
-      genebodyandpromoter.coords <- Extend(x = gene.coords, upstream = 0, downstream = 0)
-      #features.coords = genebodyandpromoter.coords
     }
+    
+    promoter.body$gene_id = geneName.mapping$gene.name
+    promoter.body <- sortSeqlevels(promoter.body)
+    promoter.body <- sort(promoter.body)
+    
+    # build a gene by cell matrix
+    tic('counting fragments for gene body and promoter')
+    gene.activities <- FeatureMatrix(
+      fragments = fragment.file,
+      features = promoter.body,
+      #features = genebodyandpromoter.coords[1:100],
+      cells = colnames(seurat.cistopic),
+      chunk = 50
+    )
+    toc()
+    
+    # convert rownames from chromsomal coordinates into gene names
+    gene.key <- promoter.body$gene_id
+    names(gene.key) <- GRangesToString(grange = promoter.body)
+    gene.key = gene.key[rownames(gene.activities)] # select gene.key present in gene activities matrix
+    
+    ## here merge possible different pieces of regions for promoter and gene body
+    gene.unique = unique(gene.key)
+    gam = gene.activities[match(gene.unique, gene.key), ] # save for backup
+    rownames(gam) = gene.unique
+    
+    for(n in 1:nrow(gam)){
+      # g = 'haf-4'
+      #if(n%%500 == 0) cat(n, '\n');
+      
+      kk = which(gene.key == rownames(gam)[n])
+      
+      if(length(kk)>1){
+        tic('time for calculating sum of rows ')
+        gam[n, ] = sum_by_col(gene.activities[kk,])
+        gam[n, ] = Matrix::colSums(gene.activities[kk, ], na.rm = FALSE)
+        toc()
+      }
+    }
+    
+    #rownames(gene.activities) <- make.unique(gene.key[rownames(gene.activities)])
+    #gene.activities <- gene.activities[rownames(gene.activities)!="",]
+    #mm = match(rownames(gene.activities), annot$Gene.stable.ID)
+    #gene.activities = gene.activities[which(!is.na(mm)), ]
+    #rownames(gene.activities) = annot$Gene.name[match(rownames(gene.activities), annot$Gene.stable.ID) ]
+    
+    #Add the gene activity matrix to the Seurat object as a new assay, and normalize it
+    seurat.cistopic[['RNA']] <- CreateAssayObject(counts = gene.activities)
+    saveRDS(seurat.cistopic, file =  paste0(saveDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_nonOverlapping_',
+                                            regions,  '_', promoter.upstream, 'bpUpstream.rds'))
+    
+    
+  }else{
+    promoter.ens = GenomicRanges::promoters(TxDb.Celegans.UCSC.ce11.ensGene, 
+                                            upstream = promoter.upstream, downstream = promoter.downstream)
+    
+    # only select promoter overlapped with refseq annotation
+    select.only.promoter.overlapped.by.Refseq = FALSE
+    if(select.only.promoter.overlapped.by.Refseq){
+      promoter.refseq = GenomicFeatures::promoters(TxDb.Celegans.UCSC.ce11.refGene, 
+                                                   upstream = promoter.upstream, downstream = promoter.downstream)
+      ii = findOverlaps(promoter.ens, promoter.refseq,
+                        maxgap=-1L, minoverlap=0L,
+                        type=c("equal"),
+                        select=c("all"),
+                        ignore.strand=FALSE)
+      gene.coords = promoter.ens[unique(ii@from), ] 
+    }else{
+      gene.coords = promoter.ens
+    }
+    
+    # select promoters for protein coding genes and miRNAs
+    mm = match(gene.coords$tx_name, annot$Transcript.stable.ID)
+    gene.coords = gene.coords[which(!is.na(mm))]
+    
+    # random choose one promoter for 
+    #mm = match(rownames(gene.activities), annot$Transcript.stable.ID)
+    #mapNames = data.frame(c(1:nrow(gene.activities)), mm, geneNames = annot$Gene.name[mm], stringsAsFactors = FALSE)
+    #genes.names = unique(mapNames$geneNames[!is.na(mapNames$geneNames)])
+    #kk = match(genes.names, mapNames$geneNames)
+    
+    seqends <- seqlengths(gene.coords)[as.character(seqnames(gene.coords))]
+    gene.coords = gene.coords[which(start(gene.coords) > 1L & end(gene.coords) <= seqends), ]
+    #which(end(gene.coords) > seqlengths(gene.coords)[as.character(seqnames(gene.coords))])
+    
+    genebodyandpromoter.coords <- keepStandardChromosomes(gene.coords, pruning.mode = 'coarse')
+    genebodyandpromoter.coords <- Extend(x = gene.coords, upstream = 0, downstream = 0)
+    #features.coords = genebodyandpromoter.coords
     
     # build a gene by cell matrix
     tic('counting fragments for gene body and promoter')
@@ -808,44 +911,25 @@ compute.gene.acitivity.scores = function(seurat.cistopic,
     )
     toc()
     
-    if(regions == 'promoter.geneBody'){
-      # convert rownames from chromsomal coordinates into gene names
-      gene.key <- genebodyandpromoter.coords$gene_id
-      names(gene.key) <- GRangesToString(grange = genebodyandpromoter.coords)
-      rownames(gene.activities) <- make.unique(gene.key[rownames(gene.activities)])
-      gene.activities <- gene.activities[rownames(gene.activities)!="",]
-      
-      mm = match(rownames(gene.activities), annot$Gene.stable.ID)
-      gene.activities = gene.activities[which(!is.na(mm)), ]
-      rownames(gene.activities) = annot$Gene.name[match(rownames(gene.activities), annot$Gene.stable.ID) ]
-      
-      #Add the gene activity matrix to the Seurat object as a new assay, and normalize it
-      seurat.cistopic[['RNA']] <- CreateAssayObject(counts = gene.activities)
-      saveRDS(seurat.cistopic, file =  paste0(saveDir, 'atac_LDA_seurat_object_geneActivityMatrix_', method, '_',
-                                              regions,  '_', promoter.upstream, 'bpUpstream.rds'))
-      
-    }else{
-      #saveRDS(gene.activities, file =  paste0(RdataDir, 'gene_activities_matrix_Promoter.rds'))
-      
-      # convert rownames from chromsomal coordinates into gene names
-      gene.key <- genebodyandpromoter.coords$tx_name
-      names(gene.key) <- GRangesToString(grange = genebodyandpromoter.coords)
-      rownames(gene.activities) <- make.unique(gene.key[rownames(gene.activities)])
-      gene.activities <- gene.activities[rownames(gene.activities)!="",]
-      
-      mm = match(rownames(gene.activities), annot$Transcript.stable.ID)
-      mapNames = data.frame(c(1:nrow(gene.activities)), mm, geneNames = annot$Gene.name[mm], stringsAsFactors = FALSE)
-      genes.names = unique(mapNames$geneNames[!is.na(mapNames$geneNames)])
-      kk = match(genes.names, mapNames$geneNames)
-      
-      gene.activities = gene.activities[mapNames[kk, 1], ]
-      rownames(gene.activities) = genes.names
-      
-      #Add the gene activity matrix to the Seurat object as a new assay, and normalize it
-      seurat.cistopic[['RNA']] <- CreateAssayObject(counts = gene.activities)
-      saveRDS(seurat.cistopic, file =  paste0(saveDir, 'atac_LDA_seurat_object_geneActivityMatrix_', method, '_',
-                                              regions,  '_', promoter.upstream, 'bpUpstream.', promoter.downstream,'bpDownstream.rds'))
-    }
+    # convert rownames from chromsomal coordinates into gene names
+    gene.key <- genebodyandpromoter.coords$tx_name
+    names(gene.key) <- GRangesToString(grange = genebodyandpromoter.coords)
+    rownames(gene.activities) <- make.unique(gene.key[rownames(gene.activities)])
+    gene.activities <- gene.activities[rownames(gene.activities)!="",]
+    
+    mm = match(rownames(gene.activities), annot$Transcript.stable.ID)
+    mapNames = data.frame(c(1:nrow(gene.activities)), mm, geneNames = annot$Gene.name[mm], stringsAsFactors = FALSE)
+    genes.names = unique(mapNames$geneNames[!is.na(mapNames$geneNames)])
+    kk = match(genes.names, mapNames$geneNames)
+    
+    gene.activities = gene.activities[mapNames[kk, 1], ]
+    rownames(gene.activities) = genes.names
+    
+    #Add the gene activity matrix to the Seurat object as a new assay, and normalize it
+    seurat.cistopic[['RNA']] <- CreateAssayObject(counts = gene.activities)
+    saveRDS(seurat.cistopic, file =  paste0(saveDir, 'atac_LDA_seurat_object_geneActivityMatrix_', method, '_',
+                                            regions,  '_', promoter.upstream, 'bpUpstream.', 
+                                            promoter.downstream,'bpDownstream.rds'))
     
   }
   
