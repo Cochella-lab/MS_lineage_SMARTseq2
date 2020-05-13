@@ -915,6 +915,7 @@ compute.cicero.gene.activity.scores = function(seuratObj, output_dir, tss_file, 
   source.my.script('scATAC_functions.R')
   
   seurat.obj = seurat.cistopic
+  DefaultAssay(seurat.obj) = 'peaks'
   output_dir = RdataDir
   reduction = 'umap'
   npc = 30
@@ -960,7 +961,7 @@ doCicero_gascore <- function(seurat.obj, reduction = 'tsne', chr_sizes,
   mtx = GetAssayData(seurat.obj, slot = 'counts')
   # change rownames using _ to delimited
   rnames = rownames(mtx)
-  new.rnames = sapply(rnames, function(x) unlist(strsplit(x, ','))[1])
+  new.rnames = sapply(rnames, function(x)  gsub(':', '_', x))
   new.rnames = sapply(new.rnames, function(x) gsub('-', '_', x))
   rownames(mtx) <- new.rnames
   
@@ -978,6 +979,7 @@ doCicero_gascore <- function(seurat.obj, reduction = 'tsne', chr_sizes,
   input_cds <- detectGenes(input_cds)
   input_cds <- estimateSizeFactors(input_cds)
   
+  
   # Next, we access the tsne or umap coordinates from the input CDS object where they are stored by Monocle and run make_cicero_cds:
   if(reduction == 'tsne') {
     if(is.null(seurat.obj@reductions$tsne))
@@ -992,7 +994,8 @@ doCicero_gascore <- function(seurat.obj, reduction = 'tsne', chr_sizes,
   
   
   #make the cell id consistet
-  cicero_cds <- make_cicero_cds(input_cds, reduced_coordinates = redu.coords, k = 100)
+  
+  cicero_cds <- make_cicero_cds(input_cds, reduced_coordinates = redu.coords, k = 50)
   
   ## get connections
   #conns <- run_cicero(cicero_cds, chr_sizes, sample_num = 2)
