@@ -37,6 +37,7 @@ if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 source.my.script('scATAC_functions.R')
+source.my.script('scATAC_cluster_annotation_functions.R')
 
 filtered_mtx_dir = paste0("../output_cellranger.ce11_scATACpro/filtered_matrix_peaks_barcodes")
 

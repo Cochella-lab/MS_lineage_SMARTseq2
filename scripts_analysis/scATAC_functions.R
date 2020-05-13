@@ -615,7 +615,7 @@ plot_clustering_comparison = function(seurat_obj1, seurat_obj2, reduction, descr
 # 3) integrate scRNA-seq data 
 ########################################################
 ########################################################
-compare.methods.for.gene.activity.matrix = function()
+compute.gene.acitivity.scores.seurat_tuning.params = function()
 {
   seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object.rds'))
   
@@ -650,56 +650,130 @@ compare.methods.for.gene.activity.matrix = function()
                                     saveDir = RdataDir)
     }
   }
-  
-  ##########################################
-  # compare promoters of different sizes with peaks 
-  ##########################################
-  gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds')
-  
-  gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter_2000bpUpstream.2000bpDownstream.rds')
-  gamat = paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds')
-  
-  gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter_2000bpUpstream.200bpDownstream.rds')
-  
-  gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter_2000bpUpstream.2000bpDownstream.rds')
-  
-  gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter_2000bpUpstream.500bpDownstream.rds')
-  
-  seurat.cistopic = readRDS(file =  gamat)
-  #seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
-  
-  DefaultAssay(seurat.cistopic) <- 'RNA'
-  
-  hist(log2(as.numeric(GetAssayData(seurat.cistopic, slot = 'counts'))+1), breaks = 10000)
-  
-  pdfname = paste0(resDir, "/UMAP_geneActivityMatrix_promoter.genebody_test_nbHVGs.pdf")
-  pdf(pdfname, width=16, height = 10)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  
-  for(nb.variableFeatures in c(seq(1000, 5000, by = 1000), 8000, 10000, 12000, 15000, nrow(seurat.cistopic)))
+}
+
+define.unique.tss = function(tss, peaks){
+  find.index.gene.start = function(tss, kk)
   {
-    # nb.variableFeatures = 20000
-    cat('nb of HVGs -- ', nb.variableFeatures, '\n')
-    seurat.cistopic <- FindVariableFeatures(seurat.cistopic, nfeatures = nb.variableFeatures)
-    seurat.cistopic <- NormalizeData(seurat.cistopic, 
-                                     #normalization.method = 'CLR',
-                                     scale.factor = median(Matrix::colSums(seurat.cistopic@assays$RNA@counts)))
-    seurat.cistopic <- ScaleData(seurat.cistopic)
+    starts = start(tss[kk])
+    ends = end(tss[kk])
+    if(unique(strand(tss[kk])) == '+' |  unique(strand(tss[kk])) == '*'){
+      return(kk[which(starts == min(starts))])
+    }else{
+      return(kk[which(ends == max(ends))])
+    }
     
-    labels = Idents(seurat.cistopic)
-    Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
-    
-    seurat.cistopic <- RunPCA(seurat.cistopic, npcs = 50, verbose = FALSE, reduction.name = 'pca.ga')
-    
-    nb.pcs = 50; n.neighbors = 20; min.dist = 0.1;
-    seurat.cistopic <- RunUMAP(seurat.cistopic, reduction = "pca.ga", dims = 1:nb.pcs,
-                               n.neighbors = n.neighbors, min.dist = min.dist, reduction.name = "umap.ga")
-    p1 = DimPlot(seurat.cistopic, reduction = "umap.ga", label = TRUE, pt.size = 2, label.size = 5, repel = FALSE) + 
-      ggtitle(paste0('nb of HVGs - ', nb.variableFeatures))
-    plot(p1)
+  }
+  #length(which(table(tss$gene_id)>1))
+  
+  ##########################################
+  # here we select tss that overlap with sc-atac peaks or/and the gene start if there are multiple tss 
+  ##########################################
+  gene.uniq = unique(tss$gene_id)
+  index.uniq = c()
+  for(g in gene.uniq)
+  {
+    kk = which(tss$gene_id == g)
+    if(length(kk) == 1){
+      index.uniq = c(index.uniq, kk)
+    }else{
+      kk.within.peaks = kk[overlapsAny(tss[kk], peaks)]
+      if(length(kk.within.peaks) == 1){
+        index.uniq = c(index.uniq, kk.within.peaks)
+      }else{
+        gene.start = unique(annot$Gene.start..bp.[which(annot$Gene.name == g)])
+        if(length(kk.within.peaks) > 1){
+          kk.gene.start = find.index.gene.start(tss, kk.within.peaks)
+        }
+        if(length(kk.within.peaks) == 0){
+          kk.gene.start = find.index.gene.start(tss, kk)
+        }
+        
+        if(length(kk.gene.start) != 1) stop('Error')
+        
+        index.uniq = c(index.uniq, kk.gene.start)
+      }
+    }
   }
   
-  dev.off()
+  tss.uniq = tss[index.uniq]
+  saveRDS(tss.uniq, file = paste0(RdataDir, 'selected_unique_TSS_for_eachGene_scATACpeak_geneStart.rds'))
+  
+  return(tss.uniq)
+  
+}
+
+define.promoter.geneBody.regions.unique.non.overlapping.with.gene = function(coords, gr, peaks)
+{
+  # coords = genebodyandpromoter.coords
+  seqends <- seqlengths(coords)[as.character(seqnames(coords))]
+  index.start = which(start(coords) < 1L)
+  if(length(index.start)>0) start(coords[index.start]) = 1L
+  index.end = which(end(coords) > seqends)
+  if(length(index.end)>0) end(coords[index.end]) = seqends[index.end]
+  
+  ## try to deal with the promoter and gene body regions overlapping with upstream gene or other genes in the opposite strand
+  ol = GenomicRanges::findOverlaps(query = coords, 
+                                   subject = gr,  ignore.strand = TRUE)
+  #ol
+  counts.overlap = table(queryHits(ol))
+  index.overlap = as.integer(names(counts.overlap[which(counts.overlap>1)]))
+  cat(length(index.overlap), ' regions were overlapped by genes \n')
+  
+  ol.df = as.data.frame(ol)
+  
+  ## here we want to define the unique regions not overlapped by genes
+  ## but they are preferred in the peak regions or covering the tss regions
+  coords.uniq = coords[-index.overlap]
+  #coords.uniq = coords.uniq[1:10]
+  geneName.mapping = coords.uniq$gene_id
+  
+  for(n in 1:length(index.overlap))
+  {
+    # n = 1
+    ii = index.overlap[n]
+    jj.over = ol.df$subjectHits[which(ol.df$queryHits== ii)]
+    jj.over = setdiff(jj.over, ii)
+    
+    if(n%%1000 == 0) cat('nb of genes overlapped :', n, '-',  length(jj.over), "\n")
+    
+    # test if quereid region is entierly covered by genes in opposite regions
+    if(!overlapsAny(coords[ii], gr[jj.over], type=c("within"), ignore.strand = TRUE) & 
+       !overlapsAny(coords[ii], gr[jj.over], type=c("equal"), ignore.strand = TRUE)){
+      
+      # reomve the gene regions
+      gr.diff = GenomicRanges::setdiff(coords[ii], gr[jj.over], ignore.strand = TRUE)
+      
+      if(length(gr.diff) == 1){
+        strand(gr.diff) = strand(coords[ii])
+        coords.uniq = c(coords.uniq, gr.diff)
+        geneName.mapping = c(geneName.mapping, coords[ii]$gene_id)
+      }
+      
+      if(length(gr.diff)>1){
+        #stop()
+        prefers = overlapsAny(gr.diff, peaks) + overlapsAny(gr.diff, tss.uniq)
+        gr.final = gr.diff[which(prefers == max(prefers))]
+        widths = width(gr.final)
+        gr.final = gr.final[which(widths == max(widths))]
+        
+        if(length(gr.final)>=1){
+          gr.final = gr.final[1];
+          strand(gr.final) = strand(coords[ii])
+          coords.uniq = c(coords.uniq, gr.final)
+          geneName.mapping = c(geneName.mapping, coords[ii]$gene_id)
+        }else{
+         stop(coords[ii]$gene_id) 
+        }
+      }
+    }
+  }
+  
+  coords.uniq$gene_id = geneName.mapping
+  coords.uniq <- sortSeqlevels(coords.uniq)
+  coords.uniq <- sort(coords.uniq)
+  
+  return(coords.uniq)
   
 }
 
@@ -725,11 +799,11 @@ compute.gene.acitivity.scores.seurat = function(seurat.cistopic,
   source.my.script('scATAC_functions.R')
   fragment.file = '../output_cellranger.ce11_scATACpro/cellranger_atac_ce11/fragments.tsv.gz'
   
-  regions = 'promoter.geneBody'; promoter.upstream = 2000; promoter.downstream = 500
+  regions = 'promoter'; promoter.upstream = 2000; promoter.downstream = 500; saveDir = RdataDir;
   
   cat('regions: ', regions, '- promoter.upstream: ', promoter.upstream, '- promoter.downstream: ', 
       promoter.downstream, '\n')
-    
+  
   ## annotation to prepre only protein coding genes
   annot = read.csv(file = "data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
   annot = annot[which((annot$Gene.type == 'protein_coding') 
@@ -743,141 +817,30 @@ compute.gene.acitivity.scores.seurat = function(seurat.cistopic,
   tss$gene_id = annot$Gene.name[nn[which(!is.na(nn))]]
   tss = unique(tss)
   
-  define.unique.tss = function(tss, peaks){
-    find.index.gene.start = function(tss, kk)
-    {
-      starts = start(tss[kk])
-      ends = end(tss[kk])
-      if(unique(strand(tss[kk])) == '+' |  unique(strand(tss[kk])) == '*'){
-        return(kk[which(starts == min(starts))])
-      }else{
-        return(kk[which(ends == max(ends))])
-      }
-      
-    }
-    #length(which(table(tss$gene_id)>1))
-    
-    ##########################################
-    # here we select tss that overlap with sc-atac peaks or/and the gene start if there are multiple tss 
-    ##########################################
-    gene.uniq = unique(tss$gene_id)
-    index.uniq = c()
-    for(g in gene.uniq)
-    {
-      kk = which(tss$gene_id == g)
-      if(length(kk) == 1){
-        index.uniq = c(index.uniq, kk)
-      }else{
-        kk.within.peaks = kk[overlapsAny(tss[kk], peaks)]
-        if(length(kk.within.peaks) == 1){
-          index.uniq = c(index.uniq, kk.within.peaks)
-        }else{
-          gene.start = unique(annot$Gene.start..bp.[which(annot$Gene.name == g)])
-          if(length(kk.within.peaks) > 1){
-            kk.gene.start = find.index.gene.start(tss, kk.within.peaks)
-          }
-          if(length(kk.within.peaks) == 0){
-            kk.gene.start = find.index.gene.start(tss, kk)
-          }
-          
-          if(length(kk.gene.start) != 1) stop('Error')
-          
-          index.uniq = c(index.uniq, kk.gene.start)
-        }
-      }
-    }
-    
-    tss.uniq = tss[index.uniq]
-    
-    return(tss.uniq)
-  }
-  
-  # select promoters for protein coding genes and miRNAs
-  mm = match(gene.coords$tx_name, annot$Transcript.stable.ID)
-  gene.coords = gene.coords[which(!is.na(mm))]
-  
+  # tss = define.unique.tss(tss, peaks)
+  tss.uniq = readRDS(file = paste0(RdataDir, 'selected_unique_TSS_for_eachGene_scATACpeak_geneStart.rds'))
   
   #extract gene coordinates from Ensembl, and ensure name formatting is consistent with  Seurat object 
+  gr <- GenomicFeatures::genes(TxDb.Celegans.UCSC.ce11.ensGene, columns = c('gene_id'))
+  seqlevelsStyle(gr) <- 'UCSC'
+  mm = match(gr$gene_id, annot$Gene.stable.ID)
+  gr = gr[which(!is.na(mm))]
+  gr$gene_id = annot$Gene.name[mm[which(!is.na(mm))]]
+  names(gr) = gr$gene_id
+  gr <- sortSeqlevels(gr)
+  gr <- sort(gr)
+  
   if(regions == 'promoter.geneBody'){
-    gr <- GenomicFeatures::genes(TxDb.Celegans.UCSC.ce11.ensGene, columns = c('gene_id'))
-    seqlevelsStyle(gr) <- 'UCSC'
-    
-    mm = match(gr$gene_id, annot$Gene.stable.ID)
-    gr = gr[which(!is.na(mm))]
-    gr$gene_id = annot$Gene.name[mm[which(!is.na(mm))]]
-    names(gr) = gr$gene_id
-    
-    gr <- sortSeqlevels(gr)
-    gr <- sort(gr)
-    
-    xx.coords <- keepStandardChromosomes(gr, pruning.mode = 'coarse')
+    gene.coords <- keepStandardChromosomes(gr, pruning.mode = 'coarse')
     genebodyandpromoter.coords <- Extend(x = xx.coords, upstream = promoter.upstream, downstream = 0)
     
-    seqends <- seqlengths(genebodyandpromoter.coords)[as.character(seqnames(genebodyandpromoter.coords))]
-    
-    index.start = which(start(genebodyandpromoter.coords) < 1L)
-    if(length(index.start)>0) start(genebodyandpromoter.coords[index.start]) = 1L
-    index.end = which(end(genebodyandpromoter.coords) > seqends)
-    if(length(index.end)>0) end(genebodyandpromoter.coords[index.end]) = seqends[index.end]
-    
-    ## try to deal with the promoter and gene body regions overlapping with upstream gene or other genes in the opposite strand
-    ol = GenomicRanges::findOverlaps(query = genebodyandpromoter.coords, 
-                                     subject = gr,  ignore.strand = TRUE)
-    #ol
-    counts.overlap = table(queryHits(ol))
-    index.overlap = as.integer(names(counts.overlap[which(counts.overlap>1)]))
-    
-    promoter.body = genebodyandpromoter.coords[-index.overlap]
-    #promoter.body = promoter.body[1:10]
-    ol.df = as.data.frame(ol)
-    
-    geneName.mapping = data.frame(gene_id = promoter.body$gene_id, gene.name =  promoter.body$gene_id, 
-                                  stringsAsFactors = FALSE)
-    
-    for(n in 1:length(index.overlap))
-    {
-      ii = index.overlap[n]
-      jj.over = ol.df$subjectHits[which(ol.df$queryHits== ii)]
-      jj.over = setdiff(jj.over, ii)
-      
-      if(n%%500 == 0)
-        cat('nb of genes overlapped :', n, '-',  length(jj.over), "\n")
-      
-      # test if quereid region is entierly covered by genes in opposite regions
-      if(!overlapsAny(genebodyandpromoter.coords[ii], gr[jj.over], type=c("within"), ignore.strand = TRUE) & 
-         !overlapsAny(genebodyandpromoter.coords[ii], gr[jj.over], type=c("equal"), ignore.strand = TRUE)){
-        
-        #genebodyandpromoter.coords[ii]%within% gr[jj.over]
-        gr.diff = GenomicRanges::setdiff(genebodyandpromoter.coords[ii], gr[jj.over], ignore.strand = TRUE)
-        
-        strand(gr.diff) = strand(genebodyandpromoter.coords[ii])
-        #gr.diff$gene_id = genebodyandpromoter.coords[ii]$gene_id
-        promoter.body = c(promoter.body, gr.diff)
-        
-        if(length(gr.diff)>1){
-          geneName.mapping = rbind(geneName.mapping, 
-                                   data.frame(gene_id = paste0(genebodyandpromoter.coords[ii]$gene_id, '_', c(1:length(gr.diff))), 
-                                              gene.name = rep(genebodyandpromoter.coords[ii]$gene_id, length(gr.diff)), 
-                                              stringsAsFactors = FALSE))
-        }
-        if(length(gr.diff)==1){
-          geneName.mapping = rbind(geneName.mapping, 
-                                   data.frame(gene_id = genebodyandpromoter.coords[ii]$gene_id, 
-                                              gene.name = genebodyandpromoter.coords[ii]$gene_id, 
-                                              stringsAsFactors = FALSE))
-        }
-      }
-    }
-    
-    promoter.body$gene_id = geneName.mapping$gene.name
-    promoter.body <- sortSeqlevels(promoter.body)
-    promoter.body <- sort(promoter.body)
+    promoterGenebody.coords = define.promoter.geneBody.regions.unique.non.overlapping.with.gene(genebodyandpromoter.coords, gr, peaks)
     
     # build a gene by cell matrix
     tic('counting fragments for gene body and promoter')
     gene.activities <- FeatureMatrix(
       fragments = fragment.file,
-      features = promoter.body,
+      features = promoterGenebody.coords,
       #features = genebodyandpromoter.coords[1:100],
       cells = colnames(seurat.cistopic),
       chunk = 50
@@ -885,29 +848,11 @@ compute.gene.acitivity.scores.seurat = function(seurat.cistopic,
     toc()
     
     # convert rownames from chromsomal coordinates into gene names
-    gene.key <- promoter.body$gene_id
-    names(gene.key) <- GRangesToString(grange = promoter.body)
+    gene.key <- promoterGenebody.coords$gene_id
+    names(gene.key) <- GRangesToString(grange = promoterGenebody.coords)
     gene.key = gene.key[rownames(gene.activities)] # select gene.key present in gene activities matrix
     
-    ## here merge possible different pieces of regions for promoter and gene body
-    gene.unique = unique(gene.key)
-    gam = gene.activities[match(gene.unique, gene.key), ] # save for backup
-    rownames(gam) = gene.unique
-    
-    for(n in 1:nrow(gam)){
-      # g = 'haf-4'
-      #if(n%%500 == 0) cat(n, '\n');
-      
-      kk = which(gene.key == rownames(gam)[n])
-      
-      if(length(kk)>1){
-        tic('time for calculating sum of rows ')
-        gam[n, ] = sum_by_col(gene.activities[kk,])
-        gam[n, ] = Matrix::colSums(gene.activities[kk, ], na.rm = FALSE)
-        toc()
-      }
-    }
-    
+    rownames(gene.activities) = gene.key
     #rownames(gene.activities) <- make.unique(gene.key[rownames(gene.activities)])
     #gene.activities <- gene.activities[rownames(gene.activities)!="",]
     #mm = match(rownames(gene.activities), annot$Gene.stable.ID)
@@ -919,51 +864,36 @@ compute.gene.acitivity.scores.seurat = function(seurat.cistopic,
     saveRDS(seurat.cistopic, file =  paste0(saveDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_nonOverlapping_',
                                             regions,  '_', promoter.upstream, 'bpUpstream.rds'))
     
-    
   }else{
-    
-    
-    # random choose one promoter for 
-    #mm = match(rownames(gene.activities), annot$Transcript.stable.ID)
-    #mapNames = data.frame(c(1:nrow(gene.activities)), mm, geneNames = annot$Gene.name[mm], stringsAsFactors = FALSE)
-    #genes.names = unique(mapNames$geneNames[!is.na(mapNames$geneNames)])
-    #kk = match(genes.names, mapNames$geneNames)
-    
-    seqends <- seqlengths(gene.coords)[as.character(seqnames(gene.coords))]
-    gene.coords = gene.coords[which(start(gene.coords) > 1L & end(gene.coords) <= seqends), ]
-    #which(end(gene.coords) > seqlengths(gene.coords)[as.character(seqnames(gene.coords))])
-    
-    genebodyandpromoter.coords <- keepStandardChromosomes(gene.coords, pruning.mode = 'coarse')
-    genebodyandpromoter.coords <- Extend(x = gene.coords, upstream = 0, downstream = 0)
-    #features.coords = genebodyandpromoter.coords
+    pt.coords <- keepStandardChromosomes(tss.uniq, pruning.mode = 'coarse')
+    pt.coords <- Extend(x = pt.coords, upstream = promoter.upstream, downstream = promoter.downstream)
+    promoter.coords = define.promoter.geneBody.regions.unique.non.overlapping.with.gene(pt.coords, gr, peaks)
+    write.table(as.data.frame(promoter.coords)[, c(1:3, 6,4,5)], col.names = FALSE, row.names = FALSE, sep = '\t',
+                quote = FALSE, file = paste0('data/annotations/promoter_2kb.upstream_500bp.downstream_intergenic.regions.bed'))
+    write.table(as.data.frame(tss.uniq)[, c(1:3)], col.names = FALSE, row.names = FALSE, sep = '\t',
+                quote = FALSE, file = paste0('data/annotations/ce11_unique_tss.bed'))
+    #saveRDS(promoter.coords, )
     
     # build a gene by cell matrix
     tic('counting fragments for gene body and promoter')
     gene.activities <- FeatureMatrix(
       fragments = fragment.file,
-      features = genebodyandpromoter.coords,
+      features = promoter.coords,
       cells = colnames(seurat.cistopic),
-      chunk = 20
+      chunk = 40
     )
     toc()
     
     # convert rownames from chromsomal coordinates into gene names
-    gene.key <- genebodyandpromoter.coords$tx_name
-    names(gene.key) <- GRangesToString(grange = genebodyandpromoter.coords)
-    rownames(gene.activities) <- make.unique(gene.key[rownames(gene.activities)])
-    gene.activities <- gene.activities[rownames(gene.activities)!="",]
-    
-    mm = match(rownames(gene.activities), annot$Transcript.stable.ID)
-    mapNames = data.frame(c(1:nrow(gene.activities)), mm, geneNames = annot$Gene.name[mm], stringsAsFactors = FALSE)
-    genes.names = unique(mapNames$geneNames[!is.na(mapNames$geneNames)])
-    kk = match(genes.names, mapNames$geneNames)
-    
-    gene.activities = gene.activities[mapNames[kk, 1], ]
-    rownames(gene.activities) = genes.names
+    gene.key <- promoter.coords$gene_id
+    names(gene.key) <- GRangesToString(grange = promoter.coords)
+    gene.key = gene.key[rownames(gene.activities)] # select gene.key present in gene activities matrix
+    rownames(gene.activities) = gene.key
     
     #Add the gene activity matrix to the Seurat object as a new assay, and normalize it
     seurat.cistopic[['RNA']] <- CreateAssayObject(counts = gene.activities)
-    saveRDS(seurat.cistopic, file =  paste0(saveDir, 'atac_LDA_seurat_object_geneActivityMatrix_', method, '_',
+    
+    saveRDS(seurat.cistopic, file =  paste0(saveDir, 'atac_LDA_seurat_object_geneActivityMatrix_nonOverlapped.withGenes_',
                                             regions,  '_', promoter.upstream, 'bpUpstream.', 
                                             promoter.downstream,'bpDownstream.rds'))
     
