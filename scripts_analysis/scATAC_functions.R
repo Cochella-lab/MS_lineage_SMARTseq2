@@ -701,13 +701,6 @@ compare.methods.for.gene.activity.matrix = function()
   
   dev.off()
   
-  ##########################################
-  # compute gene activity matrix using cicero
-  ##########################################
-  #source.my.script('scATAC_functions.R')
-  #compute.cicero.gene.activity.scores(seuratObj, output_dir, tss_file, genome_size_file)
-  
-  
 }
 
 compute.gene.acitivity.scores.seurat = function(seurat.cistopic,
@@ -737,9 +730,72 @@ compute.gene.acitivity.scores.seurat = function(seurat.cistopic,
   cat('regions: ', regions, '- promoter.upstream: ', promoter.upstream, '- promoter.downstream: ', 
       promoter.downstream, '\n')
     
+  ## annotation to prepre only protein coding genes
   annot = read.csv(file = "data/annotations/BioMart_WBcel235_noFilters.csv", header = TRUE)
   annot = annot[which((annot$Gene.type == 'protein_coding') 
-                      & annot$Chromosome.scaffold.name != 'MtDNA'), ] # prepre only protein coding genes
+                      & annot$Chromosome.scaffold.name != 'MtDNA'), ] 
+  peaks = StringToGRanges(rownames(seurat.cistopic), sep = c(':', '-'))
+  
+  ## prepare promoter regions for promoter.geneBody selection
+  tss = GenomicRanges::promoters(TxDb.Celegans.UCSC.ce11.ensGene, upstream = 0, downstream = 2, columns = c('gene_id'))
+  nn = unlist(match(tss$gene_id, annot$Gene.stable.ID))
+  tss = tss[which(!is.na(nn))]
+  tss$gene_id = annot$Gene.name[nn[which(!is.na(nn))]]
+  tss = unique(tss)
+  
+  define.unique.tss = function(tss, peaks){
+    find.index.gene.start = function(tss, kk)
+    {
+      starts = start(tss[kk])
+      ends = end(tss[kk])
+      if(unique(strand(tss[kk])) == '+' |  unique(strand(tss[kk])) == '*'){
+        return(kk[which(starts == min(starts))])
+      }else{
+        return(kk[which(ends == max(ends))])
+      }
+      
+    }
+    #length(which(table(tss$gene_id)>1))
+    
+    ##########################################
+    # here we select tss that overlap with sc-atac peaks or/and the gene start if there are multiple tss 
+    ##########################################
+    gene.uniq = unique(tss$gene_id)
+    index.uniq = c()
+    for(g in gene.uniq)
+    {
+      kk = which(tss$gene_id == g)
+      if(length(kk) == 1){
+        index.uniq = c(index.uniq, kk)
+      }else{
+        kk.within.peaks = kk[overlapsAny(tss[kk], peaks)]
+        if(length(kk.within.peaks) == 1){
+          index.uniq = c(index.uniq, kk.within.peaks)
+        }else{
+          gene.start = unique(annot$Gene.start..bp.[which(annot$Gene.name == g)])
+          if(length(kk.within.peaks) > 1){
+            kk.gene.start = find.index.gene.start(tss, kk.within.peaks)
+          }
+          if(length(kk.within.peaks) == 0){
+            kk.gene.start = find.index.gene.start(tss, kk)
+          }
+          
+          if(length(kk.gene.start) != 1) stop('Error')
+          
+          index.uniq = c(index.uniq, kk.gene.start)
+        }
+      }
+    }
+    
+    tss.uniq = tss[index.uniq]
+    
+    return(tss.uniq)
+  }
+  
+  # select promoters for protein coding genes and miRNAs
+  mm = match(gene.coords$tx_name, annot$Transcript.stable.ID)
+  gene.coords = gene.coords[which(!is.na(mm))]
+  
   
   #extract gene coordinates from Ensembl, and ensure name formatting is consistent with  Seurat object 
   if(regions == 'promoter.geneBody'){
@@ -784,7 +840,7 @@ compute.gene.acitivity.scores.seurat = function(seurat.cistopic,
       jj.over = ol.df$subjectHits[which(ol.df$queryHits== ii)]
       jj.over = setdiff(jj.over, ii)
       
-      if(n%%500 == 0) 
+      if(n%%500 == 0)
         cat('nb of genes overlapped :', n, '-',  length(jj.over), "\n")
       
       # test if quereid region is entierly covered by genes in opposite regions
@@ -865,27 +921,7 @@ compute.gene.acitivity.scores.seurat = function(seurat.cistopic,
     
     
   }else{
-    promoter.ens = GenomicRanges::promoters(TxDb.Celegans.UCSC.ce11.ensGene, 
-                                            upstream = promoter.upstream, downstream = promoter.downstream)
     
-    # only select promoter overlapped with refseq annotation
-    select.only.promoter.overlapped.by.Refseq = FALSE
-    if(select.only.promoter.overlapped.by.Refseq){
-      promoter.refseq = GenomicFeatures::promoters(TxDb.Celegans.UCSC.ce11.refGene, 
-                                                   upstream = promoter.upstream, downstream = promoter.downstream)
-      ii = findOverlaps(promoter.ens, promoter.refseq,
-                        maxgap=-1L, minoverlap=0L,
-                        type=c("equal"),
-                        select=c("all"),
-                        ignore.strand=FALSE)
-      gene.coords = promoter.ens[unique(ii@from), ] 
-    }else{
-      gene.coords = promoter.ens
-    }
-    
-    # select promoters for protein coding genes and miRNAs
-    mm = match(gene.coords$tx_name, annot$Transcript.stable.ID)
-    gene.coords = gene.coords[which(!is.na(mm))]
     
     # random choose one promoter for 
     #mm = match(rownames(gene.activities), annot$Transcript.stable.ID)
