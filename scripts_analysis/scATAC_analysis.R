@@ -207,6 +207,17 @@ DimPlot(seurat.cistopic, label = TRUE, pt.size = 0.5, label.size = 8) +
   NoLegend()
 
 ##########################################
+# check the feature distribution for each clusters 
+##########################################
+
+VlnPlot(seurat.cistopic, features = 'nCount_peaks', log = TRUE, pt.size = 0.5) + 
+  NoLegend()
+
+VlnPlot(seurat.cistopic, features = 'nFeature_peaks', log = TRUE, pt.size = 0.3) + 
+  NoLegend()
+
+
+##########################################
 # generate bigwigs for each cluster for visualization
 ##########################################
 barcode.cluster = data.frame(Barcode = colnames(seurat.cistopic),

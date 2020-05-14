@@ -944,6 +944,12 @@ compute.cicero.gene.activity.scores = function(seuratObj, output_dir, tss_file, 
   
   conns = res$conns
   
+  xx = seurat.cistopic
+  xx[['ga_score']] = CreateAssayObject(data = ga_score)
+  DefaultAssay(xx) = 'ga_score'
+  
+  FeaturePlot(xx, features = 'hnd-1')
+  
   saveRDS(ga_score, file = paste0(output_dir, '/cicero_gene_activity.rds'))
   
   #conns$Peak1 = assignGene2Peak_coords(conns$Peak1, tss_ann)
@@ -958,6 +964,7 @@ doCicero_gascore <- function(seurat.obj, reduction = 'tsne', chr_sizes,
   ## gene_ann: the first four columns: chr, start, end, gene name
   set.seed(2019)
   
+  ## gene_ann = tss_ann; coaccess_thr = 0.25;
   mtx = GetAssayData(seurat.obj, slot = 'counts')
   # change rownames using _ to delimited
   rnames = rownames(mtx)
@@ -979,7 +986,6 @@ doCicero_gascore <- function(seurat.obj, reduction = 'tsne', chr_sizes,
   input_cds <- detectGenes(input_cds)
   input_cds <- estimateSizeFactors(input_cds)
   
-  
   # Next, we access the tsne or umap coordinates from the input CDS object where they are stored by Monocle and run make_cicero_cds:
   if(reduction == 'tsne') {
     if(is.null(seurat.obj@reductions$tsne))
@@ -992,15 +998,18 @@ doCicero_gascore <- function(seurat.obj, reduction = 'tsne', chr_sizes,
     redu.coords = seurat.obj@reductions$umap@cell.embeddings
   }
   
-  
   #make the cell id consistet
-  
   cicero_cds <- make_cicero_cds(input_cds, reduced_coordinates = redu.coords, k = 50)
   
-  ## get connections
-  #conns <- run_cicero(cicero_cds, chr_sizes, sample_num = 2)
-  distance_parameters = estimate_distance_parameter(cicero_cds, genomic_coords = chr_sizes, 
+  ## get connections for c elegans, here we are using the parameters recommended for drosophilia
+  # conns <- run_cicero(cicero_cds, chr_sizes, sample_num = 100)
+  dist_params = estimate_distance_parameter(cicero_cds, genomic_coords = chr_sizes, 
                                                     window = 100000, s = 0.8, distance_constraint = 50000, sample_num = 100)
+  
+  circero.models = generate_cicero_models(cicero_cds, distance_parameter = mean(dist_params), 
+                                          s = 0.8, window = 100000, genomic_coords = chr_sizes)
+  
+  conns = assemble_connections(cicero_model_list = circero.models)
   
   ## get cicero gene activity score
   names(gene_ann)[4] <- "gene"
