@@ -59,17 +59,22 @@ process.scRNAseq.for.early.embryo.packer.et.al = function()
     library(VisCello.celegans)
     cello()
   }
+  
   Check.Cello.DataSet = FALSE
   if(Check.Cello.DataSet){
     ##########################################
     # more details in 
     # https://github.com/qinzhu/VisCello.celegans/blob/master/inst/app/global.R
     ##########################################
-    cello.data.path = "../VisCello.celegans//inst/app/data/"
+   
     
     eset = readRDS(paste0(cello.data.path, 'eset.rds'))
     saveRDS(eset, file =  paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
     #eset <- readRDS("data/eset.rds")
+    
+  }else{
+    cello.data.path = "../VisCello.celegans//inst/app/data/"
+    library(VisCello.celegans)
     
     ## clusters with coordinates in reduced dimensions (PCA, UMAP)
     clist <- readRDS(paste0(cello.data.path, "clist.rds"))
@@ -81,13 +86,17 @@ process.scRNAseq.for.early.embryo.packer.et.al = function()
     lin_sc_expr <- readRDS("data/lin_sc_expr_190602.rds")
     lin.expanded.list <- readRDS("data/lin_expanded_list_0602.rds")
     avail_nodes <- readRDS("data/avail_nodes.rds")
+    
     cell_type_markers <- read.xlsx("data/Supplementary_Tables_190611.xlsx",sheet=1, startRow=4)
     lineage_markers <-  read.xlsx("data/Supplementary_Tables_190611.xlsx",sheet=4, startRow=7)
     
-  }else{
-    library(VisCello.celegans)
     eset = readRDS(file = paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
     pmeda = data.frame(pData(eset))
+    
+    eset = eset[, which(pmeda$to.filter == FALSE)]
+    pmeda = data.frame(pData(eset))
+    
+    saveRDS(eset, file = paste0(RdataDir, 'Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
     
     ee = eset@assayData$exprs
     

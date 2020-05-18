@@ -389,6 +389,148 @@ transfer.labels.from.scRNA.to.scATAC = function(seurat.cistopic, tintori, method
   
 }
 
+transfer.labels.from.Murray.scRNA.to.scATAC.seurat. = function(seurat.cistopic)
+{
+  # process Parker et al. data
+  library(VisCello.celegans)
+  eset = readRDS(file = paste0(RdataDir, 'Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
+  pmeda = data.frame(pData(eset))
+  
+  
+  ## select the cells for early embryo
+  kk = which(pmeda$embryo.time < 270 & pmeda$cell.type != 'unannotated' & pmeda$cell.type != 'XXX')
+  cat('nb of cell in reference -- ', length(kk), '\n')
+  
+  ee = CreateSeuratObject(counts = eset@assayData$exprs[,kk], assay = 'RNA', meta.data = pmeda[kk, ])
+  ee@assays$RNA@data = eset@assayData$norm_exprs[,kk]
+  
+  ee <- FindVariableFeatures(
+    object = ee,
+    nfeatures = 3000
+  )
+  
+  ee <- ScaleData(object = ee)
+    
+  Idents(ee) = ee$cell.type
+  
+  # Here, we process the gene activity matrix 
+  # in order to find anchors between cells in the scATAC-seq dataset 
+  # and the scRNA-seq dataset.
+  Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
+  DimPlot(seurat.cistopic, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 8, repel = FALSE) + NoLegend()
+  
+  DefaultAssay(seurat.cistopic) <- 'RNA'
+  nb.variableFeatures = 5000
+  seurat.cistopic <- FindVariableFeatures(seurat.cistopic, nfeatures = nb.variableFeatures)
+  seurat.cistopic <- NormalizeData(seurat.cistopic)
+  seurat.cistopic <- ScaleData(seurat.cistopic)
+  
+  seurat.cistopic <- RunPCA(seurat.cistopic, npcs = 50, verbose = FALSE, reduction.name = 'pca.ga')
+  
+  transfer.anchors <- FindTransferAnchors(
+    reference = ee,
+    query = seurat.cistopic,
+    features = unique(c(VariableFeatures(object = ee), VariableFeatures(seurat.cistopic))),
+    #features = features.to.use,
+    reference.assay = 'RNA',
+    query.assay = 'RNA',
+    reduction = 'cca',
+    k.anchor = 10, # k.anchor is neighborhood size for MNN big k.anchor, the bigger, the more anchors found
+    k.filter = 200, # retain the anchor (cell from one dataset to annother) if within k.filter neighbors, the bigger, the more retained  
+    max.features = 200, # max nb of features used for anchor filtering
+    k.score = 30, 
+    npcs = 50, 
+    dims = 1:50
+  )
+  
+  cat('nb of cells in scATAC and in tintori as anchors : ', 
+      length(unique(transfer.anchors@anchors[, 1])), '--',  length(unique(transfer.anchors@anchors[, 2])), '\n')
+  
+  #Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
+  
+  predicted.labels <- TransferData(
+    anchorset = transfer.anchors,
+    #refdata = Idents(tintori),
+    refdata = Idents(ee),
+    #refdata = as.vector(Idents(seurat.cistopic)),
+    #weight.reduction = seurat.cistopic[['pca']],
+    weight.reduction = seurat.cistopic[['pca.ga']],
+    dims = 1:30,
+    k.weight = 50
+  )
+  
+  seurat.cistopic <- AddMetaData(object = seurat.cistopic, metadata = predicted.labels)
+  DimPlot(seurat.cistopic, group.by = "predicted.id",reduction = 'umap', label = TRUE, repel = FALSE) + ggtitle("scATAC-seq cells") +
+    scale_colour_hue(drop = FALSE)
+  
+  table(seurat.cistopic$prediction.score.max > 0.5)
+  
+  hist(seurat.cistopic$prediction.score.max)
+  abline(v = 0.5, col = "red")
+  
+  seurat.cistopic.filtered <- subset(seurat.cistopic, subset = prediction.score.max > 0.5)
+  # to make the colors match
+  
+  seurat.cistopic.filtered$predicted.id <- factor(seurat.cistopic.filtered$predicted.id, levels = levels(tintori))  
+  DimPlot(seurat.cistopic.filtered, group.by = "predicted.id", reduction = 'umap',  label = TRUE, repel = TRUE) + 
+    ggtitle("scATAC-seq cells") + 
+    scale_colour_hue(drop = FALSE)
+  
+  res = data.frame(lineage = Idents(tintori), predicted.labels, stringsAsFactors = FALSE)
+  
+  map = res[, match(paste0('prediction.score.', levels(seurat.cistopic)), colnames(res))]
+  rownames(map) = sapply(rownames(map),function(x) gsub('-cell_r*', '',x)) 
+  map = t(map)
+  
+  # process the rowname and colnames
+  rownames(map) = sapply(rownames(map), function(x) gsub('prediction.score.', '', x))
+  colnames(map) = sapply(colnames(map), function(x) paste0(unlist(strsplit(x, '_'))[c(2,1)], collapse = "_"))
+  
+  celltypes = sapply(colnames(map), function(x) unlist(strsplit(x, '_'))[1])
+  
+  # manually sort the cell types
+  #cellrefs = levels(tintori)
+  cellrefs = c("P0",  "AB", "P1", "ABa",  "ABp" , "EMS",   "P2",
+               "ABal",  "ABar","ABpl", "ABpr","MS",  "E" , 
+               "ABalx", "ABarx", "ABplx", "ABprx",  "MSx1", "MSx2",  "Cx1" ,"Cx2", "C",  "P3", "D", "P4", "Ea", "Ep")   
+  
+  kk = c()
+  for(cc in cellrefs)
+  {
+    kk = c(kk, which(celltypes==cc))
+  }
+  
+  map = map[, kk]
+  my_sample_col <- data.frame(sample = celltypes[kk])
+  rownames(my_sample_col) <- colnames(map)
+  #colnames(map) = celltypes[kk]
+  
+  library("pheatmap")
+  library("RColorBrewer")
+  library(grid)
+  
+  cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
+  pheatmap(map, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
+           cluster_cols=FALSE, main = paste0("resolution -- ",  resolution), na_col = "white",
+           color = cols, 
+           annotation_col = my_sample_col,
+           gaps_col = match(unique(my_sample_col$sample), my_sample_col$sample)[-1] -1,
+           gaps_row = c(1:nrow(map)-1),
+           fontsize_col = 10,
+           height = 8,
+           width = 30
+  )
+  
+  map.fitered = map
+  map.fitered[which(map.fitered<0.1)] = 0
+  pheatmap(map.fitered, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+           cluster_cols=FALSE, main = paste0("fitlered < 0.1 with resolution -- ",  resolution), na_col = "white",
+           color = cols)
+  
+}
+
+
+
 process.tintori.et.al = function()
 {
   # DefaultAssay(seurat.cistopic) <- 'peaks'
@@ -580,7 +722,6 @@ transfer.labels.from.scRNA.to.scATAC.with.liger = function(seurat.cistopic, tint
   
 }
 
-
 ########################################################
 ########################################################
 # Section : functions for scATAC-seq cluster annotation
@@ -733,7 +874,7 @@ cluster.annotation.using_marker.genes_tf.motif_peaks = function(seurat.cistopic)
     NoLegend()
   
   ##########################################
-  # 1) first we identify cluster-specific marker genes
+  # 1) first identify cluster-specific marker genes
   ##########################################
   DefaultAssay(seurat.cistopic) = 'RNA'
   seurat.cistopic <- NormalizeData(seurat.cistopic, 
@@ -742,15 +883,62 @@ cluster.annotation.using_marker.genes_tf.motif_peaks = function(seurat.cistopic)
   )
   seurat.cistopic <- ScaleData(seurat.cistopic)
   
+  
   DefaultAssay(seurat.cistopic) = 'RNA'
-  cluster9.markers <- FindMarkers(seurat.cistopic, ident.1 = "6.E", only.pos = TRUE,
-                                  min.pct = 0.05, logfc.threshold = 0.1, test.use = 'MAST')
-  head(cluster9.markers, n = 20)
-  cluster9.markers[grep('end-1', rownames(cluster9.markers)), ]
+  Idents(seurat.cistopic) = seurat.cistopic$seurat_clusters
+  
+  
+  
+  cms <- FindMarkers(seurat.cistopic, ident.1 = 6, only.pos = TRUE,
+                                  min.pct = 0.1, logfc.threshold = 0.1)
+  
+  #head(cms, n = 20)
+  
+  #FeaturePlot(seurat.cistopic, features = rownames(cms)[1:4])
+  #FeaturePlot(seurat.cistopic, features = rownames(cms)[c(nrow(cms):(nrow(cms)-4))])
+  #cms[grep('end-1', rownames(cms)), ]
   
   # find markers for every cluster compared to all remaining cells, report only the positive ones
-  pbmc = ms
-  pbmc.markers <- FindAllMarkers(pbmc, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+  ee.markers <- FindAllMarkers(seurat.cistopic, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
+  saveRDS(ee.markers, file = paste0(RdataDir, 'scATAC_seq_geneActivityMatrix.inPromoter.resolution.0.8_markerGenes.rds'))
+  
+  ##########################################
+  #  ## heatmap for all marker genes
+  ##########################################
+  ee.markers = readRDS(file = paste0(RdataDir, 'scATAC_seq_geneActivityMatrix.inPromoter.resolution.0.8_markerGenes.rds'))
+  
+  # ee.markers$cluster = lineages[(1+as.integer(ee.markers$cluster))]
+  top.markers <- ee.markers %>% group_by(cluster) %>% top_n(n = 50, wt = avg_logFC)
+  
+  #Idents(seurat.cistopic) = $lineage
+  DoHeatmap(seurat.cistopic, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend() 
+  
+  head(as.data.frame(top.markers[which(top.markers$cluster==11), ]), 50)
+  
+  ##########################################
+  # heatmap for TF marker genes 
+  ##########################################
+  ee.markers = readRDS(file = paste0(RdataDir, 'scATAC_seq_geneActivityMatrix.inPromoter.resolution.0.8_markerGenes.rds'))
+  library(openxlsx)
+  tfs = openxlsx::read.xlsx('data/wTF_3.0.xlsx', sheet = 1)
+  
+  tf.markers = ee.markers[!is.na(match(ee.markers$gene, tfs$Public.name)), ]
+  #tf.markers = tf.markers[tf.markers$p_val_adj<0.01, ]
+  #tf.markers <- tf.markers %>% group_by(cluster) %>% top_n(n = 5 , wt = avg_logFC)
+  
+  cat(length(unique(tf.markers$gene)), ' TFs in marker genes \n')
+  library("pheatmap")
+  library("RColorBrewer")
+  cols = c(colorRampPalette((brewer.pal(n = 7, name="YlGnBu")))(100))
+  
+  pdfname = paste0(resDir, "/cluster_annotations/marker_genes_TFs_all_log2normalized.pdf")
+  pdf(pdfname, width=12, height = 32)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  # 
+  DoHeatmap(seurat.cistopic, features = tf.markers$gene, slot = 'data',
+            size = 5, hjust = 0, label = TRUE, disp.max = 2.0) + scale_fill_gradientn(colors = cols)
+  
+  dev.off()
   
   ##########################################
   # annotat those clusters using known lineage-specifc genes or tf or tf motif activities 
@@ -763,7 +951,6 @@ cluster.annotation.using_marker.genes_tf.motif_peaks = function(seurat.cistopic)
   tintori = import.tintori.et.al.dataset(nfeatures = 3000, npcs = 30)
   # import Aleks' scRNA-seq data
   aleks = readRDS(file = paste0(RdataDir, 'EE_Aleks_rawCounts_processed_sizefactorNormalization.rds'))
-  
   
   DefaultAssay(seurat.cistopic) <- 'peaks'
   FeaturePlot(
@@ -778,16 +965,188 @@ cluster.annotation.using_marker.genes_tf.motif_peaks = function(seurat.cistopic)
   options(warn=-1)
   feature.example = c('pha-4', 'hnd-1', 'skn-1', 'hlh-1', 'tbx-8', 'unc-120', 'med-2', 'med-1', 'sdz-38', 'pal-1',
                       'end-1', 'elt-2', 'end-1', 'end-3', 'elt-7')
-  #plot.feature.example.scRNA.scATAC.tf.motif(seurat.cistopic, feature.example = feature.example, tintori, aleks)
+  #plot.feature.example.scRNA.scATAC.tf.motif(seurat.cistopic, feature.example = 'ceh-51', tintori, aleks)
+  feature.example = c('ttx-1', 'lec-8', 'cwn-2', 'unc-62', 'fos-1')
+  feature.example = c('hlh-1', 'myo-3', 'egl-20', 'cwn-1', 'ceh-13', 'ceh-34', 'eya-1',
+                      'cup-4', 'lgc-26', 'let-381', 
+                      'unc-30', 'let-381', 'sfrp-1',
+                      'hlh-8', 'pal-1',
+                      'ehn-3', 'unc-39')
+  
+  feature.example = c('hnd-1', 'pha-4')
+  feature.example = c('egl-20', 'nob-1', 'cwn-1', 'ceh-34', 'eya-1', 'ceh-13', 'lin-39' )
+  feature.example = c('pha-4', 'tbx-2', 'ceh-22', 'myo-2', 'hlh-6')
   FeaturePlot(seurat.cistopic, features = feature.example, ncol = 3)
+  
   
   motifs2check = rownames(seurat.cistopic)[grep('tbx-35|tbx-38|MA0542.1|MA0924.1 pal-1|MA0546.1|end-1|MA0547.1 skn-1|
                                                 hnd|unc-130|mom-2|med-2|ref', 
                                                 rownames(seurat.cistopic))]
   
-  
 }
 
+wormmine.database.download = function(seurat.cistopic)
+{
+  library(InterMineR)
+  listMines()
+  
+  # load HumaMine
+  im <- initInterMine(mine=listMines()["WormMine"])
+  im
+  
+  # Get template (collection of pre-defined queries)
+  template = getTemplates(im)
+  head(template)
+  
+  # Get gene-related templates
+  template[grep("gene", template$name, ignore.case=TRUE),]
+  
+  # Query for gene pathways
+  queryGenePath = getTemplateQuery(
+    im = im, 
+    name = "anatomical_expression_patterns_for_genes"
+    #name = 'genes_in_expression_cluster'
+  )
+  
+  
+  queryGenePath
+  
+  DefaultAssay(seurat.cistopic) = 'RNA'
+  
+  
+  wmm.data = c()
+  for(n in 15884:nrow(seurat.cistopic))
+  {
+    # n = 7300
+    g = rownames(seurat.cistopic)[n];
+    
+    cat(g)
+    queryGenePath$where[[1]][["value"]] <- g
+    
+    resGenePath <- runQuery(im, queryGenePath)
+    if(!is.null(resGenePath)) {
+      wmm.data = rbind(wmm.data, resGenePath[, c(3,5,6)])
+      cat('\n')
+    }else{
+      cat(' not found\n')
+    }
+  }
+  
+  saveRDS(wmm.data, file = paste0(RdataDir, 'wormbase_anatomical_expression_patterns_part.rds'))
+  anatomy = rbind(anatomy, wmm.data)
+  
+  saveRDS(anatomy, file = paste0(RdataDir, 'wormbase_anatomical_expression_patterns_all.rds'))
+  
+  length(unique(anatomy$Gene.symbol[which(anatomy$Gene.expressionPatterns.anatomyTerms.name == 'Aba')]))
+  
+  
+  ##########################################
+  # start to edit the marker-gene-lineage table 
+  ##########################################
+  cells.0.28 = c('P0', # 1-cell  
+               'AB', 'P1', # 2-cell
+               'ABa','ABp', 'EMS', 'P2', # 4-cell
+               'ABal', 'ABar', 'ABpl', 'ABpr', 'MS', 'E', 'C', 'P3', # 8-cell
+               # 16-cell
+               'ABala', 'ABalp', 'ABara', 'ABarp', 
+               'ABpla', 'ABplp', 'ABpra', 'ABprp', 
+               'MSa', 'MSp', 'Ea', 'Ep', 'Ca', 'Cp', 'D', 'P4', 
+               
+               # 28-cell
+               'ABalaa', 'ABalap', 'ABalpa', 'ABalpp', 'ABaraa', 'ABarap','ABarpa', 'ABarpp',
+               'ABplaa', 'ABplap', 'ABplpa', 'ABplpp', 'ABpraa', 'ABprap','ABprpa', 'ABprpp',
+               'MSaa', 'MSap', 'MSpa', 'MSpp',
+               'Ea', 'Ep',
+               'Caa', 'Cap', 'Cpa', 'Cpp', 
+               'D', 'P4'
+  )
+  cells.51 = c(# 51-cell
+    'ABalaaa', 'ABalapa', 'ABalpaa', 'ABalppa', 'ABaraaa', 'ABarapa','ABarpaa', 'ABarppa',
+    'ABalaap', 'ABalapp', 'ABalpap', 'ABalppp', 'ABaraap', 'ABarapp','ABarpap', 'ABarppp',
+    'ABplaaa', 'ABplapa', 'ABplpaa', 'ABplppa', 'ABpraaa', 'ABprapa','ABprpaa', 'ABprppa',
+    'ABplaap', 'ABplapp', 'ABplpap', 'ABplppp', 'ABpraap', 'ABprapp','ABprpap', 'ABprppp',
+    'MSaaa', 'MSapa', 'MSpaa', 'MSppa', 
+    'MSaap', 'MSapp', 'MSpap', 'MSppp',
+    'Eaa', 'Eap', 'Epa', 'Epp',
+    'Caa', 'Cap', 'Cpa', 'Cpp', 
+    'Da', 'Dp', 
+    'P4')
+  
+  lineages = unique(cells.0.28)
+  lineages = lineages[grep('P1|P2|P3|P4|P0|EMS', lineages, invert = TRUE)]
+  lineages = lineages[which(lineages != 'AB')]
+  
+  anatomy = readRDS(file = paste0(RdataDir, 'wormbase_anatomical_expression_patterns_all.rds'))
+  
+  marker.annatom = matrix(0, ncol = length(lineages), nrow = length(unique(anatomy$Gene.symbol)))
+  colnames(marker.annatom) = lineages
+  rownames(marker.annatom) = unique(anatomy$Gene.symbol)
+  
+  for(n in 1:ncol(marker.annatom))
+  {
+    #n = 1
+    ll = colnames(marker.annatom)[n]
+    cat(n, ' -- ', ll, '\n')
+    ggs = unique(anatomy$Gene.symbol[which(anatomy$Gene.expressionPatterns.anatomyTerms.name == ll)])
+    
+    marker.annatom[match(ggs, rownames(marker.annatom)) ,n]  = 1 
+  }
+  
+  ss = apply(marker.annatom, 1, sum)
+  marker.annatom = marker.annatom[ss>0, ]
+  
+  #DefaultAssay(seurat.cistopic) = 'RNA'
+  counts = GetAssayData(seurat.cistopic, slot = 'counts', assay = 'RNA')
+  counts = counts > 0
+  rownames(counts) = rownames(seurat.cistopic)
+  counts = counts[match(rownames(marker.annatom), rownames(seurat.cistopic)), ]
+  
+  counts = as.data.frame(counts)
+  
+  ee.markers = readRDS(file = paste0(RdataDir, 'scATAC_seq_geneActivityMatrix.inPromoter.resolution.0.8_markerGenes.rds'))
+  mm = match(rownames(counts), ee.markers$gene)
+  length(which(!is.na(mm)))
+  mm = !is.na(mm)
+  
+  counts = counts[mm, ]
+  marker.annatom = marker.annatom[mm, ]
+  
+  library("pheatmap")
+  library("RColorBrewer")
+  cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
+  pheatmap(t(marker.annatom), cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.2),
+           cluster_cols=TRUE, 
+           color = cols, 
+           fontsize_col = 10,
+           height = 8,
+           width = 30
+  )
+  
+  corefs = cor(counts, marker.annatom)
+  
+  components = unlist(apply(corefs, 1, function(x) colnames(corefs)[which.max(x)]))
+  
+  seurat.cistopic$anatamy.inferred = components
+  
+  #DimPlot(seurat.cistopic, label = TRUE, pt.size = 1, label.size = 6) 
+  DimPlot(seurat.cistopic, label = FALSE, group.by = 'anatamy.inferred', pt.size = 0.5, label.size = 6) 
+  
+  nn = c(1:ncol(seurat.cistopic))
+  
+  nn = which(seurat.cistopic$peaks_snn_res.0.8 == 7)[c(1:100)]
+  components = c()
+  for(n in  nn)
+  {
+    #n = 56
+    cors = cor(counts[match(rownames(marker.annatom), rownames(seurat.cistopic)),n], marker.annatom, method = 'spearman')
+    names(cors) = colnames(marker.annatom)
+    cat(names(cors)[which.max(cors)], '\n')
+    components = c(components, names(cors)[which.max(cors)])
+    
+  }
+  
+  barplot(table(components), las = 2)
 
+}
 
 
