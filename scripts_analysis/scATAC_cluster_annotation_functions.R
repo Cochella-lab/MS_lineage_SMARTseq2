@@ -7,6 +7,38 @@
 # Date of creation: Fri May  8 15:24:55 2020
 ##########################################################################
 ##########################################################################
+Manual.update.cluster.annotation = function(seurat.cistopic)
+{
+  DefaultAssay(seurat.cistopic) <- 'peaks'
+  Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
+  new.cluster.ids <- c("1.neurons", 
+                       "2.neurons", 
+                       "3.neurons", 
+                       "4.hypodermis", 
+                       "5.intestine.E",
+                       '6.intestine.E', 
+                       '7.P0/AB/P1/ABa.p/EMS/P2',
+                       '8.neurons', 
+                       '9.neurons/BWM', 
+                       '10.pharynx/neurons', 
+                       '11.BWM.E', '12.hypodermis/seam.cell', 
+                       '13.pharynx/germline/neurons', 
+                       '14.neurons', 
+                       '15.BWM.E',
+                       '16.pharynx/neurons', 
+                       '17.neurons', '18.neurons',
+                       '19.neurons/pharyngeal.neurons', '20.hypodermis/seam.cell', 
+                       '21.germline.P4')
+  names(new.cluster.ids) <- levels(seurat.cistopic)
+  seurat.cistopic <- RenameIdents(seurat.cistopic, new.cluster.ids)
+  
+  DimPlot(seurat.cistopic, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 5, repel = TRUE) + NoLegend()
+  
+  return(seurat.cistopic)
+  
+}
+
+
 ##########################################
 # integrate scRNA-seq data from published dataset in https://github.com/qinzhu/VisCello.celegans
 # Packer, J. S J. I. Murray (2019). A lineage-resolved molecular atlas of C. elegans embryogenesis at single-cell resolution. Science: eaax1971.
@@ -410,7 +442,7 @@ transfer.labels.from.Murray.scRNA.to.scATAC.seurat. = function(seurat.cistopic)
   )
   
   ee <- ScaleData(object = ee)
-    
+  
   Idents(ee) = ee$cell.type
   
   # Here, we process the gene activity matrix 
@@ -469,57 +501,53 @@ transfer.labels.from.Murray.scRNA.to.scATAC.seurat. = function(seurat.cistopic)
   abline(v = 0.5, col = "red")
   
   seurat.cistopic.filtered <- subset(seurat.cistopic, subset = prediction.score.max > 0.5)
-  # to make the colors match
   
+  # to make the colors match
   seurat.cistopic.filtered$predicted.id <- factor(seurat.cistopic.filtered$predicted.id, levels = levels(tintori))  
   DimPlot(seurat.cistopic.filtered, group.by = "predicted.id", reduction = 'umap',  label = TRUE, repel = TRUE) + 
     ggtitle("scATAC-seq cells") + 
     scale_colour_hue(drop = FALSE)
   
-  res = data.frame(lineage = Idents(tintori), predicted.labels, stringsAsFactors = FALSE)
+  ##########################################
+  # make summary of cluster-to-predicted label mapping
+  ##########################################
+  res = data.frame(clusters = Idents(seurat.cistopic), predicted.labels, stringsAsFactors = FALSE)
   
-  map = res[, match(paste0('prediction.score.', levels(seurat.cistopic)), colnames(res))]
-  rownames(map) = sapply(rownames(map),function(x) gsub('-cell_r*', '',x)) 
-  map = t(map)
+  labels.pred =  unique(res$predicted.id)
+  clusters = unique(res$clusters)
+  res.map = matrix(0, nrow = length(labels.pred), ncol = length(clusters))
+  rownames(res.map) = labels.pred
+  colnames(res.map) = clusters
+  res.map = res.map[, sort(colnames(res.map))]
   
-  # process the rowname and colnames
-  rownames(map) = sapply(rownames(map), function(x) gsub('prediction.score.', '', x))
-  colnames(map) = sapply(colnames(map), function(x) paste0(unlist(strsplit(x, '_'))[c(2,1)], collapse = "_"))
-  
-  celltypes = sapply(colnames(map), function(x) unlist(strsplit(x, '_'))[1])
-  
-  # manually sort the cell types
-  #cellrefs = levels(tintori)
-  cellrefs = c("P0",  "AB", "P1", "ABa",  "ABp" , "EMS",   "P2",
-               "ABal",  "ABar","ABpl", "ABpr","MS",  "E" , 
-               "ABalx", "ABarx", "ABplx", "ABprx",  "MSx1", "MSx2",  "Cx1" ,"Cx2", "C",  "P3", "D", "P4", "Ea", "Ep")   
-  
-  kk = c()
-  for(cc in cellrefs)
+  for(n in 1:ncol(res.map))
   {
-    kk = c(kk, which(celltypes==cc))
+    # n = 1
+    predicted.ids = res$predicted.id[which(res$clusters == colnames(res.map)[n])]
+    stats.ids = table(predicted.ids)
+    stats.ids = stats.ids[match(rownames(res.map), names(stats.ids))]
+    stats.ids[is.na(stats.ids)] = 0
+    res.map[,n] = stats.ids/sum(stats.ids)
   }
-  
-  map = map[, kk]
-  my_sample_col <- data.frame(sample = celltypes[kk])
-  rownames(my_sample_col) <- colnames(map)
-  #colnames(map) = celltypes[kk]
   
   library("pheatmap")
   library("RColorBrewer")
   library(grid)
   
   cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
-  pheatmap(map, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
-           cluster_cols=FALSE, main = paste0("resolution -- ",  resolution), na_col = "white",
+  pheatmap(res.map, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
+           cluster_cols=TRUE, main = paste0("resolution -- 0.8"), na_col = "white",
            color = cols, 
-           annotation_col = my_sample_col,
-           gaps_col = match(unique(my_sample_col$sample), my_sample_col$sample)[-1] -1,
-           gaps_row = c(1:nrow(map)-1),
+           #annotation_col = my_sample_col,
+           #gaps_row = c(1:nrow(map)-1),
            fontsize_col = 10,
            height = 8,
            width = 30
   )
+  
+  cols =  c(colorRampPalette((brewer.pal(n = 7, name="Set3")))(ncol(res.map)))
+  barplot(res.map, horiz = TRUE, legend = rownames(res.map), 
+          col = cols )
   
   map.fitered = map
   map.fitered[which(map.fitered<0.1)] = 0
@@ -528,7 +556,6 @@ transfer.labels.from.Murray.scRNA.to.scATAC.seurat. = function(seurat.cistopic)
            color = cols)
   
 }
-
 
 
 process.tintori.et.al = function()
@@ -847,11 +874,11 @@ cluster.annotation.using_marker.genes_tf.motif_peaks = function(seurat.cistopic)
     Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
     new.cluster.ids <- c('0.??',
                          "1.ABxxx/MSx/Cx", "2.MSx/Cx/ABxxx", 
-                         "3.ABxxx/MSx/Cx", "4.ABxx/ABx", "5.Ea",
-                         '6.Ea/p', '7.P0/AB/P1/ABa.p/EMS/P2',
+                         "3.ABxxx/MSx/Cx", "4.ABxx/ABx", "5.intestine(E)",
+                         '6.intestine (E)', '7.P0/AB/P1/ABa.p/EMS/P2',
                          '8.MSx/Cx/ABxxx', '9.ABaxx', '10.MS/E', 
-                         '11.D/P4', '12.AB', '13.MS', '14.MS', '15.P3/D/MS',
-                         '16.MS', '17.ABp', '18.AB','19.C/Ea', '20.ABa/p/MS/E', '21.P2')
+                         '11.BWM', '12.AB', '13.MS', '14.MS', '15.BWM',
+                         '16.MS', '17.ABp', '18.AB','19.C/Ea', '20.ABa/p/MS/E', '21.Germline(P4)')
     
     names(new.cluster.ids) <- levels(seurat.cistopic)
     seurat.cistopic <- RenameIdents(seurat.cistopic, new.cluster.ids)
@@ -870,7 +897,7 @@ cluster.annotation.using_marker.genes_tf.motif_peaks = function(seurat.cistopic)
   seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', 
                              dims = 1:nb.pcs, 
                              n.neighbors = n.neighbors, min.dist = min.dist)
-  DimPlot(seurat.cistopic, label = TRUE, pt.size = 1, label.size = 6) + 
+  DimPlot(seurat.cistopic, label = TRUE, pt.size = 1, label.size = 5,  repel = TRUE) + 
     NoLegend()
   
   ##########################################
