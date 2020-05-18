@@ -29,6 +29,7 @@ Manual.update.cluster.annotation = function(seurat.cistopic)
                        '17.neurons', '18.neurons',
                        '19.neurons/pharyngeal.neurons', '20.hypodermis/seam.cell', 
                        '21.germline.P4')
+  
   names(new.cluster.ids) <- levels(seurat.cistopic)
   seurat.cistopic <- RenameIdents(seurat.cistopic, new.cluster.ids)
   
@@ -94,22 +95,7 @@ compare.gene.activity.matrix.computing = function()
     cat('gene activity matrix -- ', gamat, '\n')
     Manual.modify.cluster.annotation = TRUE
     if(Manual.modify.cluster.annotation){
-      
-      DefaultAssay(seurat.cistopic) <- 'peaks'
-      Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
-      new.cluster.ids <- c('0.??',
-                           "1.ABxxx/MSx/Cx", "2.MSx/Cx/ABxxx", 
-                           "3.ABxxx/MSx/Cx", "4.ABxx/ABx", "5.Ea",
-                           '6.Ea/p', '7.P0/AB/P1/ABa.p/EMS/P2',
-                           '8.MSx/Cx/ABxxx', '9.ABaxx', '10.MS/E', 
-                           '11.D/P4', '12.AB', '13.MS', '14.MS', '15.P3/D/MS',
-                           '16.MS', '17.ABp', '18.AB','19.C/Ea', '20.ABa/p/MS/E', '21.P2')
-      
-      names(new.cluster.ids) <- levels(seurat.cistopic)
-      seurat.cistopic <- RenameIdents(seurat.cistopic, new.cluster.ids)
-      
-      # DimPlot(seurat.cistopic, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 5, repel = FALSE) + NoLegend()
-      
+      Manual.modify.cluster.annotation(seurat.cistopic)
     }
     
     # remove cluster0 cells because they are not real cells
@@ -371,24 +357,7 @@ transfer.labels.from.scRNA.to.scATAC = function(seurat.cistopic, tintori, method
     
     dev.off()
     
-    
-    Manual.modify.cluster.annotation = FALSE
-    if(Manual.modify.cluster.annotation){
-      DefaultAssay(seurat.cistopic) <- 'peaks'
-      Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
-      new.cluster.ids <- c("1.ABxxx/MSx/Cx", "2.MSx/Cx/ABxxx", 
-                           "3.ABxxx/MSx/Cx", "4.ABxx/ABx", "5.Ea",
-                           '6.Ea/p', '7.P0/AB/P1/ABa.p/EMS/P2',
-                           '8.MSx/Cx/ABxxx', '9.ABaxx', '10.MS/E', 
-                           '11.D/P4', '12.AB', '13.MS', '14.MS', '15.P3/D/MS',
-                           '16.MS', '17.ABp', '18.AB','19.C/Ea', '20.ABa/p/MS/E', '21.P2')
-      names(new.cluster.ids) <- levels(seurat.cistopic)
-      seurat.cistopic <- RenameIdents(seurat.cistopic, new.cluster.ids)
-      
-      DimPlot(seurat.cistopic, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 5, repel = FALSE) + NoLegend()
-      
-      
-    }
+    # Manual.modify.cluster.annotation(seurat.cistopic)
     
     # xx = as.matrix(map)
     # pheatmap(xx, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
@@ -621,16 +590,6 @@ process.tintori.et.al = function()
   )
   
   DimPlot(tintori, reduction = "umap", label = TRUE, pt.size = 2, label.size = 5, repel = TRUE)
-  
-  #Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
-  new.cluster.ids <- c("P0/AB/P1", "P0/AB/P1", "P0/AB/P1","ABa/p/EMS", "ABa/p/EMS", "ABa/p/EMS",
-                       "P2/P3/C","ABa/pr/l",  "ABa/pr/l",  "ABa/pr/l", "ABa/pr/l",
-                       "P2/P3/C", "MS/E","P2/P3/C", "MS/E",
-                       "ABa/pr/lx", "ABa/pr/lx", "ABa/pr/lx", "ABa/pr/lx",
-                       "MSx1/2", "MSx1/2",  "Cx1/2",   
-                       "Ea/p",    "Ea/p",    "Cx1/2",   "P4/D",    "P4/D" )   
-  names(new.cluster.ids) <- levels(tintori)
-  tintori <- RenameIdents(tintori, new.cluster.ids)
   
   Merge.cell.types.tintori = FALSE
   if(Merge.cell.types.tintori){
@@ -867,28 +826,11 @@ cluster.annotation.using_marker.genes_tf.motif_peaks = function(seurat.cistopic)
   gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_nonOverlapped.withGenes_promoter_2000bpUpstream.500bpDownstream.rds')
   seurat.cistopic = readRDS(file = gamat)
   
-  Manual.modify.cluster.annotation = TRUE
-  if(Manual.modify.cluster.annotation){
-    
-    DefaultAssay(seurat.cistopic) <- 'peaks'
-    Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
-    new.cluster.ids <- c('0.??',
-                         "1.ABxxx/MSx/Cx", "2.MSx/Cx/ABxxx", 
-                         "3.ABxxx/MSx/Cx", "4.ABxx/ABx", "5.intestine(E)",
-                         '6.intestine (E)', '7.P0/AB/P1/ABa.p/EMS/P2',
-                         '8.MSx/Cx/ABxxx', '9.ABaxx', '10.MS/E', 
-                         '11.BWM', '12.AB', '13.MS', '14.MS', '15.BWM',
-                         '16.MS', '17.ABp', '18.AB','19.C/Ea', '20.ABa/p/MS/E', '21.Germline(P4)')
-    
-    names(new.cluster.ids) <- levels(seurat.cistopic)
-    seurat.cistopic <- RenameIdents(seurat.cistopic, new.cluster.ids)
-    
-    DimPlot(seurat.cistopic, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 5, repel = FALSE) + NoLegend()
-    
-  }
-  
   # remove cluster0 cells because they are not real cells
   seurat.cistopic = subset(seurat.cistopic, cells = which(seurat.cistopic$peaks_snn_res.0.8 != 0) )
+  
+  Manual.update.cluster.annotation(seurat.cistopic);
+  
   # test.umap.param(seurat.cistopic)
   #nb.pcs = ncol(seurat.cistopic[['pca']]);
   nb.pcs = 80;
