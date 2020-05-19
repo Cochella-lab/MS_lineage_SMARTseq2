@@ -15,25 +15,26 @@ Manual.update.cluster.annotation = function(seurat.cistopic)
                        "2.neurons", 
                        "3.neurons", 
                        "4.hypodermis", 
-                       "5.intestine.E",
-                       '6.intestine.E', 
+                       "5.intestine",
+                       '6.intestine', 
                        '7.P0/AB/P1/ABa.p/EMS/P2',
-                       '8.neurons', 
+                       '8.hypodermis', 
                        '9.neurons/BWM', 
                        '10.pharynx/neurons', 
-                       '11.BWM.E', '12.hypodermis/seam.cell', 
+                       '11.BWM', 
+                       '12.hypodermis', 
                        '13.pharynx/germline/neurons', 
                        '14.neurons', 
-                       '15.BWM.E',
+                       '15.BWM',
                        '16.pharynx/neurons', 
                        '17.neurons', '18.neurons',
-                       '19.neurons/pharyngeal.neurons', '20.hypodermis/seam.cell', 
+                       '19.neurons/pharyngeal.neurons', '20.hypodermis', 
                        '21.germline.P4')
   
   names(new.cluster.ids) <- levels(seurat.cistopic)
   seurat.cistopic <- RenameIdents(seurat.cistopic, new.cluster.ids)
   
-  DimPlot(seurat.cistopic, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 5, repel = TRUE) + NoLegend()
+  #DimPlot(seurat.cistopic, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 5, repel = TRUE) + NoLegend()
   
   return(seurat.cistopic)
   
@@ -826,25 +827,11 @@ cluster.annotation.using_marker.genes_tf.motif_peaks = function(seurat.cistopic)
   gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_nonOverlapped.withGenes_promoter_2000bpUpstream.500bpDownstream.rds')
   seurat.cistopic = readRDS(file = gamat)
   
-  # remove cluster0 cells because they are not real cells
-  seurat.cistopic = subset(seurat.cistopic, cells = which(seurat.cistopic$peaks_snn_res.0.8 != 0) )
+  # add motif activities into seurat.cistopic
+  xx = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_motifClassChromVar.rds'))
+  seurat.cistopic[['chromvar']] = CreateAssayObject(data = xx@assays$chromvar@data)
   
-  Manual.update.cluster.annotation(seurat.cistopic);
-  
-  # test.umap.param(seurat.cistopic)
-  #nb.pcs = ncol(seurat.cistopic[['pca']]);
-  nb.pcs = 80;
-  n.neighbors = 30; min.dist = 0.1;
-  
-  seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', 
-                             dims = 1:nb.pcs, 
-                             n.neighbors = n.neighbors, min.dist = min.dist)
-  DimPlot(seurat.cistopic, label = TRUE, pt.size = 1, label.size = 5,  repel = TRUE) + 
-    NoLegend()
-  
-  ##########################################
-  # 1) first identify cluster-specific marker genes
-  ##########################################
+  ## normalize the gene activity matrix
   DefaultAssay(seurat.cistopic) = 'RNA'
   seurat.cistopic <- NormalizeData(seurat.cistopic, 
                                    #normalization.method = 'CLR',
@@ -853,68 +840,107 @@ cluster.annotation.using_marker.genes_tf.motif_peaks = function(seurat.cistopic)
   seurat.cistopic <- ScaleData(seurat.cistopic)
   
   
-  DefaultAssay(seurat.cistopic) = 'RNA'
-  Idents(seurat.cistopic) = seurat.cistopic$seurat_clusters
+  # remove cluster0 cells because they are not real cells
+  seurat.cistopic = subset(seurat.cistopic, cells = which(seurat.cistopic$peaks_snn_res.0.8 != 0) )
   
+  seurat.cistopic = Manual.update.cluster.annotation(seurat.cistopic);
   
+  # test.umap.param(seurat.cistopic)
+  #nb.pcs = ncol(seurat.cistopic[['pca']]);
+  nb.pcs = 80;
+  n.neighbors = 50; min.dist = 0.1;
   
-  cms <- FindMarkers(seurat.cistopic, ident.1 = 6, only.pos = TRUE,
-                                  min.pct = 0.1, logfc.threshold = 0.1)
+  seurat.cistopic <- RunUMAP(object = seurat.cistopic, reduction = 'pca', 
+                             dims = 1:nb.pcs, 
+                             n.neighbors = n.neighbors, min.dist = min.dist)
+  DimPlot(seurat.cistopic, label = TRUE, pt.size = 2, label.size = 6,  repel = TRUE) + 
+    NoLegend()
   
-  #head(cms, n = 20)
-  
-  #FeaturePlot(seurat.cistopic, features = rownames(cms)[1:4])
-  #FeaturePlot(seurat.cistopic, features = rownames(cms)[c(nrow(cms):(nrow(cms)-4))])
-  #cms[grep('end-1', rownames(cms)), ]
-  
-  # find markers for every cluster compared to all remaining cells, report only the positive ones
-  ee.markers <- FindAllMarkers(seurat.cistopic, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
-  saveRDS(ee.markers, file = paste0(RdataDir, 'scATAC_seq_geneActivityMatrix.inPromoter.resolution.0.8_markerGenes.rds'))
-  
-  ##########################################
-  #  ## heatmap for all marker genes
-  ##########################################
-  ee.markers = readRDS(file = paste0(RdataDir, 'scATAC_seq_geneActivityMatrix.inPromoter.resolution.0.8_markerGenes.rds'))
-  
-  # ee.markers$cluster = lineages[(1+as.integer(ee.markers$cluster))]
-  top.markers <- ee.markers %>% group_by(cluster) %>% top_n(n = 50, wt = avg_logFC)
-  
-  #Idents(seurat.cistopic) = $lineage
-  DoHeatmap(seurat.cistopic, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend() 
-  
-  head(as.data.frame(top.markers[which(top.markers$cluster==11), ]), 50)
+ 
   
   ##########################################
-  # heatmap for TF marker genes 
+  # 1) first identify cluster-specific marker genes
   ##########################################
-  ee.markers = readRDS(file = paste0(RdataDir, 'scATAC_seq_geneActivityMatrix.inPromoter.resolution.0.8_markerGenes.rds'))
-  library(openxlsx)
-  tfs = openxlsx::read.xlsx('data/wTF_3.0.xlsx', sheet = 1)
+  Run.findMarkers = FALSE
+  if(Run.findMarkers){
+    DefaultAssay(seurat.cistopic) = 'RNA'
+    Idents(seurat.cistopic) = seurat.cistopic$seurat_clusters
+    
+    cms <- FindMarkers(seurat.cistopic, ident.1 = 6, only.pos = TRUE,
+                       min.pct = 0.1, logfc.threshold = 0.1)
+    
+    #head(cms, n = 20)
+    
+    #FeaturePlot(seurat.cistopic, features = rownames(cms)[1:4])
+    #FeaturePlot(seurat.cistopic, features = rownames(cms)[c(nrow(cms):(nrow(cms)-4))])
+    #cms[grep('end-1', rownames(cms)), ]
+    
+    # find markers for every cluster compared to all remaining cells, report only the positive ones
+    ee.markers <- FindAllMarkers(seurat.cistopic, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
+    saveRDS(ee.markers, file = paste0(RdataDir, 'scATAC_seq_geneActivityMatrix.inPromoter.resolution.0.8_markerGenes.rds'))
+  }
   
-  tf.markers = ee.markers[!is.na(match(ee.markers$gene, tfs$Public.name)), ]
-  #tf.markers = tf.markers[tf.markers$p_val_adj<0.01, ]
-  #tf.markers <- tf.markers %>% group_by(cluster) %>% top_n(n = 5 , wt = avg_logFC)
+  make.heatmap.for.markerGenes.tfs = FALSE
+  if(make.heatmap.for.markerGenes.tfs)
+  {
+    ##########################################
+    #  ## heatmap for all marker genes
+    ##########################################
+    ee.markers = readRDS(file = paste0(RdataDir, 'scATAC_seq_geneActivityMatrix.inPromoter.resolution.0.8_markerGenes.rds'))
+    
+    # ee.markers$cluster = lineages[(1+as.integer(ee.markers$cluster))]
+    top.markers <- ee.markers %>% group_by(cluster) %>% top_n(n = 50, wt = avg_logFC)
+    
+    #Idents(seurat.cistopic) = $lineage
+    DoHeatmap(seurat.cistopic, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend() 
+    
+    head(as.data.frame(top.markers[which(top.markers$cluster==11), ]), 50)
+    
+    ##########################################
+    # heatmap for TF marker genes 
+    ##########################################
+    ee.markers = readRDS(file = paste0(RdataDir, 'scATAC_seq_geneActivityMatrix.inPromoter.resolution.0.8_markerGenes.rds'))
+    library(openxlsx)
+    tfs = openxlsx::read.xlsx('data/wTF_3.0.xlsx', sheet = 1)
+    
+    
+    tf.markers = ee.markers[!is.na(match(ee.markers$gene, tfs$Public.name)), ]
+    #tf.markers = tf.markers[tf.markers$p_val_adj<0.01, ]
+    tf.markers <- tf.markers %>% group_by(cluster) %>% top_n(n = 5 , wt = avg_logFC)
+    
+    cat(length(unique(tf.markers$gene)), ' TFs in marker genes \n')
+    library("pheatmap")
+    library("RColorBrewer")
+    cols = c(colorRampPalette((brewer.pal(n = 7, name="RdYlBu")))(100))
+    
+    DefaultAssay(seurat.cistopic) = 'RNA'
+    
+    groups.orders = levels(seurat.cistopic)
+    new.orders = unique(c(grep('7.P0', groups.orders), 
+                      grep('21.germline', groups.orders),
+                      grep('intestine', groups.orders),
+                      grep('hypodermis', groups.orders),
+                      grep('11.BWM|15.BWM', groups.orders), 
+                      grep('pharynx', groups.orders), 
+                      grep('neurons', groups.orders)))
+    
+    levels(seurat.cistopic) <- groups.orders[new.orders]
+    
+    pdfname = paste0(resDir, "/cluster_annotations/marker_genes_TFs_top5_log2normalized_v3.pdf")
+    pdf(pdfname, width=16, height = 18)
+    par(cex =2.0, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    # 
+    DoHeatmap(seurat.cistopic, features = tf.markers$gene, slot = 'data',
+              size = 5, hjust = 0, label = TRUE, disp.max = 2, lines.width = 50) + scale_fill_gradientn(colors = rev(cols))
+    
+    dev.off()
+    
+  }
   
-  cat(length(unique(tf.markers$gene)), ' TFs in marker genes \n')
-  library("pheatmap")
-  library("RColorBrewer")
-  cols = c(colorRampPalette((brewer.pal(n = 7, name="YlGnBu")))(100))
-  
-  pdfname = paste0(resDir, "/cluster_annotations/marker_genes_TFs_all_log2normalized.pdf")
-  pdf(pdfname, width=12, height = 32)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  # 
-  DoHeatmap(seurat.cistopic, features = tf.markers$gene, slot = 'data',
-            size = 5, hjust = 0, label = TRUE, disp.max = 2.0) + scale_fill_gradientn(colors = cols)
-  
-  dev.off()
   
   ##########################################
   # annotat those clusters using known lineage-specifc genes or tf or tf motif activities 
   ##########################################
-  # add motif activities into seurat.cistopic
-  xx = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_motifClassChromVar.rds'))
-  seurat.cistopic[['chromvar']] = CreateAssayObject(data = xx@assays$chromvar@data)
   
   # import processed tintori from raw data
   tintori = import.tintori.et.al.dataset(nfeatures = 3000, npcs = 30)
@@ -932,6 +958,7 @@ cluster.annotation.using_marker.genes_tf.motif_peaks = function(seurat.cistopic)
   )
   
   options(warn=-1)
+ 
   feature.example = c('pha-4', 'hnd-1', 'skn-1', 'hlh-1', 'tbx-8', 'unc-120', 'med-2', 'med-1', 'sdz-38', 'pal-1',
                       'end-1', 'elt-2', 'end-1', 'end-3', 'elt-7')
   #plot.feature.example.scRNA.scATAC.tf.motif(seurat.cistopic, feature.example = 'ceh-51', tintori, aleks)
@@ -945,12 +972,42 @@ cluster.annotation.using_marker.genes_tf.motif_peaks = function(seurat.cistopic)
   feature.example = c('hnd-1', 'pha-4')
   feature.example = c('egl-20', 'nob-1', 'cwn-1', 'ceh-34', 'eya-1', 'ceh-13', 'lin-39' )
   feature.example = c('pha-4', 'tbx-2', 'ceh-22', 'myo-2', 'hlh-6')
-  FeaturePlot(seurat.cistopic, features = feature.example, ncol = 3)
   
+  # marker genes for intestine
+  feature.example.intestine = c('sys-1','med-1', 'med-2', 'end-3', 'end-1', 'elt-2', 'elt-7', 'elt-4',
+                      'nit-1', 'sdz-31', 'sdz-1',
+                      'sdz-38', 'tbx-35',
+                      'sdz-26', 'sdz-23',
+                      'ges-1' 
+                      )
+  # marker genes (main tfs) for body wall muscle
+  feature.example.bwm = c('myo-3', 'atn-1', 'unc-89', 'pat-6', 'pal-1', 'hlh-8', 'hnd-1', 'hlh-1', 'unc-120')
   
-  motifs2check = rownames(seurat.cistopic)[grep('tbx-35|tbx-38|MA0542.1|MA0924.1 pal-1|MA0546.1|end-1|MA0547.1 skn-1|
-                                                hnd|unc-130|mom-2|med-2|ref', 
-                                                rownames(seurat.cistopic))]
+  # marker genes for epidermis 
+  feature.example.epidermis = c('elt-1', 'lin-26', 'elt-3', 'nhr-25', 'nhr-23', 'ajm-1', 'dlg-1', 'che-14',
+                                'pal-1', 'tbx-8', 'tbx-9', 'vab-7',
+                                'die-1','che-16', 
+                                'egl-18', # elt-5
+                                'elt-6', 'rnd-1')
+  
+  feature.example = feature.example.epidermis
+  DefaultAssay(seurat.cistopic) <- 'RNA'
+  FeaturePlot(seurat.cistopic, features = feature.example, ncol = 3, reduction = 'umap')
+  
+  DefaultAssay(seurat.cistopic) <- 'chromvar'
+  motifs2check = rownames(seurat.cistopic)[grep(paste0(feature.example, collapse = '|'), rownames(seurat.cistopic))]
+  if(length(motifs2check)>0){
+    FeaturePlot(
+      object = seurat.cistopic,
+      features = motifs2check,
+      pt.size = 0.1,
+      #cols = c('red', 'blue'),
+      #max.cutoff = 1,
+      min.cutoff = 0.2,
+      ncol = 2
+    )
+  }
+  
   
 }
 
