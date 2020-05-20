@@ -20,18 +20,18 @@ Manual.update.cluster.annotation = function(seurat.cistopic)
                        '7.P0/AB/P1/ABa.p/EMS/P2',
                        '8.hypodermis', 
                        '9.neurons/BWM', 
-                       '10.pharynx/neurons', 
+                       '10.pharynx', 
                        '11.BWM', 
                        '12.hypodermis', 
-                       '13.pharynx/neurons', 
-                       '14.pharynx/neurons', 
+                       '13.pharynx', 
+                       '14.pharynx', 
                        '15.BWM',
-                       '16.pharynx/neurons', 
+                       '16.pharynx', 
                        '17.neurons', 
                        '18.neurons',
-                       '19.pharynx/neurons', 
+                       '19.pharynx', 
                        '20.hypodermis', 
-                       '21.germline.P4')
+                       '21.germline')
   
   names(new.cluster.ids) <- levels(seurat.cistopic)
   seurat.cistopic <- RenameIdents(seurat.cistopic, new.cluster.ids)
