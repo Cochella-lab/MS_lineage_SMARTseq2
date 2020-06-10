@@ -46,9 +46,11 @@ if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 # 
 ########################################################
 ########################################################
-process.scRNAseq.for.early.embryo.packer.et.al = function()
+process.Murray.scRNAseq = function(Install.VisCello.celegans = FALSE)
 {
   Install.VisCello.celegans = FALSE
+  Check.Cello.DataSet = FALSE
+  
   if(Install.VisCello.celegans){
     ##########################################
     # details see https://github.com/qinzhu/VisCello.celegans
@@ -60,67 +62,89 @@ process.scRNAseq.for.early.embryo.packer.et.al = function()
     cello()
   }
   
-  Check.Cello.DataSet = FALSE
   if(Check.Cello.DataSet){
     ##########################################
     # more details in 
     # https://github.com/qinzhu/VisCello.celegans/blob/master/inst/app/global.R
     ##########################################
-   
-    
     eset = readRDS(paste0(cello.data.path, 'eset.rds'))
     saveRDS(eset, file =  paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
     #eset <- readRDS("data/eset.rds")
     
-  }else{
-    cello.data.path = "../VisCello.celegans//inst/app/data/"
-    library(VisCello.celegans)
-    
-    ## clusters with coordinates in reduced dimensions (PCA, UMAP)
-    clist <- readRDS(paste0(cello.data.path, "clist.rds"))
-    
-    elist <- readRDS(paste0(cello.data.path, "elist.rds"))
-    ct_tbl <-  readRDS("data/s6_tbl.rds")
-    lin_tbl <-  readRDS("data/s7_tbl.rds")
-    tree_tbl <- as_tibble(readRDS("data/lineage_tree_tbl.rds"))
-    lin_sc_expr <- readRDS("data/lin_sc_expr_190602.rds")
-    lin.expanded.list <- readRDS("data/lin_expanded_list_0602.rds")
-    avail_nodes <- readRDS("data/avail_nodes.rds")
-    
-    cell_type_markers <- read.xlsx("data/Supplementary_Tables_190611.xlsx",sheet=1, startRow=4)
-    lineage_markers <-  read.xlsx("data/Supplementary_Tables_190611.xlsx",sheet=4, startRow=7)
-    
-    eset = readRDS(file = paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
-    pmeda = data.frame(pData(eset))
-    
-    eset = eset[, which(pmeda$to.filter == FALSE)]
-    pmeda = data.frame(pData(eset))
-    
-    saveRDS(eset, file = paste0(RdataDir, 'Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
-    
-    ee = eset@assayData$exprs
-    
-    sels = sample(c(1:ncol(ee)), size = 20000, replace = FALSE)
-    ss = apply(ee[, sels], 2, function(x) sum(x >0) )
-    
-    Compare.Murray.vs.Aleks.scRNA = FALSE
-    if(Compare.Murray.vs.Aleks.scRNA){
-      load(file=paste0("data/R_processed_data/all_batches_QCed_cells_genes_filtered_SCE.Rdata"))
-      xx = 10^sce$log10_total_features_by_counts
-      
-      hist(ss, breaks = 100, freq = FALSE, xlab = 'nb of genes detected per cell', main = 'Murray data')
-      
-      hist(xx, breaks = 100, freq = FALSE, xlab = 'nb of genes detected per cell', main = 'ALeks data')
-      median(xx)
-      median(ss)
-      
-      boxplot(list(murray= ss, aleks= xx))
-    }
-    
-    sels = which(pmeda$embryo.time.bin == '< 100')
-    pp = pmeda[sels, ]
-     
   }
+  
+  library(VisCello.celegans)
+  cello.data.path = "../VisCello.celegans/inst/app/data/"
+ 
+  ## clusters with coordinates in reduced dimensions (PCA, UMAP)
+  clist <- readRDS(paste0(cello.data.path, "clist.rds"))
+  elist <- readRDS(paste0(cello.data.path, "elist.rds"))
+  ct_tbl <-  readRDS(paste0(cello.data.path, "s6_tbl.rds"))
+  lin_tbl <-  readRDS(paste0(cello.data.path,"s7_tbl.rds"))
+  tree_tbl <- as_tibble(readRDS(paste0(cello.data.path,"lineage_tree_tbl.rds")))
+  
+  # the table used by Aleks
+  lin_sc_expr <- readRDS(paste0(cello.data.path, "lin_sc_expr_190602.rds")) #
+  
+  lin.expanded.list <- readRDS(paste0(cello.data.path,"lin_expanded_list_0602.rds"))
+  avail_nodes <- readRDS(paste0(cello.data.path, "avail_nodes.rds"))
+  
+  cell_type_markers <- read.xlsx(paste0(cello.data.path, "Supplementary_Tables_190611.xlsx"),sheet=1, startRow=4)
+  lineage_markers <-  read.xlsx(paste0(cello.data.path, "Supplementary_Tables_190611.xlsx"),sheet=4, startRow=7)
+  
+  ## import the gene expression matrix and metadata
+  eset = readRDS(file = paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
+  pmeda = data.frame(pData(eset))
+  
+  # filtered 
+  eset = eset[, which(pmeda$to.filter == FALSE)]
+  pmeda = data.frame(pData(eset))
+  
+  saveRDS(eset, file = paste0(RdataDir, 'Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
+  
+  ee = eset@assayData$exprs
+  
+  sels = sample(c(1:ncol(ee)), size = 20000, replace = FALSE)
+  ss = apply(ee[, sels], 2, function(x) sum(x >0) )
+  
+  Compare.Murray.vs.Aleks.scRNA = FALSE
+  if(Compare.Murray.vs.Aleks.scRNA){
+    load(file=paste0("data/R_processed_data/all_batches_QCed_cells_genes_filtered_SCE.Rdata"))
+    xx = 10^sce$log10_total_features_by_counts
+    
+    hist(ss, breaks = 100, freq = FALSE, xlab = 'nb of genes detected per cell', main = 'Murray data')
+    
+    hist(xx, breaks = 100, freq = FALSE, xlab = 'nb of genes detected per cell', main = 'ALeks data')
+    median(xx)
+    median(ss)
+    
+    boxplot(list(murray= ss, aleks= xx))
+  }
+  
+  #sels = which(pmeda$embryo.time.bin == '< 100')
+  #pp = pmeda[sels, ]
+  library(VisCello.celegans)
+  eset = readRDS(file = paste0(RdataDir, 'Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
+  pmeda = data.frame(pData(eset))
+  
+  ## avaible time bins: < 100, 100-130, 130-170, 170-210, 210-270, 270-330 330-390 390-450 450-510 510-580 580-650   > 650 
+  kk = which(pmeda$embryo.time < 210 & pmeda$cell.type != 'unannotated' & pmeda$cell.type != 'XXX')
+  cat('nb of cell in reference -- ', length(kk), '\n')
+  
+  ee = CreateSeuratObject(counts = eset@assayData$exprs[,kk], assay = 'RNA', meta.data = pmeda[kk, ])
+  ee@assays$RNA@data = eset@assayData$norm_exprs[,kk]
+  
+  ee <- FindVariableFeatures(
+    object = ee,
+    nfeatures = 3000
+  )
+  
+  ee <- ScaleData(object = ee)
+  
+  Idents(ee) = ee$cell.type
+  
+  
+  
 }
 
 
@@ -588,15 +612,4 @@ EE_integration_Aleks_Tintori = function(ee, tt, Method = c('seurat', 'liger'))
     
     
   }
-  
-  
 }
-
-
-
-
-
-
-
-
-

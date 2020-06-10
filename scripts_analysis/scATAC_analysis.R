@@ -37,9 +37,7 @@ if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 source.my.script('scATAC_functions.R')
-source.my.script('scATAC_cluster_annotation_functions.R')
-
-filtered_mtx_dir = paste0("../output_cellranger.ce11_scATACpro/filtered_matrix_peaks_barcodes")
+#source.my.script('scATAC_cluster_annotation_functions.R')
 
 ########################################################
 ########################################################
@@ -48,6 +46,7 @@ filtered_mtx_dir = paste0("../output_cellranger.ce11_scATACpro/filtered_matrix_p
 ########################################################
 ########################################################
 source.my.script('scATAC_functions.R')
+filtered_mtx_dir = paste0("../output_cellranger.ce11_scATACpro/filtered_matrix_peaks_barcodes")
 
 run_scATAC_peak_annotation(paste0(filtered_mtx_dir, '/peaks.bed'))
 
@@ -300,37 +299,4 @@ if(Compute.gene.activity.scores){
   )
 
 }
-
-########################################################
-########################################################
-# Section : scATAC-seq cluster annotation
-# 
-########################################################
-########################################################
-
-##########################################
-# using marker genes 
-##########################################
-gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter_2000bpUpstream.500bpDownstream.rds')
-seurat.cistopic = readRDS(file = gamat)
-#seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
-
-source.my.script('scATAC_functions.R')
-annotate.scATAC.clusters.with.marker.genes = function(seurat.cistopic)
-
-##########################################
-# label transferring from scRNA-seq data using liger and seurat 
-# see details in https://satijalab.org/signac/articles/mouse_brain_vignette.html#integrating-with-scrna-seq-data
-##########################################
-
-#seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_promoterOnly.activityscores.rds'))
-#seurat.cistopic = readRDS(file =  paste0(RdataDir, 'atac_LDA_seurat_object_geneBody.promoter.activityscores.rds'))
-gamat = paste0(RdataDir, 'atac_LDA_seurat_object_geneActivityMatrix_seurat_promoter_2000bpUpstream.500bpDownstream.rds')
-seurat.cistopic = readRDS(file =  gamat)
-
-source.my.script('scATAC_functions.R')
-transfer.labels.from.scRNA.to.scATAC(seurat.cistopic, tintori, method = 'liger')
-
-
-
 
