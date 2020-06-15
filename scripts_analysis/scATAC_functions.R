@@ -1179,24 +1179,48 @@ compute.motif.enrichment = function(seurat.cistopic)
   ##########################################
   # motif analysis 1) :Finding overrepresented motifs for differentially accessible peaks
   ##########################################
-  da_peaks <- FindMarkers(
-    object = seurat.cistopic,
-    ident.1 = '10', 
-    ident.2 = '0',
-    min.pct = 0.1,
-    test.use = 'LR',
-    latent.vars = 'nFeature_peaks'
-  )
+  Idents(seurat.cistopic) = seurat.cistopic$peaks_snn_res.0.8
   
-  head(da_peaks)
-  
-  enriched.motifs <- FindMotifs(
-    object = seurat.cistopic,
-    #background = 2000,
-    features = head(rownames(da_peaks), 2000)
-  )
-  
-  head(enriched.motifs, 20)
+  for(id in levels(seurat.cistopic))
+  {
+    # id = '1'
+    cat('cluster -- ', id, '\n')
+    da_peaks <- FindMarkers(
+      object = seurat.cistopic,
+      ident.1 = id, 
+      #ident.2 = '0',
+      #min.pct = 0.1,
+      only.pos = TRUE,
+      test.use = 'LR',
+      latent.vars = 'nFeature_peaks'
+    )
+    
+    # Test the differentially accessible peaks for overrepresented motifs
+    enriched.motifs <- FindMotifs(
+      object = seurat.cistopic,
+      #background = 2000,
+      features = head(rownames(da_peaks), 1000)
+    )
+    
+    # sort by p-value and fold change
+    enriched.motifs <- enriched.motifs[order(enriched.motifs[, 7], -enriched.motifs[, 6]), ]
+    
+    write.csv(enriched.motifs, paste0(resDir, '/cluster_annotations/enrichedMotifs/cluster_', id, '.csv'))
+    pdfname = paste0(resDir, "/cluster_annotations/enrichedMotifs/cluster_", id, ".pdf")
+    pdf(pdfname, width=12, height = 8)
+    par(cex =1.0, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    p1 = MotifPlot(
+      object = seurat.cistopic,
+      motifs = rownames(enriched.motifs)[c(1:12)]
+    )
+    plot(p1)
+    dev.off()
+    
+  }
+ 
+  #head(da_peaks)
+  #head(enriched.motifs, 20)
   
   ##########################################
   # motif analysis 2): run ChromVAR
