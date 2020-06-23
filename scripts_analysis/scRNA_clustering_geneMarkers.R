@@ -8,14 +8,44 @@
 # http://bioconductor.org/packages/devel/workflows/vignettes/simpleSingleCell/inst/doc/de.html#2_blocking_on_uninteresting_factors_of_variation
 ########################################################
 ########################################################
+source.my.script <- function(name.of.function){
+  tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
+           error = function(e){
+             install.packages("rstudioapi")
+             path <-  rstudioapi::getSourceEditorContext()$path})
+  source.path <- sub(basename(path), "", path)
+  source(paste0(source.path,name.of.function))
+}
+
+## set up the paths for the data and results
+tryCatch(path <- rstudioapi::getSourceEditorContext()$path, 
+         error = function(e){
+           install.packages("rstudioapi")
+           path <-  rstudioapi::getSourceEditorContext()$path})
+source.path <- sub(basename(path), "", path)
+
+
+user <- "results_jiwang/"
+setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user))
+
+version.DATA = 'all_batches'
+version.analysis =  paste0(version.DATA, '_20191115')
+dataDir = paste0("../data/gene_counts/")
+resDir = paste0("results/", version.analysis)
+tabDir = paste0("results/", version.analysis, "/tables/")
+
+RdataDir = paste0("results/", version.analysis, "/Rdata/")
+if(!dir.exists("results/")){dir.create("results/")}
+if(!dir.exists(resDir)){dir.create(resDir)}
+if(!dir.exists(tabDir)){dir.create(tabDir)}
+if(!dir.exists(RdataDir)){dir.create(RdataDir)}
+
 
 ########################################################
 # Section : Clustering section by integrating various informations: 
 # gene expression, fac info, estimated timing and velocity 
 ########################################################
 ########################################################
-
-
 library(scater)
 library(scran)
 library(scRNA.seq.funcs)
