@@ -40,6 +40,110 @@ if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
+library(Seurat)
+library(SeuratWrappers)
+library(cowplot)
+library(ggplot2)
+########################################################
+########################################################
+# Section : annotate scRNA clusters by mapping to reference
+# 
+########################################################
+########################################################
+dir.processed.data = "/Users/jiwang/workspace/imp/scRNAseq_MS_lineage_dev/results_aleks/results/all_batches_202005/Rdata/"
+load(paste0(dir.processed.data, "all_batches_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata"))
+
+ms <- FindNeighbors(object = ms, reduction = "mnn", k.param = 20, dims = 1:20)
+ms <- FindClusters(ms, resolution = 12, algorithm = 3)
+
+DimPlot(object = ms, cells = colnames(ms), group.by = 'ident', label = TRUE, pt.size = 1)
+
+all_ms.markers <- FindAllMarkers(ms, min.pct = 0.25, logfc.threshold = 0.25)
+all_ms.top10 <- all_ms.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+
+
+#length(unique(all_ms.top10$gene))
+
+lin_sc_expr_190602 <- readRDS("../../../../data/JM_data/lin_sc_expr_190602.rds")
+MS_names <- lin_sc_expr_190602[,grepl(pattern = "MS.", x = colnames(lin_sc_expr_190602))]
+#lin_sc_expr_190602[,MS_names]
+
+library(dplyr)
+
+combined_MS_names <- data.frame(matrix(NA, dim(MS_names)[1], 1))
+used_cells <- c()
+
+for (cell in colnames(MS_names)){
+  if (cell %in% used_cells){next}
+  indx <- (MS_names[1:100,] == MS_names[1:100,cell])[1,]
+  indx_name <- colnames(MS_names)[indx]
+  tmp_df <- data.frame(MS_names[,indx_name[1]])
+  colnames(tmp_df) <- paste(indx_name, collapse = "/")
+  combined_MS_names <- cbind(combined_MS_names,tmp_df)
+  used_cells <- c(used_cells, indx_name)
+}
+
+JM_data <- combined_MS_names[,-1]
+my_MS <- as.matrix(ms[["SCT"]]@data)
+
+indexes <- match(all_ms.top10$gene, rownames(my_MS))
+my_MS <- my_MS[indexes,]
+indexes <- match(rownames(my_MS), rownames(JM_data))
+mathed_gene_names <- rownames(JM_data)[indexes[!is.na(indexes)]]
+JM_data <- JM_data[mathed_gene_names,]
+my_MS <- my_MS[mathed_gene_names,]
+
+cor_vec <- c()
+
+combined_df <- data.frame(row.names = 1:(dim(JM_data)[2]))
+combined_df_corv <- data.frame(row.names = 1:(dim(JM_data)[2]))
+
+library(progress)
+pb <- progress_bar$new(
+  format = " progress [:bar] :percent eta: :eta",
+  total = length(colnames(my_MS)))
+
+for (a in colnames(my_MS)){
+  for (i in 1:dim(JM_data)[2]){
+    cor_vec[i] <- cor(my_MS[,a], JM_data[,i])
+  }
+  combined_df[,a] <- colnames(JM_data)[order(cor_vec, decreasing = T)]
+  combined_df_corv[,a] <- cor_vec[order(cor_vec, decreasing = T)]
+  pb$tick()
+}
+
+
+View(combined_df_corv[1:10,1:40])
+cell.names <- colnames(combined_df)
+
+Idents(ms, cells = cell.names) <- combined_df[1,]
+
+pb <- progress_bar$new(
+  format = " progress [:bar] :percent eta: :eta",
+  total = length(levels(Idents(ms))))
+
+pdfname = paste0(paste0("../idents_new.pdf"))
+pdf(pdfname, width=16, height = 16)
+
+for (idntt in levels(Idents(ms))){
+  
+  #pdfname = paste0(paste0("~/Documents/plots/", which(levels(Idents(test_ms)) == idntt), ".pdf"))
+  #pdf(pdfname, width=8, height = 8)
+  
+  cells_to_show <- list(c(WhichCells(ms, idents = idntt)))
+  names(cells_to_show) <- idntt
+  print(DimPlot(ms, reduction = "umap", label = F, cells.highlight = cells_to_show))
+  #dev.off()
+  pb$tick()
+  
+}
+
+dev.off()
+
+ms_correlation_idents <- ms
+
+saveRDS(ms_correlation_idents, file = './ms_correlation_idents.rds')
+
 
 ########################################################
 # Section : Clustering section by integrating various informations: 
