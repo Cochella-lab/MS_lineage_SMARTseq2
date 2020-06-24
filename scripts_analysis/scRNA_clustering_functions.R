@@ -7,6 +7,47 @@
 # Date of creation: Fri Nov 22 15:38:57 2019
 ##########################################################################
 ##########################################################################
+test.umap.params = function(seurat.obj, pdfname = paste0(resDir, '/umap_params_test.pdf'), 
+                            nb.pcs.sampling = seq(20, 50, by = 10),
+                            n.neighbors.sampling = seq(10, 50, by = 10),
+                            min.dist.sampling = c(0.01, 0.05, seq(0.1, 0.5, by = 0.1))
+)
+{
+  #pdfname = paste0(resDir, "/cluster_annotations/test_umap_params_for_seurat.cistopic.pdf")
+  pdf(pdfname, width=12, height = 8)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  #nb.pcs = ncol(seurat.obj[['pca']]);
+  #n.neighbors = 50; min.dist = 0.01;
+  
+  for(nb.pcs in unique(c(nb.pcs.sampling, ncol(seurat.obj[['pca']]))))
+  {
+    if(nb.pcs <= ncol(seurat.obj[['pca']])){
+      for(n.neighbors in n.neighbors.sampling)
+      {
+        for(min.dist in min.dist.sampling)
+        {
+          cat('nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, ', min.dist - ', min.dist, '\n')
+          seurat.obj <- RunUMAP(object = seurat.obj, reduction = 'pca', 
+                                dims = 1:nb.pcs, 
+                                n.neighbors = n.neighbors, min.dist = min.dist)
+          p1 =  DimPlot(seurat.obj, reduction = 'umap', label = TRUE, pt.size = 1, label.size = 6) + 
+            NoLegend() + 
+            ggtitle(paste0('nb.pcs - ', nb.pcs, '; n.neighbors - ', n.neighbors, ', min.dist - ', min.dist))
+          plot(p1)
+        }
+      }
+    }
+  }
+  
+  dev.off()
+  
+}
+
+
+
+
+
 ########################################################
 ########################################################
 # Section :
@@ -286,3 +327,7 @@ config.umap = function(n_neighbors=15,
   return(umap.defaults)
   
 }
+
+
+
+
