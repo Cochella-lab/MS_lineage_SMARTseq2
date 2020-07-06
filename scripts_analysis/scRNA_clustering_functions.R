@@ -49,7 +49,7 @@ test.umap.params = function(seurat.obj, pdfname = paste0(resDir, '/umap_params_t
 # Section : label transferring from Murray dataset
 # 1) seurat
 # 2) scmap, svm, RF
-
+# 3) utility functions
 ########################################################
 ########################################################
 seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj)
@@ -206,13 +206,14 @@ reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap'
   logcounts(ee) = as.matrix(logcounts(ee))
   rowData(ee)$feature_symbol <- rownames(ee)
   ee$cell_type1 = ee$lineage
-  ee <- selectFeatures(ee, suppress_plot = FALSE)
+  
+  ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = 500)
+  
   table(rowData(ee)$scmap_features)
   as.character(unique(ee$cell_type1))
   
   if(method == 'scmap'){
     ee_ref = indexCluster(ee)
-    
     head(metadata(ee_ref)$scmap_cluster_index)
     
     heatmap(as.matrix(metadata(ee_ref)$scmap_cluster_index))
@@ -229,63 +230,125 @@ reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap'
     
     head(scmapCluster_results$scmap_cluster_siml)
     
+    hist(scmapCluster_results$scmap_cluster_siml, breaks = 100)
     head(scmapCluster_results$combined_labs)
     
-    plot(
-      getSankey(
-        colData(sce)$SCT_snn_res.12, 
-        scmapCluster_results$scmap_cluster_labs[,'murray'],
-        plot_height = 1000,
-        plot_width = 400
-        #colors = TRUE
-      )
-    )
+    
+    # plot(
+    #   getSankey(
+    #     colData(sce)$SCT_snn_res.12, 
+    #     scmapCluster_results$scmap_cluster_labs[,'murray'],
+    #     plot_height = 1000,
+    #     plot_width = 400
+    #     #colors = TRUE
+    #   )
+    # )
+    
     predicted.id = scmapCluster_results$scmap_cluster_labs
     predicted.id[which(predicted.id == 'unassigned')] = NA
     seurat.obj$predicted.id = predicted.id
     
     DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
-            na.value = "grey10") + 
-      ggtitle("transferred labels with scmap") +
+            na.value = "gray") + 
+      ggtitle("projection into Murray data with scmap") +
       scale_colour_hue(drop = FALSE) + 
       NoLegend()
     
   }else{
-    if(method == 'svm'){
-        #' @importFrom e1071 svm
-        #' @importFrom stats predict
-        library(e1071)
-        support_vector_machines <- function(train, study, kern = "linear") {
-          train <- t(train)
-          labs <- factor(rownames(train))
-          rownames(train) <- NULL
-          model <- tryCatch(e1071::svm(train, labs, kernel = kern, probability = TRUE), error = function(cond) return(NA))
-          pred <- stats::predict(model, t(study), probability = TRUE)
-          return(pred = pred)
-        }
-    }
+    # prepare train and test tables
+    #ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = 500)
+    #table(rowData(ee)$scmap_features)
+    
+    features.sel = rownames(ee)[rowData(ee)$scmap_features]
+    features.sel = features.sel[!is.na(match(features.sel, rownames(sce)))]
+    ee.sel = ee[match(features.sel, rownames(ee)),]
+    sce.sel = sce[match(features.sel, rownames(sce))]
+    
+    train = logcounts(ee.sel)
+    study = logcounts(sce.sel)
+    
     if(method == 'rf'){
-      #' @importFrom randomForest randomForest
-      #' @importFrom stats predict
-      random_forest <- function(train, study, ntree = 50) {
-        train <- t(train)
-        train <- as.data.frame(train)
-        y <- as.factor(rownames(train))
-        study <- t(study)
-        study <- as.data.frame(study)
-        rownames(train) <- NULL
-        rownames(study) <- NULL
-        train_rf <- randomForest::randomForest(x = train, y = y, ntree = ntree, keep.forest = TRUE)
-        Prediction <- stats::predict(train_rf, study, type = "prob")
-        return(Prediction)
-      }
+      library(randomForest)
+      library(stats)
+      
+      train = scale(train)
+      study = scale(study)
+      
+      train = t(train)
+      train <- as.data.frame(train)
+      y <- as.factor(ee.sel$lineage)
+      study = t(study)
+      study <- as.data.frame(study)
+      rownames(train) <- NULL
+      rownames(study) <- NULL
+      ntree = 100
+      bestmtry <- tuneRF(x = train, y = y, stepFactor=2, improve=0.001, ntree=ntree)
+      print(bestmtry)
+      
+      train_rf <- randomForest::randomForest(x = train, y = y, ntree = ntree, mtry=88, keep.forest = TRUE, 
+                                             importance = TRUE)
+      
+      Prediction <- stats::predict(train_rf, study, type = "prob")
+      rf.res = data.frame(label = apply(Prediction, 1, function(x) colnames(Prediction)[which.max(x)]),
+                                prob = apply(Prediction, 1, function(x) x[which.max(x)])
+                                )
+      hist(rf.res$prob)
+     
+      pred.prob.threshod = 0.5
+      predicted.id = rf.res$label
+      predicted.id[which(rf.res$prob < pred.prob.threshod)] = NA
+      seurat.obj$predicted.id = predicted.id
+      
+      DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
+              na.value = "grey10") + 
+        ggtitle(paste0("projection with RF (threshold = ", pred.prob.threshod, ")")) +
+        scale_colour_hue(drop = FALSE) + 
+        NoLegend()
     }
+    
+    if(method == 'svm'){
+      library(e1071)
+      library(stats)
+      #' @importFrom e1071 svm
+      #' @importFrom stats predict
+      #library(e1071)
+      
+      train = t(train)
+      train <- as.data.frame(train)
+      y <- as.factor(ee.sel$lineage)
+      study = t(study)
+      study <- as.data.frame(study)
+      rownames(train) <- NULL
+      rownames(study) <- NULL
+      
+      model <- e1071::svm(train, y, kernel = 'linear', probability = TRUE)
+      pred <- predict(model, study, probability = TRUE)
+      
+      Prediction = attr(pred, "probabilities")
+      svm.res = data.frame(label = apply(Prediction, 1, function(x) colnames(Prediction)[which.max(x)]),
+                          prob = apply(Prediction, 1, function(x) x[which.max(x)])
+      )
+      hist(svm.res$prob)
+      
+      predicted.id = svm.res$label
+      predicted.id[which(svm.res$prob < 0.5)] = NA
+      seurat.obj$predicted.id = predicted.id
+      
+      DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
+              na.value = "grey10") + 
+        ggtitle("projection with SVM ") +
+        scale_colour_hue(drop = FALSE) + 
+        NoLegend()
+    }
+    
   }
   
   
 }
 
-
+##########################################
+# utility functions for the function reference.based.cluster.annotation.scmap
+##########################################
 process.import.Murray.scRNA = function()
 {
   library(VisCello.celegans)
@@ -303,6 +366,41 @@ process.import.Murray.scRNA = function()
   return(ee)
   
 }
+
+test.scmap.similarity = function(ee_ref, sce)
+{
+  ee.sel = as.matrix(metadata(ee_ref)$scmap_cluster_index)
+  features.sel = rownames(ee.sel)
+  features.sel = features.sel[!is.na(match(features.sel, rownames(sce)))]
+  
+  ee.sel = ee.sel[match(features.sel, rownames(ee.sel)),]
+  sce.sel = sce[match(features.sel, rownames(sce))]
+  
+  train = ee.sel
+  study = logcounts(sce.sel)
+  
+  library(lsa)
+  for(n in 1:nrow(study))
+  {
+    # n = 1
+    xx1 = cor(study[,n], train, method = 'pearson')
+    kk1 = which.max(xx1)
+    xx1 = xx1[which.max(xx1)]
+    xx2 = cor(study[,n], train, method = 'spearman')
+    kk2 = which.max(xx2)
+    xx2 = xx2[which.max(xx2)]
+    xx3= lsa::cosine(study[,n], train)
+    kk3 = which.max(xx3)
+    xx3 = xx3[which.max(xx3)]
+    
+    cat(colnames(study)[n], ': ', xx1, xx2, xx3, colnames(train)[c(kk1, kk2, kk3)],  '\n',
+        colnames(sce)[n], ': scamp -- ', scmapCluster_results$scmap_cluster_siml[n], '\n')
+    n = n + 1
+    #readline() 
+    #break()
+  }
+}
+
 
 ##########################################
 # Aleks' cell-state assignment using correlation 
