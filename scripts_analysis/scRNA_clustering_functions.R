@@ -207,7 +207,10 @@ reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap'
   rowData(ee)$feature_symbol <- rownames(ee)
   ee$cell_type1 = ee$lineage
   
-  ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = 500)
+  nb.features = 500
+  threshold = 0.7
+  
+  ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = nb.features)
   
   table(rowData(ee)$scmap_features)
   as.character(unique(ee$cell_type1))
@@ -223,16 +226,21 @@ reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap'
       index_list = list(
         murray = metadata(ee_ref)$scmap_cluster_index
       ),
-      threshold = 0.7
+      threshold = threshold
     )
     
     head(scmapCluster_results$scmap_cluster_labs)
+    length(scmapCluster_results$scmap_cluster_labs)
     
     head(scmapCluster_results$scmap_cluster_siml)
     
     hist(scmapCluster_results$scmap_cluster_siml, breaks = 100)
+    abline(v = threshold, col = 'red')
     head(scmapCluster_results$combined_labs)
     
+    predicted.id = scmapCluster_results$scmap_cluster_labs
+    predicted.id[which(predicted.id == 'unassigned')] = NA
+    cat(length(predicted.id[!is.na(predicted.id)]), length(predicted.id[!is.na(predicted.id)])/length(predicted.id), '\n')
     
     # plot(
     #   getSankey(
@@ -244,13 +252,10 @@ reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap'
     #   )
     # )
     
-    predicted.id = scmapCluster_results$scmap_cluster_labs
-    predicted.id[which(predicted.id == 'unassigned')] = NA
     seurat.obj$predicted.id = predicted.id
-    
     DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
             na.value = "gray") + 
-      ggtitle("projection into Murray data with scmap") +
+      ggtitle(paste0("projection into Murray data with scmap (nfeature = ", nb.features,", threshold = ", threshold, ")")) +
       scale_colour_hue(drop = FALSE) + 
       NoLegend()
     
@@ -268,12 +273,13 @@ reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap'
     study = logcounts(sce.sel)
     
     if(method == 'rf'){
+      #https://cran.r-project.org/web/packages/randomForestExplainer/vignettes/randomForestExplainer.html
+      #library(tree)
       library(randomForest)
       library(stats)
       
-      train = scale(train)
-      study = scale(study)
-      
+      #train = scale(train)
+      #study = scale(study)
       train = t(train)
       train <- as.data.frame(train)
       y <- as.factor(ee.sel$lineage)
@@ -340,10 +346,7 @@ reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap'
         scale_colour_hue(drop = FALSE) + 
         NoLegend()
     }
-    
   }
-  
-  
 }
 
 ##########################################
@@ -357,6 +360,10 @@ process.import.Murray.scRNA = function()
   
   ## select the cells for MS lineages
   kk = grep('^MS', pmeda$lineage)
+  kk1 = which(pmeda$lineage == '28_cell_or_earlier'| pmeda$lineage == 'ABaxx'| pmeda$lineage == 'Cx'|
+                pmeda$lineage == 'Dx'|pmeda$lineage == 'Dxa'|pmeda$lineage == 'Exx')
+  
+  kk = unique(c(kk, kk1))
   cat('nb of cell in reference -- ', length(kk), '\n')
   cat('nb of cell states in reference -- ', length(unique(pmeda$lineage[kk])), '\n')
   
