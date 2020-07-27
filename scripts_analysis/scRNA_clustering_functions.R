@@ -189,10 +189,17 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj)
   
 }
 
-reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap')
+reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap', nb.features.scmap = 500, threshold.scmap = 0.7
+                                                    )
 {
-  # seurat.obj = ms
+  # seurat.obj = ms; 
+  # method = 'scmap';  nb.features.scmap = 500; threshold.scmap = 0.7;
   
+  ##########################################
+  # first step: project aleks cells to the reference using scmap
+  # transfer labels with stringent threshold
+  ##########################################
+  ## process aleks data for scmap
   library(SingleCellExperiment)
   library(scmap)
   sce = Seurat::as.SingleCellExperiment(seurat.obj)
@@ -201,6 +208,7 @@ reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap'
   counts(sce) = as.matrix(counts(sce)) # sce object converted from seurat object was using spare matrix
   logcounts(sce) = as.matrix(logcounts(sce))
   
+  ## import and process Murray datfa for scmap as reference
   ee = process.import.Murray.scRNA()
   ee = Seurat::as.SingleCellExperiment(ee)
   counts(ee) = as.matrix(counts(ee))
@@ -208,11 +216,9 @@ reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap'
   rowData(ee)$feature_symbol <- rownames(ee)
   ee$cell_type1 = ee$lineage
   
-  nb.features = 500
-  threshold = 0.7
   
-  ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = nb.features)
-  
+  ## feature selection for scmap
+  ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = nb.features.scmap)
   table(rowData(ee)$scmap_features)
   as.character(unique(ee$cell_type1))
   
@@ -227,7 +233,7 @@ reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap'
       index_list = list(
         murray = metadata(ee_ref)$scmap_cluster_index
       ),
-      threshold = threshold
+      threshold = threshold.scmap
     )
     
     head(scmapCluster_results$scmap_cluster_labs)
@@ -236,12 +242,14 @@ reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap'
     head(scmapCluster_results$scmap_cluster_siml)
     
     hist(scmapCluster_results$scmap_cluster_siml, breaks = 100)
-    abline(v = threshold, col = 'red')
+    abline(v = threshold.scmap, col = 'red')
     head(scmapCluster_results$combined_labs)
     
     predicted.id = scmapCluster_results$scmap_cluster_labs
     predicted.id[which(predicted.id == 'unassigned')] = NA
-    cat(length(predicted.id[!is.na(predicted.id)]), length(predicted.id[!is.na(predicted.id)])/length(predicted.id), '\n')
+    
+    cat('nb of assigned cells :',  length(predicted.id[!is.na(predicted.id)]), '\n')
+    cat('percent of assigned cells: ', length(predicted.id[!is.na(predicted.id)])/length(predicted.id), '\n')
     
     # plot(
     #   getSankey(
@@ -252,12 +260,15 @@ reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap'
     #     #colors = TRUE
     #   )
     # )
+    
     seurat.obj$predicted.id = predicted.id
     DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
             na.value = "gray") + 
-      ggtitle(paste0("projection into Murray data with scmap (nfeature = ", nb.features,", threshold = ", threshold, ")")) +
+      ggtitle(paste0("projection into Murray data with scmap (nfeature = ", nb.features.scmap,", threshold = ", 
+                     threshold.scmap, ")")) +
       scale_colour_hue(drop = FALSE) + 
       NoLegend()
+    
     
   }else{
     # prepare train and test tables
@@ -307,8 +318,32 @@ reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap'
         NoLegend()
     }
   }
+  
+  ##########################################
+  # step 2: predict unassigned cells using assgined cells with svm
+  ##########################################
+  ee = process.import.Murray.scRNA()
+  ee = Seurat::as.SingleCellExperiment(ee)
+  counts(ee) = as.matrix(counts(ee))
+  logcounts(ee) = as.matrix(logcounts(ee))
+  rowData(ee)$feature_symbol <- rownames(ee)
+  ee$cell_type1 = ee$lineage
+  
+  ## split the Murray data into train and test
+  set.seed(101)
+  index.train = sample(1:ncol(ee), 8000)
+  train = ee[, index.train]
+  test = ee[, -index.train]
+  
+  # test scmap
+  library(scmap)
+  nb.features = 500
+  threshold = 0.7
+  
+  train <- selectFeatures(train, suppress_plot = FALSE, n_features = nb.features)    
+  
+  
 }
-
 
 ##########################################
 # utility functions for the function reference.based.cluster.annotation.scmap
