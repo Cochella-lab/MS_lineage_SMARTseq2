@@ -192,6 +192,7 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj)
 reference.based.cluster.annotation.scmap = function(seurat.obj, method = 'scmap')
 {
   # seurat.obj = ms
+  
   library(SingleCellExperiment)
   library(scmap)
   sce = Seurat::as.SingleCellExperiment(seurat.obj)

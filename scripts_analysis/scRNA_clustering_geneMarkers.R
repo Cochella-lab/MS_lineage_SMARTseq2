@@ -24,7 +24,6 @@ tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
            path <-  rstudioapi::getSourceEditorContext()$path})
 source.path <- sub(basename(path), "", path)
 
-
 user <- "results_jiwang/"
 setwd(paste0("../", user))
 #setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user))
@@ -43,6 +42,7 @@ if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 library(Seurat)
 library(ggplot2)
+
 ########################################################
 ########################################################
 # Section : annotate scRNA clusters by mapping to reference
