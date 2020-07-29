@@ -751,6 +751,7 @@ reference.based.cell.projection.rf.svm = function()
     rf.res = run.classifier.rf(train, study)
     
     pred.prob.threshod = 0.5
+    
     predicted.id = rf.res$label
     predicted.id[which(rf.res$prob < pred.prob.threshod)] = NA
     seurat.obj$predicted.id = predicted.id
