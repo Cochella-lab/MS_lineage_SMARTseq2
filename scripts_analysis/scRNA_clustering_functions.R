@@ -355,35 +355,36 @@ annotate.clusters.using.predicted.id = function(seurat.obj, redefine.clusters = 
   if(redefine.clusters){
     
     nfeatures = 3000
-    ms <- FindVariableFeatures(ms, selection.method = "vst", nfeatures = nfeatures)
+    seurat.obj <- FindVariableFeatures(seurat.obj, selection.method = "vst", nfeatures = nfeatures)
     
-    top10 <- head(VariableFeatures(ms), 10) # Identify the 10 most highly variable genes
+    # top10 <- head(VariableFeatures(seurat.obj), 10) # Identify the 10 most highly variable genes
+    # 
+    # plot1 <- VariableFeaturePlot(seurat.obj)
+    # plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+    # CombinePlots(plots = list(plot1, plot2)) # plot variable features with and without labels
+    # 
+    seurat.obj = ScaleData(seurat.obj, features = rownames(seurat.obj))
     
-    plot1 <- VariableFeaturePlot(ms)
-    plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
-    CombinePlots(plots = list(plot1, plot2)) # plot variable features with and without labels
+    seurat.obj <- RunPCA(object = seurat.obj, features = VariableFeatures(seurat.obj), verbose = FALSE)
+    ElbowPlot(seurat.obj, ndims = 50)
     
-    ms = ScaleData(ms, features = rownames(ms))
-    
-    ms <- RunPCA(object = ms, features = VariableFeatures(ms), verbose = FALSE)
-    ElbowPlot(ms, ndims = 50)
-    
-    ms <- FindNeighbors(object = ms, reduction = "pca", k.param = 20, dims = 1:20)
-    ms <- FindClusters(ms, resolution = 12, algorithm = 3)
+    seurat.obj <- FindNeighbors(object = seurat.obj, reduction = "pca", k.param = 20, dims = 1:30)
+    seurat.obj <- FindClusters(seurat.obj, resolution = 5, algorithm = 3)
     
     #nb.pcs = 30; n.neighbors = 30; min.dist = 0.25;
-    #ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+    #seurat.obj <- RunUMAP(object = seurat.obj, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
     
   }
   
+  seurat.obj$predicted.id.scmap[which(is.na(seurat.obj$predicted.id.scmap))] = 'unassigned'
   
+  seurat.obj$seurat_clusters = seurat.obj$RNA_snn_res.5
   seurat.obj$cluster.idents = seurat.obj$seurat_clusters
   cluster.ids = unique(seurat.obj$seurat_clusters)
   cluster.ids = cluster.ids[order(cluster.ids)]
-    
   
   pdfname = paste0(resDir, "/annotate_clusters_using_predicted.ids_test_1.pdf")
-  pdf(pdfname, width=10, height = 8)
+  pdf(pdfname, width=16, height = 8)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   for(n in 1:length(cluster.ids))
@@ -403,46 +404,57 @@ annotate.clusters.using.predicted.id = function(seurat.obj, redefine.clusters = 
     
     p2 = DimPlot(seurat.obj, 
             cells = colnames(seurat.obj)[sels],
-            group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 4,
-            sizes.highlight = 2,
+            group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 3, label.size = 4,
             na.value = "gray") + 
       ggtitle(paste0("cluster ", cluster.ids[n])) 
     
-    plot(p1)
-    plot(p2)
-    
+    pp = CombinePlots(list(p1, p2))
+    plot(pp)
     pred.ids = seurat.obj$predicted.id.scmap[sels]
     pred.ids[which(is.na(pred.ids))] = 'unassigned'
     
+    par(mfrow = c(1, 1))
     par(mar=c(5,8,4,2)) # increase y-axis margin.
     barplot(table(pred.ids)/length(pred.ids), las = 2, horiz = TRUE, xlim =c(0, 1), main = paste0("cluster ", cluster.ids[n]))
     
-    hist(seurat.obj$BSC_log2[sels], breaks = 15)
+    par(mfrow = c(1, 2))
+    hist(seurat.obj$BSC_log2[sels], breaks = 20)
+    hist(seurat.obj$FSC_log2[sels], breaks = 20)
     
-    hist(seurat.obj$FSC_log2[sels], breaks = 15)
-    
-    subobj = subset(seurat.obj, cells = sels)
-    subobj <- FindVariableFeatures(subobj, selection.method = "vst", nfeatures = 500)
-    
-    subobj = ScaleData(subobj, features = rownames(subobj))
-    
-    subobj <- RunPCA(object = subobj, features = VariableFeatures(subobj), verbose = FALSE)
-    ElbowPlot(ms, ndims = 50)
-    
-    subobj <- FindNeighbors(object = subobj, reduction = "pca", k.param = 20, dims = 1:20)
-    subobj <- FindClusters(subobj, resolution = 1, algorithm = 3)
-   
-    nb.pcs = 20; n.neighbors = 30; min.dist = 0.25;
-    subobj <- RunUMAP(object = subobj, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-    
-    DimPlot(subobj, reduction = 'umap')
-    
+    #subobj = subset(seurat.obj, cells = sels)
+    # subobj = clustering.splitting(subobj = subobj)
+    # 
+    # p3 = DimPlot(subobj,
+    #              group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 3, label.size = 4,
+    #              na.value = "gray") +
+    #   ggtitle(paste0("cluster ", cluster.ids[n]))
+    # 
+    # plot(p3)
     
   }
   
   dev.off()
   
+}
+
+clustering.splitting = function(subobj, )
+{
+  subobj <- FindVariableFeatures(subobj, selection.method = "vst", nfeatures = 1000)
   
+  subobj = ScaleData(subobj, features = rownames(subobj))
+  
+  subobj <- RunPCA(object = subobj, features = VariableFeatures(subobj), verbose = FALSE)
+  ElbowPlot(subobj, ndims = 50)
+  
+  subobj <- FindNeighbors(object = subobj, reduction = "pca", k.param = 20, dims = 1:20)
+  subobj <- FindClusters(subobj, resolution = 1, algorithm = 3)
+  
+  nb.pcs = 20; n.neighbors = 20; min.dist = 0.05;
+  subobj <- RunUMAP(object = subobj, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+  
+  #DimPlot(subobj, reduction = 'umap')
+  
+  return(subobj)
 }
 
 test.classifier.for.Murray.data = function(method = c('scmap', 'rf', 'gbm', 'svm'))
