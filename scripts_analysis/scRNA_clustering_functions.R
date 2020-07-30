@@ -389,7 +389,7 @@ annotate.clusters.using.predicted.id = function(seurat.obj, redefine.clusters = 
   
   for(n in 1:length(cluster.ids))
   {
-    # n = 4
+    # n = 5
     cat('cluster ', as.character(cluster.ids[n]), '\n')
     
     sels = which(seurat.obj$seurat_clusters == cluster.ids[n])
@@ -408,8 +408,9 @@ annotate.clusters.using.predicted.id = function(seurat.obj, redefine.clusters = 
             na.value = "gray") + 
       ggtitle(paste0("cluster ", cluster.ids[n])) 
     
-    pp = CombinePlots(list(p1, p2))
+    pp = CombinePlots(list(p1, p2), ncol = 2)
     plot(pp)
+    
     pred.ids = seurat.obj$predicted.id.scmap[sels]
     pred.ids[which(is.na(pred.ids))] = 'unassigned'
     
@@ -422,7 +423,7 @@ annotate.clusters.using.predicted.id = function(seurat.obj, redefine.clusters = 
     hist(seurat.obj$FSC_log2[sels], breaks = 20)
     
     #subobj = subset(seurat.obj, cells = sels)
-    # subobj = clustering.splitting(subobj = subobj)
+    seurat.obj = clustering.splitting.kmean.outlier.detection(seurat.obj, sels)
     # 
     # p3 = DimPlot(subobj,
     #              group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 3, label.size = 4,
@@ -437,7 +438,7 @@ annotate.clusters.using.predicted.id = function(seurat.obj, redefine.clusters = 
   
 }
 
-clustering.splitting = function(subobj, )
+clustering.splitting = function(seurat.obj, )
 {
   subobj <- FindVariableFeatures(subobj, selection.method = "vst", nfeatures = 1000)
   
