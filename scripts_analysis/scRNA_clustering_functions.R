@@ -189,15 +189,15 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj)
   
 }
 
-reference.based.cluster.annotation = function(seurat.obj, method = 'scmap', 
-                                              nb.features.scmap = 500, threshold.scmap = 0.7,
-                                              threshold.svm = 0.5, threshold.rf = 0.5)
+reference.based.cluster.annotation = function(seurat.obj, 
+                                              method = 'scmap', nb.features.scmap = 500, threshold.scmap = 0.7,
+                                              predict.unassignedCells = FALSE, threshold.svm = 0.5, threshold.rf = 0.5)
 {
-  # seurat.obj = ms;
-  # method = 'scmap';  nb.features.scmap = 500; threshold.scmap = 0.7; nb.features.svm = 1500; threshold.svm = 0.5;threshold.rf = 0.5;
+  # seurat.obj = ms; predict.unassignedCells = FALSE;
+  # method = 'scmap'; nb.features.scmap = 500; threshold.scmap = 0.7; nb.features.svm = 1500; threshold.svm = 0.5;threshold.rf = 0.5;
   
   ##########################################
-  # first step: project aleks cells to the reference using scmap
+  # step 1): project aleks cells to the reference using scmap
   # transfer labels with stringent threshold
   ##########################################
   ## process aleks data for scmap
@@ -263,85 +263,90 @@ reference.based.cluster.annotation = function(seurat.obj, method = 'scmap',
                      threshold.scmap, ")")) +
       scale_colour_hue(drop = FALSE) + 
       NoLegend()
-    
   }
   
   ##########################################
-  # step 2: predict unassigned cells using assgined cells with rf and svm
+  # step 2): predict unassigned cells using assgined cells with rf and svm
   ##########################################
-  library(Seurat)
-  seurat.obj = Seurat::FindVariableFeatures(seurat.obj, selection.method = "vst", nfeatures = nb.features.svm)
+  if(predict.unassignedCells){
+    library(Seurat)
+    seurat.obj = Seurat::FindVariableFeatures(seurat.obj, selection.method = "vst", nfeatures = nb.features.svm)
+    
+    sce2 = Seurat::as.SingleCellExperiment(seurat.obj)
+    counts(sce2) = as.matrix(counts(sce2))
+    logcounts(sce2) = as.matrix(logcounts(sce2))
+    rowData(sce2)$feature_symbol <- rownames(sce2)
+    
+    ## split the Murray data into train and test
+    features.sels = rowData(sce2)$vst.variable
+    
+    index.train = which(!is.na(sce2$predicted.id.scmap))
+    index.test = which(is.na(sce2$predicted.id.scmap))
+    
+    train = sce2[features.sels, index.train]
+    test = sce2[features.sels, index.test]
+    y <- as.factor(train$predicted.id.scmap)
+    
+    train = logcounts(train)
+    test = logcounts(test)
+    train = t(train)
+    train <- as.data.frame(train)
+    test = t(test)
+    test <- as.data.frame(test)
+    rownames(train) <- NULL
+    rownames(test) <- NULL
+    
+    ## run rf prediction
+    rf.res = run.classifier.rf(train, y, test, ntree = 200, param.tuning = FALSE)
+    rf.res = data.frame(rf.res, index.test, stringsAsFactors = FALSE)
+    cat('RF nb of cells with probability > 0.5 :', length(which(rf.res$prob>0.5)), '\n')
+    cat('RF nb of cells with probability > 0.7 :', length(which(rf.res$prob>0.7)), '\n')
+    
+    ## run svm prediction
+    svm.res = run.classifier.svm(train, y, test, cost = 0.1, param.tuning = FALSE)
+    svm.res = data.frame(svm.res, index.test, stringsAsFactors = FALSE)
+    
+    cat('SVM nb of cells with probability > 0.5 :', length(which(svm.res$prob>0.5)), '\n')
+    cat('SVM nb of cells with probability > 0.7 :', length(which(svm.res$prob>0.7)), '\n')
+    
+    rf.filter = rf.res[which(rf.res$prob > threshold.rf), ]
+    seurat.obj$predicted.id.rf = NA;
+    seurat.obj$predicted.id.rf[rf.filter$index] = as.character(rf.filter$label)
+    
+    svm.filter = svm.res[which(svm.res$prob > threshold.svm), ]
+    seurat.obj$predicted.id.svm = NA;
+    seurat.obj$predicted.id.svm[svm.filter$index] = as.character(svm.filter$label)
+    
+    #seurat.obj$predicted.id.scmap.svm = seurat.obj$predicted.id.scmap
+    #seurat.obj$predicted.id.scmap.svm[svm.filter$index] = as.character(svm.filter$label)
+    
+    #predicted.id = seurat.obj$predicted.id.scmap.svm
+    #cat('after svm classification nb of assigned cells :',  length(predicted.id[!is.na(predicted.id)]), '\n')
+    #cat('after svm classification percent of assigned cells: ', length(predicted.id[!is.na(predicted.id)])/length(predicted.id), '\n')
+    
+    #Idents(seurat.obj) = seurat.obj$predicted.id.scmap.svm
+    p2 = DimPlot(seurat.obj, group.by = "predicted.id.rf", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
+                 na.value = "gray") + 
+      ggtitle(paste0("projection into Murray data with rf (nfeature = ", nb.features.svm,", threshold = ", 
+                     threshold.rf, ")")) +
+      scale_colour_hue(drop = FALSE) + 
+      NoLegend()
+    
+    p3 = DimPlot(seurat.obj, group.by = "predicted.id.svm", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
+                 na.value = "gray") + 
+      ggtitle(paste0("projection into Murray data with svm (nfeature = ", nb.features.scmap,", threshold = ", 
+                     threshold.svm, ")")) +
+      scale_colour_hue(drop = FALSE) + 
+      NoLegend()
+    
+    CombinePlots(list(p2, p3))
+  }
   
-  sce2 = Seurat::as.SingleCellExperiment(seurat.obj)
-  counts(sce2) = as.matrix(counts(sce2))
-  logcounts(sce2) = as.matrix(logcounts(sce2))
-  rowData(sce2)$feature_symbol <- rownames(sce2)
+  ##########################################
+  # step 3):  
+  ##########################################
   
-  ## split the Murray data into train and test
-  features.sels = rowData(sce2)$vst.variable
-  
-  index.train = which(!is.na(sce2$predicted.id.scmap))
-  index.test = which(is.na(sce2$predicted.id.scmap))
-  
-  train = sce2[features.sels, index.train]
-  test = sce2[features.sels, index.test]
-  y <- as.factor(train$predicted.id.scmap)
-  
-  train = logcounts(train)
-  test = logcounts(test)
-  train = t(train)
-  train <- as.data.frame(train)
-  test = t(test)
-  test <- as.data.frame(test)
-  rownames(train) <- NULL
-  rownames(test) <- NULL
-  
-  ## run rf prediction
-  rf.res = run.classifier.rf(train, y, test, ntree = 200, param.tuning = FALSE)
-  rf.res = data.frame(rf.res, index.test, stringsAsFactors = FALSE)
-  cat('RF nb of cells with probability > 0.5 :', length(which(rf.res$prob>0.5)), '\n')
-  cat('RF nb of cells with probability > 0.7 :', length(which(rf.res$prob>0.7)), '\n')
-  
-  ## run svm prediction
-  svm.res = run.classifier.svm(train, y, test, cost = 0.1, param.tuning = FALSE)
-  svm.res = data.frame(svm.res, index.test, stringsAsFactors = FALSE)
-  
-  cat('SVM nb of cells with probability > 0.5 :', length(which(svm.res$prob>0.5)), '\n')
-  cat('SVM nb of cells with probability > 0.7 :', length(which(svm.res$prob>0.7)), '\n')
-  
-  rf.filter = rf.res[which(rf.res$prob > threshold.rf), ]
-  seurat.obj$predicted.id.rf = NA;
-  seurat.obj$predicted.id.rf[rf.filter$index] = as.character(rf.filter$label)
-  
-  svm.filter = svm.res[which(svm.res$prob > threshold.svm), ]
-  seurat.obj$predicted.id.svm = NA;
-  seurat.obj$predicted.id.svm[svm.filter$index] = as.character(svm.filter$label)
-  
-  #seurat.obj$predicted.id.scmap.svm = seurat.obj$predicted.id.scmap
-  #seurat.obj$predicted.id.scmap.svm[svm.filter$index] = as.character(svm.filter$label)
-  
-  #predicted.id = seurat.obj$predicted.id.scmap.svm
-  #cat('after svm classification nb of assigned cells :',  length(predicted.id[!is.na(predicted.id)]), '\n')
-  #cat('after svm classification percent of assigned cells: ', length(predicted.id[!is.na(predicted.id)])/length(predicted.id), '\n')
-  
-  #Idents(seurat.obj) = seurat.obj$predicted.id.scmap.svm
-  p2 = DimPlot(seurat.obj, group.by = "predicted.id.rf", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
-          na.value = "gray") + 
-    ggtitle(paste0("projection into Murray data with rf (nfeature = ", nb.features.svm,", threshold = ", 
-                   threshold.rf, ")")) +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
-  p3 = DimPlot(seurat.obj, group.by = "predicted.id.svm", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
-          na.value = "gray") + 
-    ggtitle(paste0("projection into Murray data with svm (nfeature = ", nb.features.scmap,", threshold = ", 
-                   threshold.svm, ")")) +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
-   CombinePlots(list(p2, p3))
-   
-   seurat.obj = annotate.clusters.using.predicted.id(seurat.obj)
+  seurat.obj = annotate.clusters.using.predicted.id(seurat.obj)
    
 }
 
