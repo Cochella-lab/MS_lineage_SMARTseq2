@@ -47,149 +47,11 @@ test.umap.params = function(seurat.obj, pdfname = paste0(resDir, '/umap_params_t
 ########################################################
 ########################################################
 # Section : label transferring from Murray dataset
-# 1) seurat
-# 2) scmap, svm, RF
-# 3) utility functions
+# 1) seurat, scmap, svm, RF
+# 2) utility functions
 ########################################################
 ########################################################
-seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj)
-{
-  # seurat.obj = ms;
-  # process and import Parker et al. data
-  process.import.Murray.scRNA()
-  ee <- FindVariableFeatures(
-    object = ee,
-    nfeatures = 3000
-  )
-  
-  ee <- ScaleData(object = ee)
-  Idents(ee) = ee$lineage
-  
-  # Here, we process the gene activity matrix 
-  # in order to find anchors between cells in the scATAC-seq dataset 
-  # and the scRNA-seq dataset.
-  Idents(seurat.obj) = seurat.obj$SCT_snn_res.12
-  
-  DimPlot(seurat.obj, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 5, repel = FALSE) + NoLegend()
-  
-  DefaultAssay(seurat.obj) <- 'RNA'
-  #nb.variableFeatures = 5000
-  #seurat.obj <- FindVariableFeatures(seurat.obj, nfeatures = nb.variableFeatures)
-  #seurat.obj <- NormalizeData(seurat.obj)
-  #seurat.obj <- ScaleData(seurat.obj)
-  
-  #seurat.obj <- RunPCA(seurat.obj, npcs = 50, verbose = FALSE, reduction.name = 'pca.ga')
-  
-  transfer.anchors <- FindTransferAnchors(
-    reference = ee,
-    query = seurat.obj,
-    features = unique(VariableFeatures(seurat.obj)),
-    #features = features.to.use,
-    reference.assay = 'RNA',
-    query.assay = 'RNA',
-    reduction = 'cca',
-    k.anchor = 10, # k.anchor is neighborhood size for MNN big k.anchor, the bigger, the more anchors found
-    k.filter = 200, # retain the anchor (cell from one dataset to annother) if within k.filter neighbors, the bigger, the more retained  
-    max.features = 200, # max nb of features used for anchor filtering
-    k.score = 30, 
-    npcs = 50, 
-    dims = 1:50
-  )
-  
-  cat('nb of cells in query and in reference as anchors : ', 
-      length(unique(transfer.anchors@anchors[, 1])), '--',  length(unique(transfer.anchors@anchors[, 2])), '\n')
-  
-  
-  predicted.labels <- TransferData(
-    anchorset = transfer.anchors,
-    #refdata = Idents(tintori),
-    refdata = Idents(ee),
-    #refdata = as.vector(Idents(seurat.obj)),
-    #weight.reduction = seurat.obj[['pca']],
-    weight.reduction = seurat.obj[['pca']],
-    dims = 1:30,
-    k.weight = 50
-  )
-  
-  seurat.obj <- AddMetaData(object = seurat.obj, metadata = predicted.labels)
-  #nb.pcs = 50; n.neighbors = 30; min.dist = 0.4;
-  #seurat.obj <- RunUMAP(object = seurat.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
-  #                      n.neighbors = n.neighbors, min.dist = min.dist)
-  
-  DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
-    ggtitle("transferred labels") +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
-  table(seurat.obj$prediction.score.max > 0.5)
-  
-  hist(seurat.obj$prediction.score.max)
-  abline(v = 0.5, col = "red")
-  
-  seurat.obj.filtered <- subset(seurat.obj, subset = prediction.score.max > 0.5)
-  
-  # to make the colors match
-  seurat.obj.filtered$predicted.id <- factor(seurat.obj.filtered$predicted.id, levels = levels(ee))  
-  DimPlot(seurat.obj.filtered, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
-  ggtitle("transferred labels with probability threshod = 0.5") +
-  scale_colour_hue(drop = FALSE) + 
-  NoLegend()
-  
-  DimPlot(ms_correlation_idents, reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
-    ggtitle("aleks correlation assignment") +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
-  ##########################################
-  # make summary of cluster-to-predicted label mapping
-  ##########################################
-  res = data.frame(clusters = Idents(seurat.obj), predicted.labels, stringsAsFactors = FALSE)
-  
-  labels.pred =  unique(res$predicted.id)
-  clusters = unique(res$clusters)
-  res.map = matrix(0, nrow = length(labels.pred), ncol = length(clusters))
-  rownames(res.map) = labels.pred
-  colnames(res.map) = clusters
-  res.map = res.map[, sort(colnames(res.map))]
-  
-  for(n in 1:ncol(res.map))
-  {
-    # n = 1
-    predicted.ids = res$predicted.id[which(res$clusters == colnames(res.map)[n])]
-    stats.ids = table(predicted.ids)
-    stats.ids = stats.ids[match(rownames(res.map), names(stats.ids))]
-    stats.ids[is.na(stats.ids)] = 0
-    res.map[,n] = stats.ids/sum(stats.ids)
-  }
-  
-  library("pheatmap")
-  library("RColorBrewer")
-  library(grid)
-  
-  cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
-  pheatmap(res.map, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
-           cluster_cols=TRUE, main = paste0("resolution -- 0.8"), na_col = "white",
-           color = cols, 
-           #annotation_col = my_sample_col,
-           #gaps_row = c(1:nrow(map)-1),
-           fontsize_col = 10,
-           height = 8,
-           width = 30
-  )
-  
-  cols =  c(colorRampPalette((brewer.pal(n = 7, name="Set3")))(ncol(res.map)))
-  barplot(res.map, horiz = TRUE, legend = rownames(res.map), 
-          col = cols )
-  
-  map.fitered = map
-  map.fitered[which(map.fitered<0.1)] = 0
-  pheatmap(map.fitered, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-           cluster_cols=FALSE, main = paste0("fitlered < 0.1 with resolution -- ",  resolution), na_col = "white",
-           color = cols)
-  
-}
-
-reference.based.cluster.annotation = function(seurat.obj, 
+reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TRUE,
                                               method = 'scmap', nb.features.scmap = 500, threshold.scmap = 0.7,
                                               predict.unassignedCells = FALSE, threshold.svm = 0.5, threshold.rf = 0.5)
 {
@@ -197,33 +59,72 @@ reference.based.cluster.annotation = function(seurat.obj,
   # method = 'scmap'; nb.features.scmap = 500; threshold.scmap = 0.7; nb.features.svm = 1500; threshold.svm = 0.5;threshold.rf = 0.5;
   
   ##########################################
+  # step 0) refine the clustering from seurat
+  ##########################################
+  if(redefine.clusters){
+    nfeatures = 3000
+    seurat.obj <- FindVariableFeatures(seurat.obj, selection.method = "vst", nfeatures = nfeatures)
+    
+    seurat.obj = ScaleData(seurat.obj, features = rownames(seurat.obj))
+    
+    seurat.obj <- RunPCA(object = seurat.obj, features = VariableFeatures(seurat.obj), verbose = FALSE, weight.by.var = FALSE)
+    ElbowPlot(seurat.obj, ndims = 50)
+    
+    seurat.obj <- FindNeighbors(object = seurat.obj, reduction = "pca", k.param = 10, dims = 1:20)
+    
+    #library(leiden)
+    #cluster_leiden <- leiden(seurat.obj@graphs$RNA_snn)
+    #library(reticulate)
+    #use_python("/usr/local/bin/python", required = TRUE)
+    #system('pip install leidenalg igraph')
+    #system('python --version')
+    #system('which python')
+    
+    seurat.obj <- FindClusters(seurat.obj, resolution = 3, algorithm = 3)
+    
+    cat(length(unique(seurat.obj$seurat_clusters)), 'clusters found \n')
+    
+    #nb.pcs = 30; n.neighbors = 30; min.dist = 0.3;
+    #seurat.obj <- RunUMAP(object = seurat.obj, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+    
+    DimPlot(seurat.obj, group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+            na.value = "gray") + 
+      ggtitle(paste0("Seurat_clustering_SLM_resolution_3_3000variableFeatures_20pca_k10")) +
+      scale_colour_hue(drop = FALSE) + 
+      NoLegend()
+  }
+  
+  ##########################################
   # step 1): project aleks cells to the reference using scmap
   # transfer labels with stringent threshold
   ##########################################
-  ## process aleks data for scmap
-  library(SingleCellExperiment)
-  library(scmap)
-  sce = Seurat::as.SingleCellExperiment(seurat.obj)
-  sce <- sce[!duplicated(rownames(sce)), ]
-  rowData(sce)$feature_symbol <- rownames(sce)
-  counts(sce) = as.matrix(counts(sce)) # sce object converted from seurat object was using spare matrix
-  logcounts(sce) = as.matrix(logcounts(sce))
   
   ## import and process Murray datfa for scmap as reference
   ee = process.import.Murray.scRNA()
-  ee = Seurat::as.SingleCellExperiment(ee)
-  counts(ee) = as.matrix(counts(ee))
-  logcounts(ee) = as.matrix(logcounts(ee))
-  rowData(ee)$feature_symbol <- rownames(ee)
-  ee$cell_type1 = ee$lineage
-  
-  ## feature selection for scmap
-  ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = nb.features.scmap)
-  table(rowData(ee)$scmap_features)
-  #as.character(unique(ee$cell_type1))
   
   if(method == 'scmap'){
     ee_ref = indexCluster(ee)
+    
+    ## process aleks data for scmap
+    library(SingleCellExperiment)
+    library(scmap)
+    sce = Seurat::as.SingleCellExperiment(seurat.obj)
+    sce <- sce[!duplicated(rownames(sce)), ]
+    rowData(sce)$feature_symbol <- rownames(sce)
+    counts(sce) = as.matrix(counts(sce)) # sce object converted from seurat object was using spare matrix
+    logcounts(sce) = as.matrix(logcounts(sce))
+    
+    ee = Seurat::as.SingleCellExperiment(ee)
+    counts(ee) = as.matrix(counts(ee))
+    logcounts(ee) = as.matrix(logcounts(ee))
+    rowData(ee)$feature_symbol <- rownames(ee)
+    ee$cell_type1 = ee$lineage
+    
+    ## feature selection for scmap
+    ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = nb.features.scmap)
+    table(rowData(ee)$scmap_features)
+    #as.character(unique(ee$cell_type1))
+    
     
     #head(metadata(ee_ref)$scmap_cluster_index)
     #heatmap(as.matrix(metadata(ee_ref)$scmap_cluster_index))
@@ -250,6 +151,9 @@ reference.based.cluster.annotation = function(seurat.obj,
     head(scmapCluster_results$combined_labs)
     
     predicted.id = scmapCluster_results$scmap_cluster_labs
+    counts.pred.ids = table(predicted.id)
+    counts.pred.ids = counts.pred.ids[order(-counts.pred.ids)]
+    
     predicted.id[which(predicted.id == 'unassigned')] = NA
     
     cat('nb of assigned cells :',  length(predicted.id[!is.na(predicted.id)]), '\n')
@@ -257,12 +161,30 @@ reference.based.cluster.annotation = function(seurat.obj,
     
     seurat.obj$predicted.id.scmap = predicted.id
     
+    counts <- table(seurat.obj$predicted.id.scmap, seurat.obj$seurat_clusters)
+    barplot(counts, main="composition of subclusters ",
+            xlab="subcluster index", col=c(1:nrow(counts)),
+            legend = rownames(counts))
+    
     p1 = DimPlot(seurat.obj, group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
             na.value = "gray") + 
       ggtitle(paste0("projection into Murray data with scmap (nfeature = ", nb.features.scmap,", threshold = ", 
                      threshold.scmap, ")")) +
       scale_colour_hue(drop = FALSE) + 
       NoLegend()
+    
+    plot(p1)
+    
+    # saveRDS(seurat.obj, file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized_scmapProjection.rds'))
+    
+  }
+  
+  if(method == 'seurat'){
+    seurat.transfer.labels.from.Murray.scRNA.to.scRNA(seurat.obj)
+  }
+  
+  if(method == 'clustifyr'){
+    clustifyr.transfer.labels.from.Murray.scRNA(seurat.obj)
   }
   
   ##########################################
@@ -343,43 +265,169 @@ reference.based.cluster.annotation = function(seurat.obj,
   }
   
   ##########################################
-  # step 3):  
+  # step 3):  annotate clusters with predicted identities and also other information
   ##########################################
-  
   seurat.obj = annotate.clusters.using.predicted.id(seurat.obj)
-   
+  
+  
+  return(seurat.obj)
+  
 }
 
 ##########################################
 # utility functions for the function reference.based.cluster.annotation.scmap
 ##########################################
+scmap.transfer.labels.from.Murray.scRNA = function(seurat.obj)
+{
+  
+}
+
+clustifyr.transfer.labels.from.Murray.scRNA = function(seurat.obj)
+{
+  library('clustifyr') # install older version in https://github.com/rnabioco/clustifyr/releases/tag/0.99.4
+}
+
+seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj)
+{
+  # seurat.obj = ms;
+  # process and import Parker et al. data
+  process.import.Murray.scRNA()
+  ee <- FindVariableFeatures(
+    object = ee,
+    nfeatures = 3000
+  )
+  
+  ee <- ScaleData(object = ee)
+  Idents(ee) = ee$lineage
+  
+  # Here, we process the gene activity matrix 
+  # in order to find anchors between cells in the scATAC-seq dataset 
+  # and the scRNA-seq dataset.
+  Idents(seurat.obj) = seurat.obj$SCT_snn_res.12
+  
+  DimPlot(seurat.obj, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 5, repel = FALSE) + NoLegend()
+  
+  DefaultAssay(seurat.obj) <- 'RNA'
+  #nb.variableFeatures = 5000
+  #seurat.obj <- FindVariableFeatures(seurat.obj, nfeatures = nb.variableFeatures)
+  #seurat.obj <- NormalizeData(seurat.obj)
+  #seurat.obj <- ScaleData(seurat.obj)
+  
+  #seurat.obj <- RunPCA(seurat.obj, npcs = 50, verbose = FALSE, reduction.name = 'pca.ga')
+  
+  transfer.anchors <- FindTransferAnchors(
+    reference = ee,
+    query = seurat.obj,
+    features = unique(VariableFeatures(seurat.obj)),
+    #features = features.to.use,
+    reference.assay = 'RNA',
+    query.assay = 'RNA',
+    reduction = 'cca',
+    k.anchor = 10, # k.anchor is neighborhood size for MNN big k.anchor, the bigger, the more anchors found
+    k.filter = 200, # retain the anchor (cell from one dataset to annother) if within k.filter neighbors, the bigger, the more retained  
+    max.features = 200, # max nb of features used for anchor filtering
+    k.score = 30, 
+    npcs = 50, 
+    dims = 1:50
+  )
+  
+  cat('nb of cells in query and in reference as anchors : ', 
+      length(unique(transfer.anchors@anchors[, 1])), '--',  length(unique(transfer.anchors@anchors[, 2])), '\n')
+  
+  
+  predicted.labels <- TransferData(
+    anchorset = transfer.anchors,
+    #refdata = Idents(tintori),
+    refdata = Idents(ee),
+    #refdata = as.vector(Idents(seurat.obj)),
+    #weight.reduction = seurat.obj[['pca']],
+    weight.reduction = seurat.obj[['pca']],
+    dims = 1:30,
+    k.weight = 50
+  )
+  
+  seurat.obj <- AddMetaData(object = seurat.obj, metadata = predicted.labels)
+  
+  DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
+    ggtitle("transferred labels") +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  table(seurat.obj$prediction.score.max > 0.5)
+  
+  hist(seurat.obj$prediction.score.max)
+  abline(v = 0.5, col = "red")
+  
+  seurat.obj.filtered <- subset(seurat.obj, subset = prediction.score.max > 0.5)
+  
+  # to make the colors match
+  seurat.obj.filtered$predicted.id <- factor(seurat.obj.filtered$predicted.id, levels = levels(ee))  
+  DimPlot(seurat.obj.filtered, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
+    ggtitle("transferred labels with probability threshod = 0.5") +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  DimPlot(ms_correlation_idents, reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
+    ggtitle("aleks correlation assignment") +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  ##########################################
+  # make summary of cluster-to-predicted label mapping
+  ##########################################
+  res = data.frame(clusters = Idents(seurat.obj), predicted.labels, stringsAsFactors = FALSE)
+  
+  labels.pred =  unique(res$predicted.id)
+  clusters = unique(res$clusters)
+  res.map = matrix(0, nrow = length(labels.pred), ncol = length(clusters))
+  rownames(res.map) = labels.pred
+  colnames(res.map) = clusters
+  res.map = res.map[, sort(colnames(res.map))]
+  
+  for(n in 1:ncol(res.map))
+  {
+    # n = 1
+    predicted.ids = res$predicted.id[which(res$clusters == colnames(res.map)[n])]
+    stats.ids = table(predicted.ids)
+    stats.ids = stats.ids[match(rownames(res.map), names(stats.ids))]
+    stats.ids[is.na(stats.ids)] = 0
+    res.map[,n] = stats.ids/sum(stats.ids)
+  }
+  
+  library("pheatmap")
+  library("RColorBrewer")
+  library(grid)
+  
+  cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
+  pheatmap(res.map, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
+           cluster_cols=TRUE, main = paste0("resolution -- 0.8"), na_col = "white",
+           color = cols, 
+           #annotation_col = my_sample_col,
+           #gaps_row = c(1:nrow(map)-1),
+           fontsize_col = 10,
+           height = 8,
+           width = 30
+  )
+  
+  cols =  c(colorRampPalette((brewer.pal(n = 7, name="Set3")))(ncol(res.map)))
+  barplot(res.map, horiz = TRUE, legend = rownames(res.map), 
+          col = cols )
+  
+  map.fitered = map
+  map.fitered[which(map.fitered<0.1)] = 0
+  pheatmap(map.fitered, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+           cluster_cols=FALSE, main = paste0("fitlered < 0.1 with resolution -- ",  resolution), na_col = "white",
+           color = cols)
+  
+}
+
+
 annotate.clusters.using.predicted.id = function(seurat.obj, redefine.clusters = FALSE)
 {
   ## current clusters were define using 3000 variable genes and resolution = 12
   ## those clusters are relatively small owe to the high value of resolution
-  if(redefine.clusters){
-    
-    nfeatures = 3000
-    seurat.obj <- FindVariableFeatures(seurat.obj, selection.method = "vst", nfeatures = nfeatures)
-    
-    # top10 <- head(VariableFeatures(seurat.obj), 10) # Identify the 10 most highly variable genes
-    # 
-    # plot1 <- VariableFeaturePlot(seurat.obj)
-    # plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
-    # CombinePlots(plots = list(plot1, plot2)) # plot variable features with and without labels
-    # 
-    seurat.obj = ScaleData(seurat.obj, features = rownames(seurat.obj))
-    
-    seurat.obj <- RunPCA(object = seurat.obj, features = VariableFeatures(seurat.obj), verbose = FALSE)
-    ElbowPlot(seurat.obj, ndims = 50)
-    
-    seurat.obj <- FindNeighbors(object = seurat.obj, reduction = "pca", k.param = 20, dims = 1:30)
-    seurat.obj <- FindClusters(seurat.obj, resolution = 5, algorithm = 3)
-    
-    #nb.pcs = 30; n.neighbors = 30; min.dist = 0.25;
-    #seurat.obj <- RunUMAP(object = seurat.obj, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-    
-  }
+  
+  # seurat.obj = readRDS(file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized_scmapProjection.rds'))
   
   seurat.obj$predicted.id.scmap[which(is.na(seurat.obj$predicted.id.scmap))] = 'unassigned'
   
@@ -388,13 +436,14 @@ annotate.clusters.using.predicted.id = function(seurat.obj, redefine.clusters = 
   cluster.ids = unique(seurat.obj$seurat_clusters)
   cluster.ids = cluster.ids[order(cluster.ids)]
   
-  pdfname = paste0(resDir, "/annotate_clusters_using_predicted.ids_test_1.pdf")
+  pdfname = paste0(resDir, "/annotate_clusters_using_predicted.ids_split_merge_test1.pdf")
   pdf(pdfname, width=16, height = 8)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
-  for(n in 1:length(cluster.ids))
+  for(n in 1:10)
+  #for(n in 1:length(cluster.ids))
   {
-    # n = 7
+    # n = 6
     cat('cluster ', as.character(cluster.ids[n]), '\n')
     
     sels = which(seurat.obj$seurat_clusters == cluster.ids[n])
@@ -413,8 +462,7 @@ annotate.clusters.using.predicted.id = function(seurat.obj, redefine.clusters = 
             na.value = "gray") + 
       ggtitle(paste0("cluster ", cluster.ids[n])) 
     
-    pp = CombinePlots(list(p1, p2), ncol = 2)
-    plot(pp)
+    plot(CombinePlots(list(p1, p2), ncol = 2))
     
     pred.ids = seurat.obj$predicted.id.scmap[sels]
     pred.ids[which(is.na(pred.ids))] = 'unassigned'
@@ -428,8 +476,8 @@ annotate.clusters.using.predicted.id = function(seurat.obj, redefine.clusters = 
     hist(seurat.obj$FSC_log2[sels], breaks = 20)
     
     ## refine clusters by splitting or outlier detection (k mean cluster and RaceID)
-    seurat.obj = clustering.splitting.kmean.outlier.detection(seurat.obj, sels, redefine.gene.to.use = TRUE, nfeatures = 200)
-    
+    clustering.splitting.kmean.outlier.detection(seurat.obj, sels, redefine.gene.to.use = TRUE, nfeatures = 200)
+    cat('---------\n')
     
   }
   
@@ -437,26 +485,26 @@ annotate.clusters.using.predicted.id = function(seurat.obj, redefine.clusters = 
   
 }
 
-clustering.splitting.kmean.outlier.detection = function(seurat.obj, sels, redefine.gene.to.use = FALSE, nfeatures = 3000)
+clustering.splitting.kmean.outlier.detection = function(seurat.obj, sels, redefine.gene.to.use = FALSE, nfeatures = 3000,
+                                                        cluster.split.method = 'dbscan')
 {
-  library(RaceID) # refer to the vignett https://cran.r-project.org/web/packages/RaceID/vignettes/RaceID.html
-  library(Matrix)
-  
+  # n = 6;  sels = which(seurat.obj$seurat_clusters == cluster.ids[n])
   subobj = subset(seurat.obj, cells = sels)
+  
   p1 = DimPlot(subobj,
           group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 3, label.size = 4,
           na.value = "gray") +
     ggtitle(paste0("cluster ", cluster.ids[n]))
   
+  # plot(p1)
+  
   if(redefine.gene.to.use){
-    subobj <- FindVariableFeatures(subobj, selection.method = "vst", nfeatures = nfeatures)
+    subobj <- FindVariableFeatures(subobj, selection.method = "vst", nfeatures = nfeatures, verbose = FALSE)
     # subobj = ScaleData(subobj, features = rownames(subobj))
     # subobj <- RunPCA(object = subobj, features = VariableFeatures(subobj), verbose = FALSE)
     # ElbowPlot(subobj, ndims = 50)
     # subobj <- FindNeighbors(object = subobj, reduction = "pca", k.param = 20, dims = 1:20)
     # subobj <- FindClusters(subobj, resolution = 1, algorithm = 3)
-    # nb.pcs = 20; n.neighbors = 20; min.dist = 0.05;
-    # subobj <- RunUMAP(object = subobj, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
     ss = subset(subobj, features = VariableFeatures(subobj))
     sc = SCseq(ss@assays$RNA@counts)
     
@@ -464,45 +512,78 @@ clustering.splitting.kmean.outlier.detection = function(seurat.obj, sels, redefi
     sc = SCseq(subobj@assays$RNA@counts)
   }
   
-  # test example from viggnette
-  #sc <- SCseq(intestinalData)
-  sc <- filterdata(sc, mintotal=2000, minexpr = 10, minnumber = 2)
-  fdata <- getfdata(sc)
-  cat('nb of genes after filtering :', fdata@Dim[1], '\n')
-  cat('nb of cells after filtering :', fdata@Dim[2], '\n')
+  if(cluster.split.method == 'kmean')
+  {
+    library(RaceID) # refer to the vignett https://cran.r-project.org/web/packages/RaceID/vignettes/RaceID.html
+    library(Matrix)
+    
+    # test example from viggnette
+    #sc <- SCseq(intestinalData)
+    sc <- filterdata(sc, mintotal=2000, minexpr = 10, minnumber = 2)
+    fdata <- getfdata(sc)
+    #cat('nb of genes after filtering :', fdata@Dim[1], '\n')
+    #cat('nb of cells after filtering :', fdata@Dim[2], '\n')
+    
+    #sc <- compdist(sc,metric="pearson", FSelect = FALSE)
+    cat('use pca to calculate Pearson correlation and then distance and then k-mean\n')
+    subobj.pca = subobj@reductions$pca@cell.embeddings[, c(1:30)]
+    mat.dist = 1- cor(t(subobj.pca))
+    sc@distances = mat.dist
+    sc <- clustexp(sc, FUNcluster = 'kmedoids', verbose = FALSE)
+    
+    par(mfrow = c(1, 1))
+    plotsaturation(sc,disp=FALSE)
+    plotsaturation(sc,disp=TRUE)
+    #plotjaccard(sc)
+    
+    nb.subcluster = sc@cluster$clb$nc
+    cat('optimal subclusters found :', nb.subcluster, '\n')
+    
+    sc <- clustexp(sc,cln=nb.subcluster, sat=FALSE, verbose = FALSE)
+    
+    #sc <- findoutliers(sc, outminc = 10, outlg = 10)
+    #plotbackground(sc)
+    
+    #plotoutlierprobs(sc)
+    #clustheatmap(sc)
+    
+    #sc <- compumap(sc)
+    #sc <- compfr(sc,knn=10)
+    #plotmap(sc,um=TRUE)
+    #plotmap(sc,fr=TRUE)
+    
+    subobj$seurat_clusters_split = sc@cluster$kpart
+    
+  }
   
-  sc <- compdist(sc,metric="pearson", FSelect = FALSE)
-  sc <- clustexp(sc, FUNcluster = 'kmedoids', verbose = FALSE)
-  
-  par(mfrow = c(1, 1))
-  plotsaturation(sc,disp=FALSE)
-  
-  #plotsaturation(sc,disp=TRUE)
-  #plotjaccard(sc)
-  nb.subcluster = sc@cluster$clb$nc
-  cat('optimal subclusters found :', nb.subcluster, '\n')
-  
-  sc <- clustexp(sc,cln=nb.subcluster, sat=FALSE, verbose = FALSE)
-  
-  #sc <- findoutliers(sc, outminc = 10, outlg = 10)
-  #plotbackground(sc)
-  
-  #plotoutlierprobs(sc)
-  #clustheatmap(sc)
-  
-  #sc <- compumap(sc)
-  #sc <- compfr(sc,knn=10)
-  #plotmap(sc,um=TRUE)
-  #plotmap(sc,fr=TRUE)
-  
-  subobj$seurat_clusters_split = sc@cluster$kpart
+  if(cluster.split.method == 'dbscan'){
+    library('dbscan')
+    library('lsa')
+    #library("fpc")
+    
+    #sc <- compdist(sc,metric="pearson", FSelect = FALSE)
+    cat('use pca to calculate Pearson correlation and then distance and then dbscan clustering \n')
+    subobj.pca = subobj@reductions$pca@cell.embeddings[, c(1:20)]
+    #mat.dist = dist(1- cor(t(subobj.pca)))
+    mat.dist = dist(lsa::cosine(t(subobj.pca)))
+    #mat.dist = dist(subobj.pca, method = 'euclidean')
+    
+    dbscan::kNNdistplot(mat.dist, k = 4)
+    abline(h = 1, lty = 2)
+    
+    res.db <- dbscan(mat.dist, eps = 0.5, minPts = 4)
+    cat('nb of clusters found by dbscan -- ', length(unique(res.db$cluster)), '\n')
+    
+    subobj$seurat_clusters_split = res.db$cluster
+    
+  }
   
   p2 = DimPlot(subobj,
           group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 3, label.size = 4,
           na.value = "gray") +
     ggtitle(paste0("cluster ", cluster.ids[n]))
   
-  CombinePlots(list(p1, p2))
+  plot(CombinePlots(list(p1, p2)))
   
   par(mfrow=c(1, 1))
   counts <- table(subobj$predicted.id.scmap, subobj$seurat_clusters_split)
@@ -511,6 +592,7 @@ clustering.splitting.kmean.outlier.detection = function(seurat.obj, sels, redefi
           legend = rownames(counts))
   
   return(subobj)
+  
 }
 
 test.classifier.for.Murray.data = function(method = c('scmap', 'rf', 'gbm', 'svm'))
