@@ -103,79 +103,8 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
   ee = process.import.Murray.scRNA()
   
   if(method == 'scmap'){
-    ee_ref = indexCluster(ee)
-    
-    ## process aleks data for scmap
-    library(SingleCellExperiment)
-    library(scmap)
-    sce = Seurat::as.SingleCellExperiment(seurat.obj)
-    sce <- sce[!duplicated(rownames(sce)), ]
-    rowData(sce)$feature_symbol <- rownames(sce)
-    counts(sce) = as.matrix(counts(sce)) # sce object converted from seurat object was using spare matrix
-    logcounts(sce) = as.matrix(logcounts(sce))
-    
-    ee = Seurat::as.SingleCellExperiment(ee)
-    counts(ee) = as.matrix(counts(ee))
-    logcounts(ee) = as.matrix(logcounts(ee))
-    rowData(ee)$feature_symbol <- rownames(ee)
-    ee$cell_type1 = ee$lineage
-    
-    ## feature selection for scmap
-    ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = nb.features.scmap)
-    table(rowData(ee)$scmap_features)
-    #as.character(unique(ee$cell_type1))
     
     
-    #head(metadata(ee_ref)$scmap_cluster_index)
-    #heatmap(as.matrix(metadata(ee_ref)$scmap_cluster_index))
-    
-    scmapCluster_results <- scmapCluster(
-      projection = sce, 
-      index_list = list(
-        murray = metadata(ee_ref)$scmap_cluster_index
-      ),
-      threshold = threshold.scmap
-    )
-    
-    length(scmapCluster_results$scmap_cluster_labs)
-    length(scmapCluster_results$combined_labs)
-    ident.murray = unique(ee$lineage)
-    ident.projection = unique(scmapCluster_results$scmap_cluster_labs)
-    ident.missed = ident.murray[which(is.na(match(ident.murray, ident.projection)))]
-    print(ident.missed)
-    #head(scmapCluster_results$scmap_cluster_labs)
-    #head(scmapCluster_results$scmap_cluster_siml)
-    
-    hist(scmapCluster_results$scmap_cluster_siml, breaks = 100)
-    abline(v = threshold.scmap, col = 'red')
-    head(scmapCluster_results$combined_labs)
-    
-    predicted.id = scmapCluster_results$scmap_cluster_labs
-    counts.pred.ids = table(predicted.id)
-    counts.pred.ids = counts.pred.ids[order(-counts.pred.ids)]
-    
-    predicted.id[which(predicted.id == 'unassigned')] = NA
-    
-    cat('nb of assigned cells :',  length(predicted.id[!is.na(predicted.id)]), '\n')
-    cat('percent of assigned cells: ', length(predicted.id[!is.na(predicted.id)])/length(predicted.id), '\n')
-    
-    seurat.obj$predicted.id.scmap = predicted.id
-    
-    counts <- table(seurat.obj$predicted.id.scmap, seurat.obj$seurat_clusters)
-    barplot(counts, main="composition of subclusters ",
-            xlab="subcluster index", col=c(1:nrow(counts)),
-            legend = rownames(counts))
-    
-    p1 = DimPlot(seurat.obj, group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
-            na.value = "gray") + 
-      ggtitle(paste0("projection into Murray data with scmap (nfeature = ", nb.features.scmap,", threshold = ", 
-                     threshold.scmap, ")")) +
-      scale_colour_hue(drop = FALSE) + 
-      NoLegend()
-    
-    plot(p1)
-    
-    # saveRDS(seurat.obj, file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized_scmapProjection.rds'))
     
   }
   
@@ -183,9 +112,9 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
     seurat.transfer.labels.from.Murray.scRNA.to.scRNA(seurat.obj)
   }
   
-  if(method == 'clustifyr'){
-    clustifyr.transfer.labels.from.Murray.scRNA(seurat.obj)
-  }
+  # if(method == 'clustifyr'){
+  #   clustifyr.transfer.labels.from.Murray.scRNA(seurat.obj)
+  # }
   
   ##########################################
   # step 2): predict unassigned cells using assgined cells with rf and svm
@@ -269,7 +198,6 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
   ##########################################
   seurat.obj = annotate.clusters.using.predicted.id(seurat.obj)
   
-  
   return(seurat.obj)
   
 }
@@ -279,13 +207,83 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
 ##########################################
 scmap.transfer.labels.from.Murray.scRNA = function(seurat.obj)
 {
+  ## process aleks data for scmap
+  library(SingleCellExperiment)
+  library(scmap)
+  sce = Seurat::as.SingleCellExperiment(seurat.obj)
+  sce <- sce[!duplicated(rownames(sce)), ]
+  rowData(sce)$feature_symbol <- rownames(sce)
+  counts(sce) = as.matrix(counts(sce)) # sce object converted from seurat object was using spare matrix
+  logcounts(sce) = as.matrix(logcounts(sce))
   
+  ee = Seurat::as.SingleCellExperiment(ee)
+  counts(ee) = as.matrix(counts(ee))
+  logcounts(ee) = as.matrix(logcounts(ee))
+  rowData(ee)$feature_symbol <- rownames(ee)
+  ee$cell_type1 = ee$lineage
+  
+  ## feature selection for scmap
+  ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = nb.features.scmap)
+  table(rowData(ee)$scmap_features)
+  #as.character(unique(ee$cell_type1))
+  
+  ee_ref = indexCluster(ee)
+  #head(metadata(ee_ref)$scmap_cluster_index)
+  #heatmap(as.matrix(metadata(ee_ref)$scmap_cluster_index))
+  
+  scmapCluster_results <- scmapCluster(
+    projection = sce, 
+    index_list = list(
+      murray = metadata(ee_ref)$scmap_cluster_index
+    ),
+    threshold = threshold.scmap
+  )
+  
+  #length(scmapCluster_results$scmap_cluster_labs)
+  #length(scmapCluster_results$combined_labs)
+  ident.murray = unique(ee$lineage)
+  ident.projection = unique(scmapCluster_results$scmap_cluster_labs)
+  ident.missed = ident.murray[which(is.na(match(ident.murray, ident.projection)))]
+  print(ident.missed)
+  #head(scmapCluster_results$scmap_cluster_labs)
+  #head(scmapCluster_results$scmap_cluster_siml)
+  
+  hist(scmapCluster_results$scmap_cluster_siml, breaks = 100)
+  abline(v = threshold.scmap, col = 'red')
+  head(scmapCluster_results$combined_labs)
+  
+  predicted.id = scmapCluster_results$scmap_cluster_labs
+  counts.pred.ids = table(predicted.id)
+  counts.pred.ids = counts.pred.ids[order(-counts.pred.ids)]
+  
+  predicted.id[which(predicted.id == 'unassigned')] = NA
+  
+  cat('nb of assigned cells :',  length(predicted.id[!is.na(predicted.id)]), '\n')
+  cat('percent of assigned cells: ', length(predicted.id[!is.na(predicted.id)])/length(predicted.id), '\n')
+  
+  seurat.obj$predicted.id.scmap = predicted.id
+  
+  counts <- table(seurat.obj$predicted.id.scmap, seurat.obj$seurat_clusters)
+  barplot(counts, main="composition of subclusters ",
+          xlab="subcluster index", col=c(1:nrow(counts)),
+          legend = rownames(counts))
+  
+  p1 = DimPlot(seurat.obj, group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
+               na.value = "gray") + 
+    ggtitle(paste0("projection into Murray data with scmap (nfeature = ", nb.features.scmap,", threshold = ", 
+                   threshold.scmap, ")")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  plot(p1)
+  
+  # saveRDS(seurat.obj, file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized_scmapProjection.rds'))
 }
 
-clustifyr.transfer.labels.from.Murray.scRNA = function(seurat.obj)
-{
-  library('clustifyr') # install older version in https://github.com/rnabioco/clustifyr/releases/tag/0.99.4
-}
+# clustifyr.transfer.labels.from.Murray.scRNA = function(seurat.obj)
+# {
+#   library('clustifyr') # install older version in https://github.com/rnabioco/clustifyr/releases/tag/0.99.4
+# }
 
 seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj)
 {
