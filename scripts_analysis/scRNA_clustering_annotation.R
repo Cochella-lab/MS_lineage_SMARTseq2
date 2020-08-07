@@ -184,7 +184,7 @@ DimPlot(ms, reduction = "umap", group.by = 'request') + ggtitle('scran normaliza
 
 DimPlot(ms, reduction = "umap", group.by = 'timingEst') + ggtitle(paste0(nfeatures, ' HVGs'))
 
-source.my.script("scRNA_clustering_functions.R")
+source.my.script("scRNA_cluster_annotation_functions.R")
 test.umap.params(seurat.obj = ms)
 
 # save(ms, file=paste0(RdataDir, version.DATA, '_QCleaned_sctransformNorm.Rdata'))
@@ -281,7 +281,7 @@ saveRDS(ms, file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized.rds')
 #  label transfer with seurat
 ##########################################
 ms = readRDS(file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized.rds'))
-source.my.script("scRNA_clustering_functions.R")
+source.my.script("scRNA_cluster_annotation_functions.R")
 
 ms = seurat.transfer.labels.from.Murray.scRNA.to.scRNA(seurat.obj = ms)
 
@@ -289,7 +289,7 @@ ms = seurat.transfer.labels.from.Murray.scRNA.to.scRNA(seurat.obj = ms)
 # mapping reference with scmap and svm, rf
 ##########################################
 ms = readRDS(file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized.rds'))
-source.my.script("scRNA_clustering_functions.R")
+source.my.script("scRNA_cluster_annotation_functions.R")
 
 reference.based.cluster.annotation.scmap(seurat.obj = ms)
 
