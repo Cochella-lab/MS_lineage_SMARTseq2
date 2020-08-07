@@ -53,9 +53,9 @@ test.umap.params = function(seurat.obj, pdfname = paste0(resDir, '/umap_params_t
 ########################################################
 reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TRUE,
                                               method = 'scmap', nb.features.scmap = 500, threshold.scmap = 0.7,
-                                              predict.unassignedCells = FALSE, threshold.svm = 0.5, threshold.rf = 0.5)
+                                              predict.unassignedCells = TRUE, threshold.svm = 0.5, threshold.rf = 0.5)
 {
-  # seurat.obj = ms; predict.unassignedCells = FALSE;
+  # seurat.obj = ms; redefine.clusters = TRUE; predict.unassignedCells = TRUE;
   # method = 'scmap'; nb.features.scmap = 500; threshold.scmap = 0.7; nb.features.svm = 1500; threshold.svm = 0.5;threshold.rf = 0.5;
   
   ##########################################
@@ -67,7 +67,7 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
     
     seurat.obj = ScaleData(seurat.obj, features = rownames(seurat.obj))
     
-    seurat.obj <- RunPCA(object = seurat.obj, features = VariableFeatures(seurat.obj), verbose = FALSE, weight.by.var = FALSE)
+    seurat.obj <- RunPCA(object = seurat.obj, features = VariableFeatures(seurat.obj), verbose = FALSE, weight.by.var = TRUE)
     ElbowPlot(seurat.obj, ndims = 50)
     
     seurat.obj <- FindNeighbors(object = seurat.obj, reduction = "pca", k.param = 10, dims = 1:20)
@@ -84,7 +84,7 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
     
     cat(length(unique(seurat.obj$seurat_clusters)), 'clusters found \n')
     
-    #nb.pcs = 30; n.neighbors = 30; min.dist = 0.3;
+    #nb.pcs = 30; n.neighbors = 40; min.dist = 0.25;
     #seurat.obj <- RunUMAP(object = seurat.obj, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
     
     DimPlot(seurat.obj, group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
@@ -92,29 +92,22 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
       ggtitle(paste0("Seurat_clustering_SLM_resolution_3_3000variableFeatures_20pca_k10")) +
       scale_colour_hue(drop = FALSE) + 
       NoLegend()
+    
   }
   
   ##########################################
-  # step 1): project aleks cells to the reference using scmap
+  # step 1): project aleks cells to the reference using scmap and seurat
   # transfer labels with stringent threshold
   ##########################################
+  source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
   
-  ## import and process Murray datfa for scmap as reference
+  ## import and process Murray datfa 
   ee = process.import.Murray.scRNA()
   
-  if(method == 'scmap'){
-    
-    
-    
-  }
-  
-  if(method == 'seurat'){
-    seurat.transfer.labels.from.Murray.scRNA.to.scRNA(seurat.obj)
-  }
-  
-  # if(method == 'clustifyr'){
-  #   clustifyr.transfer.labels.from.Murray.scRNA(seurat.obj)
-  # }
+  ## tranfer Murray labels with scmap
+  seurat.obj = scmap.transfer.labels.from.Murray.scRNA(seurat.obj, ee)
+  ## transfer Murray labels with seurat
+  seurat.obj = seurat.transfer.labels.from.Murray.scRNA.to.scRNA(seurat.obj, ee)
   
   ##########################################
   # step 2): predict unassigned cells using assgined cells with rf and svm
@@ -194,228 +187,15 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
   }
   
   ##########################################
-  # step 3):  annotate clusters with predicted identities and also other information
+  # step 3):  refine clusters (split or merge)
   ##########################################
   seurat.obj = annotate.clusters.using.predicted.id(seurat.obj)
   
+  ##########################################
+  # step 4): focus short list of cell identities and manual annotate with other information
+  ##########################################
+  
   return(seurat.obj)
-  
-}
-
-##########################################
-# utility functions for the function reference.based.cluster.annotation.scmap
-##########################################
-scmap.transfer.labels.from.Murray.scRNA = function(seurat.obj)
-{
-  ## process aleks data for scmap
-  library(SingleCellExperiment)
-  library(scmap)
-  sce = Seurat::as.SingleCellExperiment(seurat.obj)
-  sce <- sce[!duplicated(rownames(sce)), ]
-  rowData(sce)$feature_symbol <- rownames(sce)
-  counts(sce) = as.matrix(counts(sce)) # sce object converted from seurat object was using spare matrix
-  logcounts(sce) = as.matrix(logcounts(sce))
-  
-  ee = Seurat::as.SingleCellExperiment(ee)
-  counts(ee) = as.matrix(counts(ee))
-  logcounts(ee) = as.matrix(logcounts(ee))
-  rowData(ee)$feature_symbol <- rownames(ee)
-  ee$cell_type1 = ee$lineage
-  
-  ## feature selection for scmap
-  ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = nb.features.scmap)
-  table(rowData(ee)$scmap_features)
-  #as.character(unique(ee$cell_type1))
-  
-  ee_ref = indexCluster(ee)
-  #head(metadata(ee_ref)$scmap_cluster_index)
-  #heatmap(as.matrix(metadata(ee_ref)$scmap_cluster_index))
-  
-  scmapCluster_results <- scmapCluster(
-    projection = sce, 
-    index_list = list(
-      murray = metadata(ee_ref)$scmap_cluster_index
-    ),
-    threshold = threshold.scmap
-  )
-  
-  #length(scmapCluster_results$scmap_cluster_labs)
-  #length(scmapCluster_results$combined_labs)
-  ident.murray = unique(ee$lineage)
-  ident.projection = unique(scmapCluster_results$scmap_cluster_labs)
-  ident.missed = ident.murray[which(is.na(match(ident.murray, ident.projection)))]
-  print(ident.missed)
-  #head(scmapCluster_results$scmap_cluster_labs)
-  #head(scmapCluster_results$scmap_cluster_siml)
-  
-  hist(scmapCluster_results$scmap_cluster_siml, breaks = 100)
-  abline(v = threshold.scmap, col = 'red')
-  head(scmapCluster_results$combined_labs)
-  
-  predicted.id = scmapCluster_results$scmap_cluster_labs
-  counts.pred.ids = table(predicted.id)
-  counts.pred.ids = counts.pred.ids[order(-counts.pred.ids)]
-  
-  predicted.id[which(predicted.id == 'unassigned')] = NA
-  
-  cat('nb of assigned cells :',  length(predicted.id[!is.na(predicted.id)]), '\n')
-  cat('percent of assigned cells: ', length(predicted.id[!is.na(predicted.id)])/length(predicted.id), '\n')
-  
-  seurat.obj$predicted.id.scmap = predicted.id
-  
-  counts <- table(seurat.obj$predicted.id.scmap, seurat.obj$seurat_clusters)
-  barplot(counts, main="composition of subclusters ",
-          xlab="subcluster index", col=c(1:nrow(counts)),
-          legend = rownames(counts))
-  
-  p1 = DimPlot(seurat.obj, group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
-               na.value = "gray") + 
-    ggtitle(paste0("projection into Murray data with scmap (nfeature = ", nb.features.scmap,", threshold = ", 
-                   threshold.scmap, ")")) +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
-  plot(p1)
-  
-  # saveRDS(seurat.obj, file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized_scmapProjection.rds'))
-}
-
-# clustifyr.transfer.labels.from.Murray.scRNA = function(seurat.obj)
-# {
-#   library('clustifyr') # install older version in https://github.com/rnabioco/clustifyr/releases/tag/0.99.4
-# }
-
-seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj)
-{
-  # seurat.obj = ms;
-  # process and import Parker et al. data
-  process.import.Murray.scRNA()
-  ee <- FindVariableFeatures(
-    object = ee,
-    nfeatures = 3000
-  )
-  
-  ee <- ScaleData(object = ee)
-  Idents(ee) = ee$lineage
-  
-  # Here, we process the gene activity matrix 
-  # in order to find anchors between cells in the scATAC-seq dataset 
-  # and the scRNA-seq dataset.
-  Idents(seurat.obj) = seurat.obj$SCT_snn_res.12
-  
-  DimPlot(seurat.obj, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 5, repel = FALSE) + NoLegend()
-  
-  DefaultAssay(seurat.obj) <- 'RNA'
-  #nb.variableFeatures = 5000
-  #seurat.obj <- FindVariableFeatures(seurat.obj, nfeatures = nb.variableFeatures)
-  #seurat.obj <- NormalizeData(seurat.obj)
-  #seurat.obj <- ScaleData(seurat.obj)
-  
-  #seurat.obj <- RunPCA(seurat.obj, npcs = 50, verbose = FALSE, reduction.name = 'pca.ga')
-  
-  transfer.anchors <- FindTransferAnchors(
-    reference = ee,
-    query = seurat.obj,
-    features = unique(VariableFeatures(seurat.obj)),
-    #features = features.to.use,
-    reference.assay = 'RNA',
-    query.assay = 'RNA',
-    reduction = 'cca',
-    k.anchor = 10, # k.anchor is neighborhood size for MNN big k.anchor, the bigger, the more anchors found
-    k.filter = 200, # retain the anchor (cell from one dataset to annother) if within k.filter neighbors, the bigger, the more retained  
-    max.features = 200, # max nb of features used for anchor filtering
-    k.score = 30, 
-    npcs = 50, 
-    dims = 1:50
-  )
-  
-  cat('nb of cells in query and in reference as anchors : ', 
-      length(unique(transfer.anchors@anchors[, 1])), '--',  length(unique(transfer.anchors@anchors[, 2])), '\n')
-  
-  
-  predicted.labels <- TransferData(
-    anchorset = transfer.anchors,
-    #refdata = Idents(tintori),
-    refdata = Idents(ee),
-    #refdata = as.vector(Idents(seurat.obj)),
-    #weight.reduction = seurat.obj[['pca']],
-    weight.reduction = seurat.obj[['pca']],
-    dims = 1:30,
-    k.weight = 50
-  )
-  
-  seurat.obj <- AddMetaData(object = seurat.obj, metadata = predicted.labels)
-  
-  DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
-    ggtitle("transferred labels") +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
-  table(seurat.obj$prediction.score.max > 0.5)
-  
-  hist(seurat.obj$prediction.score.max)
-  abline(v = 0.5, col = "red")
-  
-  seurat.obj.filtered <- subset(seurat.obj, subset = prediction.score.max > 0.5)
-  
-  # to make the colors match
-  seurat.obj.filtered$predicted.id <- factor(seurat.obj.filtered$predicted.id, levels = levels(ee))  
-  DimPlot(seurat.obj.filtered, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
-    ggtitle("transferred labels with probability threshod = 0.5") +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
-  DimPlot(ms_correlation_idents, reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
-    ggtitle("aleks correlation assignment") +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
-  ##########################################
-  # make summary of cluster-to-predicted label mapping
-  ##########################################
-  res = data.frame(clusters = Idents(seurat.obj), predicted.labels, stringsAsFactors = FALSE)
-  
-  labels.pred =  unique(res$predicted.id)
-  clusters = unique(res$clusters)
-  res.map = matrix(0, nrow = length(labels.pred), ncol = length(clusters))
-  rownames(res.map) = labels.pred
-  colnames(res.map) = clusters
-  res.map = res.map[, sort(colnames(res.map))]
-  
-  for(n in 1:ncol(res.map))
-  {
-    # n = 1
-    predicted.ids = res$predicted.id[which(res$clusters == colnames(res.map)[n])]
-    stats.ids = table(predicted.ids)
-    stats.ids = stats.ids[match(rownames(res.map), names(stats.ids))]
-    stats.ids[is.na(stats.ids)] = 0
-    res.map[,n] = stats.ids/sum(stats.ids)
-  }
-  
-  library("pheatmap")
-  library("RColorBrewer")
-  library(grid)
-  
-  cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
-  pheatmap(res.map, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
-           cluster_cols=TRUE, main = paste0("resolution -- 0.8"), na_col = "white",
-           color = cols, 
-           #annotation_col = my_sample_col,
-           #gaps_row = c(1:nrow(map)-1),
-           fontsize_col = 10,
-           height = 8,
-           width = 30
-  )
-  
-  cols =  c(colorRampPalette((brewer.pal(n = 7, name="Set3")))(ncol(res.map)))
-  barplot(res.map, horiz = TRUE, legend = rownames(res.map), 
-          col = cols )
-  
-  map.fitered = map
-  map.fitered[which(map.fitered<0.1)] = 0
-  pheatmap(map.fitered, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-           cluster_cols=FALSE, main = paste0("fitlered < 0.1 with resolution -- ",  resolution), na_col = "white",
-           color = cols)
   
 }
 
@@ -593,317 +373,9 @@ clustering.splitting.kmean.outlier.detection = function(seurat.obj, sels, redefi
   
 }
 
-test.classifier.for.Murray.data = function(method = c('scmap', 'rf', 'gbm', 'svm'))
-{
-  ##########################################
-  # here we test classical predition methods using Johm Murray's data 
-  ##########################################
-  library(SingleCellExperiment)
-  library(irr)
-  
-  ee = process.import.Murray.scRNA()
-  ee = Seurat::as.SingleCellExperiment(ee)
-  counts(ee) = as.matrix(counts(ee))
-  logcounts(ee) = as.matrix(logcounts(ee))
-  rowData(ee)$feature_symbol <- rownames(ee)
-  ee$cell_type1 = ee$lineage
-  
-  ## split the Murray data into train and test
-  set.seed(101)
-  index.train = sample(1:ncol(ee), 8000)
-  train = ee[, index.train]
-  test = ee[, -index.train]
-  
-  # test scmap
-  library(scmap)
-  nb.features = 500
-  threshold = 0.7
-  
-  train <- selectFeatures(train, suppress_plot = FALSE, n_features = nb.features)
-  
-  table(rowData(train)$scmap_features)
-  as.character(unique(train$cell_type1))
-  
-  train = indexCluster(train)
-  head(metadata(train)$scmap_cluster_index)
-  
-  scmapCluster_results <- scmapCluster(
-    projection = test, 
-    index_list = list(
-      murray = metadata(train)$scmap_cluster_index
-    ),
-    threshold = threshold
-  )
-  
-  head(scmapCluster_results$scmap_cluster_labs)
-  length(scmapCluster_results$scmap_cluster_labs)
-  
-  head(scmapCluster_results$scmap_cluster_siml)
-  
-  hist(scmapCluster_results$scmap_cluster_siml, breaks = 40)
-  abline(v = threshold, col = 'red')
-  head(scmapCluster_results$combined_labs)
-  predicted.id = scmapCluster_results$scmap_cluster_labs
-  predicted.id[which(predicted.id == 'unassigned')] = NA
-  cat(length(predicted.id[!is.na(predicted.id)]), length(predicted.id[!is.na(predicted.id)])/length(predicted.id), '\n')
-  
-  kappa0 = kappa2(data.frame(predicted.id, test$lineage), weight = c("unweighted"), sort.levels = FALSE)
-  kappa2(data.frame(predicted.id, test$lineage)[!is.na(predicted.id), ], weight = c("unweighted"), sort.levels = FALSE)
-  
-  ## prepare train and test matrix for rf and gbm
-  train.all.feature = train; test.all.feature = test
-  table(rowData(train.all.feature)$scmap_features)
-  
-  sels = rowData(train.all.feature)$scmap_features
-  train = train.all.feature[sels, ]
-  test = test.all.feature[sels, ]
-  y <- as.factor(train$lineage)
-  y.test = as.factor(test$lineage)
-  train = logcounts(train)
-  test = logcounts(test)
-  train = t(train)
-  train <- as.data.frame(train)
-  test = t(test)
-  test <- as.data.frame(test)
-  rownames(train) <- NULL
-  rownames(test) <- NULL
-  
-  # run random forest
-  #res.rf = run.classifier.rf()
-  # run svm
-  
-}
-
-run.classifier.rf = function(train, y, test, ntree = 200, param.tuning = FALSE)
-{
-  #https://cran.r-project.org/web/packages/randomForestExplainer/vignettes/randomForestExplainer.html
-  # http://uc-r.github.io/random_forests # the one I am referring to 
-  #library(tree)
-  library(randomForest)
-  library(ranger)
-  library(stats)
-  library(mlbench)
-  library(caret)
-  library(tictoc)
-  
-  if(!param.tuning){
-    #train = scale(train)
-    #study = scale(study)
-    #ntree = 100
-    #mtry = 46
-    # x = train
-    tic()
-    train_rf <- randomForest::randomForest(x = train, y = y, ntree = ntree, keep.forest = TRUE, 
-                                           importance = FALSE)
-    toc()
-    #plot(train_rf)
-    
-    # tic()
-    # m1 = ranger::ranger(x = train, y = y, num.trees = ntree, mtry = mtry, write.forest = TRUE, classification = TRUE, 
-    #                     local.importance = TRUE)
-    # toc()
-    
-  }else{
-    
-    ## tune mtry parameter with tuneRF from randomForest package
-    m2 <- tuneRF(
-      x          = train,
-      y          = y,
-      ntreeTry   = ntree,
-      mtryStart  = floor(sqrt(ncol(x))),
-      stepFactor = 1.5,
-      improve    = 0.01,
-      trace      = FALSE      # to not show real-time progress 
-    )
-    print(m2)
-    
-    # hyperparameter grid search
-    hyper_grid <- expand.grid(
-      mtry       = seq(20, 60, by = 5),
-      node_size  = seq(1, 10, by = 2),
-      #sample_size = c(.55, .632, .70, .80),
-      sample_size = c(.632),
-      prediction_err   = 0
-    )
-    
-    # total number of combinations
-    nrow(hyper_grid)
-    ## [1] 96
-    
-    for(i in 1:nrow(hyper_grid)) {
-      # train model
-      model <- ranger(
-        x = train, 
-        y = y,
-        num.trees       = ntree,
-        mtry            = hyper_grid$mtry[i],
-        min.node.size   = hyper_grid$node_size[i],
-        sample.fraction = hyper_grid$sample_size[i],
-        seed            = 123
-      )
-      
-      # add OOB error to grid
-      hyper_grid$prediction_err[i] <- model$prediction.error
-    }
-    
-    hyper_grid %>% 
-      dplyr::arrange(prediction_err) %>%
-      head(10)
-    
-    index.optimal = which.min(hyper_grid$prediction_err)
-    tic()
-    train.optimal = ranger::ranger(x = train, y = y, 
-                                   num.trees = ntree, 
-                                   mtry = hyper_grid$mtry[index.optimal], 
-                                   min.node.size = hyper_grid$node_size[index.optimal],
-                                   sample.fraction = hyper_grid$sample_size[index.optimal], 
-                                   write.forest = TRUE, 
-                                   probability = TRUE,
-                                   classification = TRUE, 
-                                   local.importance = TRUE)
-    toc()
-    
-    saveRDS(train.optimal, file = paste0(RdataDir, 'MurrayData_classifier_test_RF_optimalParam.rds'))
-    rf.fit = readRDS(file = paste0(RdataDir, 'MurrayData_classifier_test_RF_optimalParam.rds'))
-    #pred_test <-stats::predict(rf.fit, test)
-    
-    err.test = mean(pred_test==factor(y.test, levels = levels(pred_test)))
-  }
-  
-  Prediction <- stats::predict(train_rf, test, type = "prob")
-  #Prediction <- stats::predict(m1, test, type = "prob")
-  #Prediction <- predict(train_rf, test, type = "response")$predictions
-  rf.res = data.frame(label = apply(Prediction, 1, function(x) colnames(Prediction)[which.max(x)]),
-                      prob = apply(Prediction, 1, function(x) x[which.max(x)]))
-  #hist(rf.res$prob)
-  #kappa2(data.frame(rf.res$label, y.test), weight = c("unweighted"), sort.levels = FALSE)
-  return(rf.res)
-  
-}
-
-run.classifier.svm = function(train, y, test, cost = 1, param.tuning = FALSE)
-{
-  library(e1071)
-  library(stats)
-  library(tidyverse)    # data manipulation and visualization
-  library(kernlab)      # SVM methodology
-  library(RColorBrewer)
-  library(tictoc)
-  
-  if(param.tuning){
-    ##########################################
-    # tune function in e1071 is extremely slow and not used here
-    ##########################################
-    # tune.out <- tune(svm, train.x = train, train.y = y, kernel = "linear",
-    #                  ranges = list(cost = c(0.1, 1, 5)))
-    # 
-    # # extract the best model
-    # svmfit <- tune.out$best.model
-    
-    ##########################################
-    # here parallel method is used
-    # https://www.r-bloggers.com/improve-svm-tuning-through-parallelism/
-    ##########################################
-    pkgs <- c('foreach', 'doParallel')
-    lapply(pkgs, require, character.only = T)
-    registerDoParallel(cores = 4)
-    
-    #set.seed(2016)
-    #df2$fold <- caret::createFolds(1:nrow(df2), k = 4, list = FALSE)
-    
-    #gamma <- c(1, 2)
-    parms <- expand.grid(
-      cost = c(0.001, 0.01, 0.1, 1, 5, 10, 100) 
-    )
-    
-    ### LOOP THROUGH PARAMETER VALUES ###
-    result <- foreach(i = 1:nrow(parms), .combine = rbind) %do% {
-      c <- parms$cost[i]
-      
-      svmfit = e1071::svm(train, y, kernel = 'linear', cost = c, type = "C-classification", 
-                          scale = FALSE, probability = TRUE)
-      pred <- predict(svmfit, test, probability = TRUE)
-      Prediction = attr(pred, "probabilities")
-      svm.res = data.frame(label = apply(Prediction, 1, function(x) colnames(Prediction)[which.max(x)]),
-                           prob = apply(Prediction, 1, function(x) x[which.max(x)]))
-      
-      pred_train <-predict(svmfit,train)
-      err.train = mean(pred_train==y)
-      
-      pred_test <-predict(svmfit,test)
-      err.test = mean(pred_test==factor(y.test, levels = levels(pred_test)))
-      ckappa = kappa2(data.frame(pred_test, y.test))$value
-      #print(kappa2(data.frame(svm.res$label, y.test), weight = c("unweighted"), sort.levels = FALSE), '\n')
-      
-      ### CALCULATE SVM PERFORMANCE ###
-      #roc <- pROC::roc(as.factor(out$y), out$prob) 
-      data.frame(cost = parms[i, ], err.train, err.test, ckappa)
-    }
-    
-  }else{
-    
-    tic()
-    svmfit <- e1071::svm(train, y, kernel = 'linear',  cost = cost, scale = FALSE, probability = TRUE)
-    toc()
-    
-  }
-  
-  pred <- predict(svmfit, test, probability = TRUE)
-  pred = attr(pred, "probabilities")
-  svm.res = data.frame(label = apply(pred, 1, function(x) colnames(pred)[which.max(x)]),
-                       prob = apply(pred, 1, function(x) x[which.max(x)]), stringsAsFactors = FALSE)
-  
-  return(svm.res)
-  
-}
-
-run.classifier.gbm = function(train, test)
-{
-  # http://uc-r.github.io/gbm_regression
-  library(rsample)
-  library(gbm)          # basic implementation
-  library(xgboost)      # a faster implementation of gbm
-  library(caret)        # an aggregator package for performing many machine learning models
-  library(ggplot2)      # model visualization
-  #library(lime) 
-  library(tictoc)
-  
-  data = data.frame(y, train)
-  
-  ## test gbm package
-  set.seed(123)
-  tic()
-  gbm.fit <- gbm(
-    formula = y ~ .,
-    distribution = "multinomial",
-    data = data,
-    n.trees = 1000,
-    interaction.depth = 1,
-    shrinkage = 0.001,
-    cv.folds = 4,
-    n.cores = NULL, # will use all cores by default
-    verbose = FALSE
-  )  
-  toc()
-  # print results
-  print(gbm.fit)
-  
-  ## test xgboost
-  set.seed(123)
-  params <- list(booster = "gbtree", objective = "multi:softprob", num_class = length(unique(y)), eval_metric = "mlogloss")
-  xgb.data = xgb.DMatrix(as.matrix(data[, -1]), label = data[, 1], missing=median)
-  xgb.fit1 <- xgb.cv(
-    params = params,
-    data = xgb.data,
-    nrounds = 100,
-    eta=0.2,
-    nfold = 4,
-    verbose = 0               # silent,
-  )
-  
-  
-}
-
+##########################################
+# import Murray scRNA data and select the cell identities of interest (MS and some early stage cells)
+##########################################
 process.import.Murray.scRNA = function()
 {
   library(VisCello.celegans)
