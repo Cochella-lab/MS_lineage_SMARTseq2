@@ -14,11 +14,12 @@
 #  
 ########################################################
 ########################################################
-scmap.transfer.labels.from.Murray.scRNA = function(seurat.obj, ee)
+scmap.transfer.labels.from.Murray.scRNA = function(seurat.obj, ee, run.scmap.cell = FALSE)
 {
-  ## process aleks data for scmap
   library(SingleCellExperiment)
   library(scmap)
+  
+  # process aleks data for scmap
   sce = Seurat::as.SingleCellExperiment(seurat.obj)
   sce <- sce[!duplicated(rownames(sce)), ]
   rowData(sce)$feature_symbol <- rownames(sce)
@@ -31,62 +32,120 @@ scmap.transfer.labels.from.Murray.scRNA = function(seurat.obj, ee)
   rowData(ee)$feature_symbol <- rownames(ee)
   ee$cell_type1 = ee$lineage
   
-  ## feature selection for scmap
-  ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = nb.features.scmap)
-  table(rowData(ee)$scmap_features)
-  #as.character(unique(ee$cell_type1))
+  ##########################################
+  # run scmap-cell 
+  ##########################################
+  if(run.scmap.cell){
+    set.seed(1)
+    
+    ## feature selection for scmap
+    ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = 3000)
+    table(rowData(ee)$scmap_features)
+    #as.character(unique(ee$cell_type1))
+    
+    ee <- indexCell(ee)
+    
+    names(metadata(ee)$scmap_cell_index)
+    
+    length(metadata(ee)$scmap_cell_index$subcentroids)
+    
+    dim(metadata(ee)$scmap_cell_index$subcentroids[[1]])
+    
+    metadata(ee)$scmap_cell_index$subcentroids[[1]][,1:5]
+    
+    scmapCell_results <- scmapCell(
+      sce, 
+      list(
+        murray = metadata(ee)$scmap_cell_index
+      ),
+      w = 10
+    )
+    
+    scmapCell_clusters <- scmapCell2Cluster(
+      scmapCell_results, 
+      list(
+        as.character(colData(ee)$cell_type1)
+      ),
+      w = 3,
+      threshold = 0.
+    )
+    
+    head(scmapCell_clusters$scmap_cluster_labs)
+    table(scmapCell_clusters$scmap_cluster_labs)
+    
+    head(scmapCell_clusters$scmap_cluster_siml)
+    
+  }
   
-  ee_ref = indexCluster(ee)
-  #head(metadata(ee_ref)$scmap_cluster_index)
-  #heatmap(as.matrix(metadata(ee_ref)$scmap_cluster_index))
+  ##########################################
+  # run scmap-cluster
+  ##########################################
+  keep = data.frame(colnames(sce), stringsAsFactors = FALSE)
+  colnames(keep) = 'cell'
   
-  scmapCluster_results <- scmapCluster(
-    projection = sce, 
-    index_list = list(
-      murray = metadata(ee_ref)$scmap_cluster_index
-    ),
-    threshold = threshold.scmap
-  )
+  for(nb.features.scmap in c(500, 1000, 2000, 3000))
+  {
+    ## feature selection for scmap
+    #nb.features.scmap = 500
+    #threshold.scmap = 0.5
+    cat('nb of features selected : ', nb.features.scmap, '\n')
+    
+    ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = nb.features.scmap)
+    #table(rowData(ee)$scmap_features)
+    ee_ref = indexCluster(ee)
+    
+    #head(metadata(ee_ref)$scmap_cluster_index)
+    #heatmap(as.matrix(metadata(ee_ref)$scmap_cluster_index))
+    
+    scmapCluster_results <- scmapCluster(
+      projection = sce, 
+      index_list = list(
+        murray = metadata(ee_ref)$scmap_cluster_index
+      ),
+      threshold = 0
+    )
+    
+    #seurat.obj = AddMetaData(seurat.obj, as.factor(scmapCluster_results$scmap_cluster_labs), 
+    #                         col.name = paste0('scmap.pred.id.features.', nb.features.scmap))
+    
+    keep = data.frame(keep, as.character(scmapCluster_results$scmap_cluster_labs), 
+                       as.numeric(scmapCluster_results$scmap_cluster_siml), 
+                       stringsAsFactors = FALSE)
+    
+    #length(scmapCluster_results$scmap_cluster_labs)
+    #length(scmapCluster_results$combined_labs)
+    ident.murray = unique(ee$lineage)
+    ident.projection = unique(scmapCluster_results$scmap_cluster_labs)
+    ident.missed = ident.murray[which(is.na(match(ident.murray, ident.projection)))]
+    cat('cell identities missed : ')
+    print(ident.missed)
+    #head(scmapCluster_results$scmap_cluster_labs)
+    #head(scmapCluster_results$scmap_cluster_siml)
+    
+    hist(scmapCluster_results$scmap_cluster_siml, breaks = 100)
+    #abline(v = threshold.scmap, col = 'red')
+    head(scmapCluster_results$combined_labs)
+    
+    predicted.id = scmapCluster_results$scmap_cluster_labs
+    counts.pred.ids = table(predicted.id)
+    counts.pred.ids = counts.pred.ids[order(-counts.pred.ids)]
+    # print(counts.pred.ids)
+    
+    predicted.id[which(predicted.id == 'unassigned')] = NA
+    
+    cat('nb of assigned cells :',  length(predicted.id[!is.na(predicted.id)]), '\n')
+    cat('percent of assigned cells: ', length(predicted.id[!is.na(predicted.id)])/length(predicted.id), '\n')
+    
+  }
   
-  #length(scmapCluster_results$scmap_cluster_labs)
-  #length(scmapCluster_results$combined_labs)
-  ident.murray = unique(ee$lineage)
-  ident.projection = unique(scmapCluster_results$scmap_cluster_labs)
-  ident.missed = ident.murray[which(is.na(match(ident.murray, ident.projection)))]
-  print(ident.missed)
-  #head(scmapCluster_results$scmap_cluster_labs)
-  #head(scmapCluster_results$scmap_cluster_siml)
+  colnames(keep)[-1] = paste0(rep(c('scmap.pred.id.', 'scmap.corr.'), 4), rep(c(500, 1000, 2000, 3000), each =2))
+  rownames(keep) = colnames(seurat.obj)
+  seurat.obj = AddMetaData(seurat.obj, metadata = keep[, -1])
   
-  hist(scmapCluster_results$scmap_cluster_siml, breaks = 100)
-  abline(v = threshold.scmap, col = 'red')
-  head(scmapCluster_results$combined_labs)
+  saveRDS(seurat.obj, file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized_reference.based.annotation.scmap.rds'))
   
-  predicted.id = scmapCluster_results$scmap_cluster_labs
-  counts.pred.ids = table(predicted.id)
-  counts.pred.ids = counts.pred.ids[order(-counts.pred.ids)]
+  return(seurat.obj)
   
-  predicted.id[which(predicted.id == 'unassigned')] = NA
-  
-  cat('nb of assigned cells :',  length(predicted.id[!is.na(predicted.id)]), '\n')
-  cat('percent of assigned cells: ', length(predicted.id[!is.na(predicted.id)])/length(predicted.id), '\n')
-  
-  seurat.obj$predicted.id.scmap = predicted.id
-  
-  counts <- table(seurat.obj$predicted.id.scmap, seurat.obj$seurat_clusters)
-  barplot(counts, main="composition of subclusters ",
-          xlab="subcluster index", col=c(1:nrow(counts)),
-          legend = rownames(counts))
-  
-  p1 = DimPlot(seurat.obj, group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
-               na.value = "gray") + 
-    ggtitle(paste0("projection into Murray data with scmap (nfeature = ", nb.features.scmap,", threshold = ", 
-                   threshold.scmap, ")")) +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
-  plot(p1)
-  
-  # saveRDS(seurat.obj, file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized_scmapProjection.rds'))
 }
 
 seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj, ee)
@@ -103,9 +162,8 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj, ee)
   # Here, we process the gene activity matrix 
   # in order to find anchors between cells in the scATAC-seq dataset 
   # and the scRNA-seq dataset.
-  Idents(seurat.obj) = seurat.obj$SCT_snn_res.12
-  
-  DimPlot(seurat.obj, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 5, repel = FALSE) + NoLegend()
+  #Idents(seurat.obj) = seurat.obj$seurat_clusters
+  #DimPlot(seurat.obj, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 5, repel = FALSE) + NoLegend()
   
   DefaultAssay(seurat.obj) <- 'RNA'
   #nb.variableFeatures = 5000
@@ -127,8 +185,8 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj, ee)
     k.filter = 200, # retain the anchor (cell from one dataset to annother) if within k.filter neighbors, the bigger, the more retained  
     max.features = 200, # max nb of features used for anchor filtering
     k.score = 30, 
-    npcs = 50, 
-    dims = 1:50
+    npcs = 30, 
+    dims = 1:30
   )
   
   cat('nb of cells in query and in reference as anchors : ', 
@@ -146,35 +204,13 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj, ee)
     k.weight = 50
   )
   
-  seurat.obj <- AddMetaData(object = seurat.obj, metadata = predicted.labels)
-  
-  DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
-    ggtitle("transferred labels") +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
-  table(seurat.obj$prediction.score.max > 0.5)
-  
-  hist(seurat.obj$prediction.score.max)
-  abline(v = 0.5, col = "red")
-  
-  seurat.obj.filtered <- subset(seurat.obj, subset = prediction.score.max > 0.5)
-  
-  # to make the colors match
-  seurat.obj.filtered$predicted.id <- factor(seurat.obj.filtered$predicted.id, levels = levels(ee))  
-  DimPlot(seurat.obj.filtered, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
-    ggtitle("transferred labels with probability threshod = 0.5") +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
-  DimPlot(ms_correlation_idents, reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
-    ggtitle("aleks correlation assignment") +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
+  ##########################################
+  # process predicted labels and save the maximum and second max 
+  ##########################################
   ##########################################
   # make summary of cluster-to-predicted label mapping
   ##########################################
+  
   res = data.frame(clusters = Idents(seurat.obj), predicted.labels, stringsAsFactors = FALSE)
   
   labels.pred =  unique(res$predicted.id)
@@ -219,7 +255,61 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj, ee)
            cluster_cols=FALSE, main = paste0("fitlered < 0.1 with resolution -- ",  resolution), na_col = "white",
            color = cols)
   
+  
+  seurat.obj <- AddMetaData(object = seurat.obj, metadata = predicted.labels)
+  
+  DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
+    ggtitle("transferred labels") +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  table(seurat.obj$prediction.score.max > 0.5)
+  
+  hist(seurat.obj$prediction.score.max)
+  abline(v = 0.5, col = "red")
+  
+  seurat.obj.filtered <- subset(seurat.obj, subset = prediction.score.max > 0.5)
+  
+  # to make the colors match
+  seurat.obj.filtered$predicted.id <- factor(seurat.obj.filtered$predicted.id, levels = levels(ee))  
+  DimPlot(seurat.obj.filtered, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
+    ggtitle("transferred labels with probability threshod = 0.5") +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  DimPlot(ms_correlation_idents, reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
+    ggtitle("aleks correlation assignment") +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  
+  
+  return(seurat.obj)
+  
 }
+
+compare.reference.based.annotation = function(seurat.obj)
+{
+  
+  #seurat.obj$predicted.id.scmap = predicted.id
+  counts <- table(seurat.obj$predicted.id.scmap, seurat.obj$seurat_clusters)
+  barplot(counts, main="composition of subclusters ",
+          xlab="subcluster index", col=c(1:nrow(counts)),
+          legend = rownames(counts))
+  
+  p1 = DimPlot(seurat.obj, group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
+               label.size = 4,
+               na.value = "gray") + 
+    ggtitle(paste0("projection into Murray data with scmap (nfeature = ", nb.features.scmap,", threshold = ", 
+                   threshold.scmap, ")")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  plot(p1)
+  
+  
+}
+
 
 
 ########################################################

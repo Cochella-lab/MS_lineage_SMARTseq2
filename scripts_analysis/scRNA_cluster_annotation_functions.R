@@ -53,10 +53,9 @@ test.umap.params = function(seurat.obj, pdfname = paste0(resDir, '/umap_params_t
 ########################################################
 reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TRUE,
                                               method = 'scmap', nb.features.scmap = 500, threshold.scmap = 0.7,
-                                              predict.unassignedCells = TRUE, threshold.svm = 0.5, threshold.rf = 0.5)
+                                              predict.unassignedCells = FALSE, threshold.svm = 0.5, threshold.rf = 0.5)
 {
-  # seurat.obj = ms; redefine.clusters = TRUE; predict.unassignedCells = TRUE;
-  # method = 'scmap'; nb.features.scmap = 500; threshold.scmap = 0.7; nb.features.svm = 1500; threshold.svm = 0.5;threshold.rf = 0.5;
+  # seurat.obj = ms; redefine.clusters = TRUE; predict.unassignedCells = FALSE;
   
   ##########################################
   # step 0) refine the clustering from seurat
@@ -106,6 +105,7 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
   
   ## tranfer Murray labels with scmap
   seurat.obj = scmap.transfer.labels.from.Murray.scRNA(seurat.obj, ee)
+  
   ## transfer Murray labels with seurat
   seurat.obj = seurat.transfer.labels.from.Murray.scRNA.to.scRNA(seurat.obj, ee)
   
