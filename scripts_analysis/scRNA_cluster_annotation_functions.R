@@ -113,6 +113,7 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
   seurat.obj = readRDS(seurat.obj, 
                        file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized_reference.based.annotation.scmap.seurat.rds'))
   
+  
   ##########################################
   # step 2): predict unassigned cells using assgined cells with rf and svm
   ##########################################
