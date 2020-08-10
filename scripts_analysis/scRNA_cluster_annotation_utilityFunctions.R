@@ -240,16 +240,24 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj, ee)
   
 }
 
+##########################################
+# here compare scmap and seurat, two reference-based cluster annotation
+# the clusters were also given here in seurat.obj$seurat_clusters
+##########################################
 compare.reference.based.annotation.scmap.seurat = function(seurat.obj)
 {
+  library("pheatmap")
+  library("RColorBrewer")
+  library(grid)
   
   #seurat.obj$predicted.id.scmap = predicted.id
-  counts <- table(seurat.obj$predicted.id.scmap, seurat.obj$seurat_clusters)
+  predicted.ids = seurat.obj$scmap.pred.id.500
+  counts <- table(predicted.ids, seurat.obj$seurat_clusters)
   barplot(counts, main="composition of subclusters ",
           xlab="subcluster index", col=c(1:nrow(counts)),
           legend = rownames(counts))
   
-  p1 = DimPlot(seurat.obj, group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
+  p1 = DimPlot(seurat.obj, group.by = "scmap.pred.id.500", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
                label.size = 4,
                na.value = "gray") + 
     ggtitle(paste0("projection into Murray data with scmap (nfeature = ", nb.features.scmap,", threshold = ", 
@@ -259,14 +267,13 @@ compare.reference.based.annotation.scmap.seurat = function(seurat.obj)
   
   plot(p1)
   
+  
   if(prediction.summary){
-    library("pheatmap")
-    library("RColorBrewer")
-    library(grid)
+    predicted.labels =  
     
     res = data.frame(clusters = Idents(seurat.obj), predicted.labels, stringsAsFactors = FALSE)
     
-    labels.pred =  unique(res$predicted.id)
+    labels.pred =  unique(res$seurat.predicted.id)
     clusters = unique(res$clusters)
     res.map = matrix(0, nrow = length(labels.pred), ncol = length(clusters))
     rownames(res.map) = labels.pred
