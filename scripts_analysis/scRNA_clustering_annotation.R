@@ -29,7 +29,7 @@ setwd(paste0("../", user))
 #setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user))
 
 version.DATA = 'all_batches'
-version.analysis =  paste0(version.DATA, '_202005')
+version.analysis =  paste0(version.DATA, '_202008')
 dataDir = paste0("../data/gene_counts/")
 resDir = paste0("results/", version.analysis)
 tabDir = paste0("results/", version.analysis, "/tables/")
@@ -50,8 +50,8 @@ library(ggplot2)
 ########################################################
 ########################################################
 # import processed data by Aleks
-dir.processed.data = "/Users/jiwang/workspace/imp/scRNAseq_MS_lineage_dev/results_aleks/results/all_batches_202005/Rdata/"
-load(paste0(dir.processed.data, "all_batches_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata"))
+dir.processed.data = "/Users/jiwang/workspace/imp/scRNAseq_MS_lineage_dev/results_aleks/results/all_batches_202008_6.5k_cells/Rdata"
+load(paste0(dir.processed.data, "/6.5k_cells_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata"))
 
 ms <- FindNeighbors(object = ms, reduction = "mnn", k.param = 20, dims = 1:20)
 ms <- FindClusters(ms, resolution = 12, algorithm = 3)
@@ -177,10 +177,10 @@ ElbowPlot(ms, ndims = 50)
 ms <- FindNeighbors(object = ms, reduction = "pca", k.param = 20, dims = 1:20)
 ms <- FindClusters(ms, resolution = 12, algorithm = 3)
 
-nb.pcs = 30; n.neighbors = 30; min.dist = 0.25;
+nb.pcs = 30; n.neighbors = 30; min.dist = 0.4;
 ms <- RunUMAP(object = ms, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
 
-DimPlot(ms, reduction = "umap", group.by = 'request') + ggtitle('scran normalization')
+DimPlot(ms, reduction = "umap", group.by = 'seurat_clusters') + ggtitle('scran normalization')
 
 DimPlot(ms, reduction = "umap", group.by = 'timingEst') + ggtitle(paste0(nfeatures, ' HVGs'))
 
@@ -233,7 +233,7 @@ if(Correction.Batch.using.fastMNN){
   ms@reductions$mnn = Reductions(msc, slot = 'mnn')
   ms@tools$RunFastMNN = msc@tools$RunFastMNN
   
-  nb.pcs = 20; n.neighbors = 30; min.dist = 0.3;
+  nb.pcs = 30; n.neighbors = 30; min.dist = 0.3;
   ms <- RunUMAP(object = ms, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
   ms <- RunUMAP(ms, reduction = "mnn", reduction.name = "umap_mnn", reduction.key = 'umap_mnn_',dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
   
@@ -263,9 +263,11 @@ library(ggplot2)
 
 #ElbowPlot(ms)
 #ms <- FindNeighbors(object = ms, reduction = 'pca', dims = 1:20)
-nb.pcs = 30; n.neighbors = 30; min.dist = 0.3;
+nb.pcs = 50; n.neighbors = 50; min.dist = 0.4;
+
 ms <- RunUMAP(object = ms, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
 DimPlot(ms, reduction = "umap", group.by = 'SCT_snn_res.12', label = TRUE) 
+
 Idents(ms) = ms$SCT_snn_res.12
 
 DimPlot(ms, reduction = "umap", label = TRUE) 
@@ -274,21 +276,13 @@ ms[['UMAP']] = NULL
 
 FeaturePlot(ms, reduction = 'umap', features = c('pha-4', 'hnd-1', 'nhr-67'))
 
-saveRDS(ms, file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized.rds'))
+saveRDS(ms, file = paste0(RdataDir, 'processed_6.5k.cells_scran.normalized.rds'))
 
 
 ##########################################
-#  label transfer with seurat
+# mapping reference with scmap, seurat, svm, rf
 ##########################################
-ms = readRDS(file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized.rds'))
-source.my.script("scRNA_cluster_annotation_functions.R")
-
-ms = seurat.transfer.labels.from.Murray.scRNA.to.scRNA(seurat.obj = ms)
-
-##########################################
-# mapping reference with scmap and svm, rf
-##########################################
-ms = readRDS(file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized.rds'))
+ms = readRDS(file = paste0(RdataDir, 'processed_6.5k.cells_scran.normalized.rds'))
 source.my.script("scRNA_cluster_annotation_functions.R")
 
 reference.based.cluster.annotation.scmap(seurat.obj = ms)

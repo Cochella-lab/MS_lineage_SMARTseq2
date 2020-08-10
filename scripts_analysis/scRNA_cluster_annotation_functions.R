@@ -100,7 +100,7 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
   ##########################################
   source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
   
-  ## import and process Murray datfa 
+  ## import and process Murray data
   ee = process.import.Murray.scRNA()
   
   ## tranfer Murray labels with scmap
