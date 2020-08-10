@@ -142,7 +142,7 @@ scmap.transfer.labels.from.Murray.scRNA = function(seurat.obj, ee, run.scmap.cel
   rownames(keep) = colnames(seurat.obj)
   seurat.obj = AddMetaData(seurat.obj, metadata = keep[, -1])
   
-  saveRDS(seurat.obj, file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized_reference.based.annotation.scmap.rds'))
+  saveRDS(seurat.obj, file = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.rds'))
   
   return(seurat.obj)
   
@@ -234,7 +234,7 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj, ee)
   colnames(predicted.labels) = paste0('seurat.', colnames(predicted.labels))
   seurat.obj <- AddMetaData(object = seurat.obj, metadata = predicted.labels)
   
-  saveRDS(seurat.obj, file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized_reference.based.annotation.scmap.seurat.rds'))
+  saveRDS(seurat.obj, file = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds'))
   
   return(seurat.obj)
   

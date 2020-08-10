@@ -112,7 +112,7 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
   ## compare scmap and seurat reference-based annotation
   ## decide which methods and how many features to use or how to integrate different methods
   seurat.obj = readRDS(seurat.obj, 
-                       file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized_reference.based.annotation.scmap.seurat.rds'))
+                       file = paste0(RdataDir, 'processed_6.5k.cells_scran.normalized_reference.based.annotation.scmap.seurat.rds'))
   
   compare.reference.based.annotation.scmap.seurat(seurat.obj)
   
