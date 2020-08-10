@@ -109,13 +109,13 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
   ## transfer Murray labels with seurat
   seurat.obj = seurat.transfer.labels.from.Murray.scRNA.to.scRNA(seurat.obj, ee)
   
+  rdsfile.saved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds')
+  saveRDS(seurat.obj, file = rdsfile.saved)
   ## compare scmap and seurat reference-based annotation
   ## decide which methods and how many features to use or how to integrate different methods
-  seurat.obj = readRDS(seurat.obj, 
-                       file = paste0(RdataDir, 'processed_6.5k.cells_scran.normalized_reference.based.annotation.scmap.seurat.rds'))
+  seurat.obj = readRDS(seurat.obj, file = rdsfile.saved)
   
   compare.reference.based.annotation.scmap.seurat(seurat.obj)
-  
   
   ##########################################
   # step 2): predict unassigned cells using assgined cells with rf and svm

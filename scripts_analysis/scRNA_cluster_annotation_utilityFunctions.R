@@ -250,95 +250,131 @@ compare.reference.based.annotation.scmap.seurat = function(seurat.obj)
   library("RColorBrewer")
   library(grid)
   
-  #seurat.obj$predicted.id.scmap = predicted.id
-  predicted.ids = seurat.obj$scmap.pred.id.500
-  counts <- table(predicted.ids, seurat.obj$seurat_clusters)
-  barplot(counts, main="composition of subclusters ",
-          xlab="subcluster index", col=c(1:nrow(counts)),
-          legend = rownames(counts))
+  # inital clusters
+  p0 = DimPlot(seurat.obj, group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
+               label.size = 6,
+               na.value = "gray") + 
+    ggtitle(paste0("clusters ")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  plot(p0)
   
-  p1 = DimPlot(seurat.obj, group.by = "scmap.pred.id.500", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
+  # umap with predicted ids 
+  seurat.obj$predicted.ids = seurat.obj$scmap.pred.id.500
+  seurat.obj$predicted.scores = seurat.obj$scmap.corr.500
+  
+  p1 = DimPlot(seurat.obj, group.by = "predicted.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
                label.size = 4,
                na.value = "gray") + 
-    ggtitle(paste0("projection into Murray data with scmap (nfeature = ", nb.features.scmap,", threshold = ", 
-                   threshold.scmap, ")")) +
+    ggtitle(paste0("projection into Murray data with scmap (nfeature = 500)")) +
     scale_colour_hue(drop = FALSE) + 
     NoLegend()
   
   plot(p1)
   
+  # compositions of predicted labels for all clusters 
+  counts <- table(seurat.obj$predicted.ids, seurat.obj$seurat_clusters)
+  #legend.text = rownames(counts)
+  legend.text = NULL
+  barplot(counts, main="composition of subclusters ",
+          xlab="subcluster index", col=c(1:nrow(counts)),
+          legend = legend.text)
   
-  if(prediction.summary){
-    predicted.labels =  
-    
-    res = data.frame(clusters = Idents(seurat.obj), predicted.labels, stringsAsFactors = FALSE)
-    
-    labels.pred =  unique(res$seurat.predicted.id)
-    clusters = unique(res$clusters)
-    res.map = matrix(0, nrow = length(labels.pred), ncol = length(clusters))
-    rownames(res.map) = labels.pred
-    colnames(res.map) = clusters
-    res.map = res.map[, sort(colnames(res.map))]
-    
-    for(n in 1:ncol(res.map))
-    {
-      # n = 1
-      predicted.ids = res$predicted.id[which(res$clusters == colnames(res.map)[n])]
-      stats.ids = table(predicted.ids)
-      stats.ids = stats.ids[match(rownames(res.map), names(stats.ids))]
-      stats.ids[is.na(stats.ids)] = 0
-      res.map[,n] = stats.ids/sum(stats.ids)
-    }
-    
-    cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
-    pheatmap(res.map, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
-             cluster_cols=TRUE, main = paste0("resolution -- 0.8"), na_col = "white",
-             color = cols, 
-             #annotation_col = my_sample_col,
-             #gaps_row = c(1:nrow(map)-1),
-             fontsize_col = 10,
-             height = 8,
-             width = 30
-    )
-    
-    cols =  c(colorRampPalette((brewer.pal(n = 7, name="Set3")))(ncol(res.map)))
-    barplot(res.map, horiz = TRUE, legend = rownames(res.map), 
-            col = cols )
-    
-    map.fitered = map
-    map.fitered[which(map.fitered<0.1)] = 0
-    pheatmap(map.fitered, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-             cluster_cols=FALSE, main = paste0("fitlered < 0.1 with resolution -- ",  resolution), na_col = "white",
-             color = cols)
-    
-    DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
-      ggtitle("transferred labels") +
-      scale_colour_hue(drop = FALSE) + 
-      NoLegend()
-    
-    table(seurat.obj$prediction.score.max > 0.5)
-    
-    hist(seurat.obj$prediction.score.max)
-    abline(v = 0.5, col = "red")
-    
-    seurat.obj.filtered <- subset(seurat.obj, subset = prediction.score.max > 0.5)
-    
-    # to make the colors match
-    seurat.obj.filtered$predicted.id <- factor(seurat.obj.filtered$predicted.id, levels = levels(ee))  
-    DimPlot(seurat.obj.filtered, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
-      ggtitle("transferred labels with probability threshod = 0.5") +
-      scale_colour_hue(drop = FALSE) + 
-      NoLegend()
-    
-    DimPlot(ms_correlation_idents, reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
-      ggtitle("aleks correlation assignment") +
-      scale_colour_hue(drop = FALSE) + 
-      NoLegend()
-    
+  
+  ## another way of summarizing the mapping between cluster index and predicted cell identities
+  predicted.labels = as.data.frame(seurat.obj@meta.data)
+  predicted.labels = predicted.labels[, grep('seurat.predicted.id|seurat.prediction.score.', colnames(predicted.labels))]
+  res = data.frame(clusters = Idents(seurat.obj), predicted.labels, stringsAsFactors = FALSE)
+  colnames(res) = gsub('seurat.', '', colnames(res))
+  
+  labels.pred =  unique(res$predicted.id)
+  clusters = unique(res$clusters)
+  res.map = matrix(0, nrow = length(labels.pred), ncol = length(clusters))
+  rownames(res.map) = labels.pred
+  colnames(res.map) = as.character(clusters)
+  res.map = res.map[, order(as.integer(colnames(res.map)))]
+  
+  for(n in 1:ncol(res.map))
+  {
+    # n = 1
+    predicted.ids = res$predicted.id[which(res$clusters == colnames(res.map)[n])]
+    stats.ids = table(predicted.ids)
+    stats.ids = stats.ids[match(rownames(res.map), names(stats.ids))]
+    stats.ids[is.na(stats.ids)] = 0
+    res.map[,n] = stats.ids/sum(stats.ids)
   }
   
+  cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
+  pheatmap(res.map, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
+           cluster_cols=FALSE, main = paste0("resolution -- 0.8"), na_col = "white",
+           color = cols, 
+           #annotation_col = my_sample_col,
+           #gaps_row = c(1:nrow(map)-1),
+           fontsize_col = 10,
+           height = 8,
+           width = 30
+  )
+  
+  ##########################################
+  # # keep the confident ones by filtering the prediction scores
+  ##########################################
+  threshold = quantile(as.numeric(seurat.obj$predicted.scores), probs = 0.4, na.rm = TRUE);
+  hist(seurat.obj$predicted.scores, breaks = 100)
+  abline(v= threshold, col = 'red')
+  
+  seurat.obj$predicted.ids[which(seurat.obj$predicted.scores < threshold)] = NA
+  p2 = DimPlot(seurat.obj, group.by = "predicted.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
+               label.size = 4,
+               na.value = "gray") + 
+    ggtitle(paste0("projection into Murray data with scmap (nfeature = 500)")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  plot(p2)
+  
+  seurat.obj$predicted.ids[which(seurat.obj$predicted.scores < threshold)] = 'unassigned'
+  counts <- table(seurat.obj$predicted.ids, seurat.obj$seurat_clusters)
+  legend.text = rownames(counts)
+  #legend.text = NULL
+  barplot(counts, main="composition of subclusters ",
+          xlab="subcluster index", col=c(1:nrow(counts)),
+          legend = legend.text)
+  
+  #cols =  c(colorRampPalette((brewer.pal(n = 7, name="Set3")))(ncol(res.map)))
+  #barplot(res.map, horiz = TRUE, legend = rownames(res.map), col = cols )
+  
+  # map.fitered = map
+  # map.fitered[which(map.fitered<0.1)] = 0
+  # pheatmap(map.fitered, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+  #          cluster_cols=FALSE, main = paste0("fitlered < 0.1 with resolution -- ",  resolution), na_col = "white",
+  #          color = cols)
+  # 
+  # DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
+  #   ggtitle("transferred labels") +
+  #   scale_colour_hue(drop = FALSE) + 
+  #   NoLegend()
+  # 
+  # table(seurat.obj$prediction.score.max > 0.5)
+  # 
+  # hist(seurat.obj$prediction.score.max)
+  # abline(v = 0.5, col = "red")
+  # 
+  # seurat.obj.filtered <- subset(seurat.obj, subset = prediction.score.max > 0.5)
+  # 
+  # # to make the colors match
+  # seurat.obj.filtered$predicted.id <- factor(seurat.obj.filtered$predicted.id, levels = levels(ee))  
+  # DimPlot(seurat.obj.filtered, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
+  #   ggtitle("transferred labels with probability threshod = 0.5") +
+  #   scale_colour_hue(drop = FALSE) + 
+  #   NoLegend()
+  # 
+  # DimPlot(ms_correlation_idents, reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5) + 
+  #   ggtitle("aleks correlation assignment") +
+  #   scale_colour_hue(drop = FALSE) + 
+  #   NoLegend()
+  # 
+    
 }
-
 
 ########################################################
 ########################################################
