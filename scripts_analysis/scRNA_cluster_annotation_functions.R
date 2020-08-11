@@ -261,7 +261,6 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
   
 }
 
-
 ########################################################
 ########################################################
 # Section : here manual annotate BWM lineages using various information:
@@ -277,14 +276,18 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms)
   rdsfile.saved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds')
   seurat.obj = readRDS(seurat.obj, file = rdsfile.saved)
   
-  ## current clusters were define using 3000 variable genes and resolution = 12
+  ## current 54 clusters were define using 3000 variable genes and resolution =3, 20 pcs and k = 10
+  p0 = DimPlot(seurat.obj, group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+          na.value = "gray") + 
+    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  plot(p0)
   
   ## compare scmap and seurat reference-based annotation
-  ## decide which methods and how many features to use or how to integrate different methods
-  
-  compare.reference.based.annotation.scmap.seurat(seurat.obj)
-  
-  #seurat.obj = annotate.clusters.using.predicted.id(seurat.obj)
+  source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
+  overview.and.compare.predicted.labels(seurat.obj)
   
   ##########################################
   # focus short list of cell identities and manual annotate with other information
