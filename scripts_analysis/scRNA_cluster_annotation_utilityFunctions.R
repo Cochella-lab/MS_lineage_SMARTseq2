@@ -240,6 +240,94 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj, ee)
   
 }
 
+
+test.scmap.similarity = function(ee_ref, sce)
+{
+  ee.sel = as.matrix(metadata(ee_ref)$scmap_cluster_index)
+  features.sel = rownames(ee.sel)
+  features.sel = features.sel[!is.na(match(features.sel, rownames(sce)))]
+  
+  ee.sel = ee.sel[match(features.sel, rownames(ee.sel)),]
+  sce.sel = sce[match(features.sel, rownames(sce))]
+  
+  train = ee.sel
+  study = logcounts(sce.sel)
+  
+  library(lsa)
+  for(n in 1:nrow(study))
+  {
+    # n = 1
+    xx1 = cor(study[,n], train, method = 'pearson')
+    kk1 = which.max(xx1)
+    xx1 = xx1[which.max(xx1)]
+    xx2 = cor(study[,n], train, method = 'spearman')
+    kk2 = which.max(xx2)
+    xx2 = xx2[which.max(xx2)]
+    xx3= lsa::cosine(study[,n], train)
+    kk3 = which.max(xx3)
+    xx3 = xx3[which.max(xx3)]
+    
+    cat(colnames(study)[n], ': ', xx1, xx2, xx3, colnames(train)[c(kk1, kk2, kk3)],  '\n',
+        colnames(sce)[n], ': scamp -- ', scmapCluster_results$scmap_cluster_siml[n], '\n')
+    n = n + 1
+    #readline() 
+    #break()
+  }
+}
+
+
+
+reference.based.cell.projection.rf.svm = function()
+{
+  # prepare train and test tables
+  #ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = 500)
+  #table(rowData(ee)$scmap_features)
+  features.sel = rownames(ee)[rowData(ee)$scmap_features]
+  features.sel = features.sel[!is.na(match(features.sel, rownames(sce)))]
+  ee.sel = ee[match(features.sel, rownames(ee)),]
+  sce.sel = sce[match(features.sel, rownames(sce))]
+  
+  train = logcounts(ee.sel)
+  study = logcounts(sce.sel)
+  train = t(train)
+  train <- as.data.frame(train)
+  y <- as.factor(ee.sel$lineage)
+  study = t(study)
+  study <- as.data.frame(study)
+  rownames(train) <- NULL
+  rownames(study) <- NULL
+  
+  if(method == 'rf'){
+    rf.res = run.classifier.rf(train, study)
+    
+    pred.prob.threshod = 0.5
+    
+    predicted.id = rf.res$label
+    predicted.id[which(rf.res$prob < pred.prob.threshod)] = NA
+    seurat.obj$predicted.id = predicted.id
+    
+    DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
+            na.value = "grey10") + 
+      ggtitle(paste0("projection with RF (threshold = ", pred.prob.threshod, ")")) +
+      scale_colour_hue(drop = FALSE) + 
+      NoLegend()
+  }
+  
+  if(method == 'svm'){
+    svm.res = run.classifier.svm(train, study)
+    predicted.id = svm.res$label
+    predicted.id[which(svm.res$prob < 0.5)] = NA
+    seurat.obj$predicted.id = predicted.id
+    
+    DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
+            na.value = "grey10") + 
+      ggtitle("projection with SVM ") +
+      scale_colour_hue(drop = FALSE) + 
+      NoLegend()
+  }
+  
+}
+
 ##########################################
 # here compare scmap and seurat, two reference-based cluster annotation
 # the clusters were also given here in seurat.obj$seurat_clusters

@@ -7,6 +7,120 @@
 # Date of creation: Fri Nov 22 15:38:57 2019
 ##########################################################################
 ##########################################################################
+
+########################################################
+########################################################
+# Section : Aleks' code for clustering and cell-identities assignment using correlation 
+# 
+########################################################
+########################################################
+cell.identities.assignment.correlation.based.aleks = function()
+{
+  dir.processed.data = "/Users/jiwang/workspace/imp/scRNAseq_MS_lineage_dev/results_aleks/results/all_batches_202005/Rdata/"
+  load(paste0(dir.processed.data, "all_batches_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata"))
+  
+  library(dplyr)
+  #library(dplyr)
+  #setwd("/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/results_aleks/results/all_batches_202005/Rdata/")
+  #load("./all_batches_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata")
+  
+  ms <- FindNeighbors(object = ms, reduction = "mnn", k.param = 20, dims = 1:20)
+  ms <- FindClusters(ms, resolution = 12, algorithm = 3)
+  
+  DimPlot(object = ms, cells = colnames(ms), group.by = 'ident', label = TRUE, pt.size = 4)
+  all_ms.markers <- FindAllMarkers(ms, min.pct = 0.25, logfc.threshold = 0.25)
+  all_ms.top10 <- all_ms.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+  
+  lin_sc_expr_190602 <- readRDS("data/lin_sc_expr_190602.rds")
+  MS_names <- lin_sc_expr_190602[,grepl(pattern = "MS.", x = colnames(lin_sc_expr_190602))]
+  #lin_sc_expr_190602[,MS_names]
+  #load(file = paste0(dir.processed.data, 'ms_correlation_idents.rds'))
+  
+  combined_MS_names <- data.frame(matrix(NA, dim(MS_names)[1], 1))
+  used_cells <- c()
+  
+  for (cell in colnames(MS_names)){
+    if (cell %in% used_cells){next}
+    indx <- (MS_names[1:100,] == MS_names[1:100,cell])[1,]
+    indx_name <- colnames(MS_names)[indx]
+    tmp_df <- data.frame(MS_names[,indx_name[1]])
+    colnames(tmp_df) <- paste(indx_name, collapse = "/")
+    combined_MS_names <- cbind(combined_MS_names,tmp_df)
+    used_cells <- c(used_cells, indx_name)
+  }
+  
+  JM_data <- combined_MS_names[,-1]
+  my_MS <- as.matrix(ms[["SCT"]]@data)
+  
+  indexes <- match(all_ms.top10$gene, rownames(my_MS))
+  my_MS <- my_MS[indexes,]
+  indexes <- match(rownames(my_MS), rownames(JM_data))
+  mathed_gene_names <- rownames(JM_data)[indexes[!is.na(indexes)]]
+  JM_data <- JM_data[mathed_gene_names,]
+  my_MS <- my_MS[mathed_gene_names,]
+  
+  cor_vec <- c()
+  
+  combined_df <- data.frame(row.names = 1:(dim(JM_data)[2]))
+  combined_df_corv <- data.frame(row.names = 1:(dim(JM_data)[2]))
+  
+  library(progress)
+  pb <- progress_bar$new(
+    format = " progress [:bar] :percent eta: :eta",
+    total = length(colnames(my_MS)))
+  
+  for (a in colnames(my_MS)){
+    for (i in 1:dim(JM_data)[2]){
+      cor_vec[i] <- cor(my_MS[,a], JM_data[,i])
+    }
+    combined_df[,a] <- colnames(JM_data)[order(cor_vec, decreasing = T)]
+    combined_df_corv[,a] <- cor_vec[order(cor_vec, decreasing = T)]
+    pb$tick()
+  }
+  
+  
+  View(combined_df_corv[1:10,1:40])
+  cell.names <- colnames(combined_df)
+  
+  Idents(ms, cells = cell.names) <- combined_df[1,]
+  
+  pb <- progress_bar$new(
+    format = " progress [:bar] :percent eta: :eta",
+    total = length(levels(Idents(ms))))
+  
+  pdfname = paste0(paste0(resDir, "/idents_correlation_aleks.pdf"))
+  pdf(pdfname, width=16, height = 16)
+  
+  for (idntt in levels(Idents(ms))){
+    
+    #pdfname = paste0(paste0("~/Documents/plots/", which(levels(Idents(test_ms)) == idntt), ".pdf"))
+    #pdf(pdfname, width=8, height = 8)
+    
+    cells_to_show <- list(c(WhichCells(ms, idents = idntt)))
+    names(cells_to_show) <- idntt
+    print(DimPlot(ms, reduction = "umap", label = F, cells.highlight = cells_to_show))
+    #dev.off()
+    pb$tick()
+    
+  }
+  
+  dev.off()
+  
+  ms_correlation_idents <- ms
+  
+  saveRDS(ms_correlation_idents, file = paste0(RdataDir,  'ms_correlation_idents.rds'))
+  saveRDS(combined_df, file = paste0(RdataDir,  'cell.states_assignment_to_reference.JM_correlation_idents.rds'))
+  saveRDS(combined_df_corv, file = paste0(RdataDir,  'cell.states.correlation_assignment_to_reference.JM_correlation_idents.rds'))
+  
+}
+
+
+########################################################
+########################################################
+# Section : test umap parameters for best visulization
+# 
+########################################################
+########################################################
 test.umap.params = function(seurat.obj, pdfname = paste0(resDir, '/umap_params_test.pdf'), 
                             nb.pcs.sampling = seq(20, 50, by = 10),
                             n.neighbors.sampling = seq(10, 50, by = 10),
@@ -51,8 +165,32 @@ test.umap.params = function(seurat.obj, pdfname = paste0(resDir, '/umap_params_t
 # 2) utility functions
 ########################################################
 ########################################################
+##########################################
+# import Murray scRNA data and select the cell identities of interest (MS and some early stage cells)
+##########################################
+process.import.Murray.scRNA = function()
+{
+  library(VisCello.celegans)
+  eset = readRDS(file = paste0('data/Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
+  pmeda = data.frame(pData(eset))
+  
+  ## select the cells for MS lineages
+  kk = grep('^MS', pmeda$lineage)
+  kk1 = which(pmeda$lineage == '28_cell_or_earlier'| pmeda$lineage == 'ABaxx'| pmeda$lineage == 'Cx'|
+                pmeda$lineage == 'Dx'|pmeda$lineage == 'Dxa'|pmeda$lineage == 'Exx')
+  
+  kk = unique(c(kk, kk1))
+  cat('nb of cell in reference -- ', length(kk), '\n')
+  cat('nb of cell states in reference -- ', length(unique(pmeda$lineage[kk])), '\n')
+  
+  ee = CreateSeuratObject(counts = eset@assayData$exprs[,kk], assay = 'RNA', meta.data = pmeda[kk, ])
+  ee@assays$RNA@data = eset@assayData$norm_exprs[,kk]
+  
+  return(ee)
+  
+}
+
 reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TRUE,
-                                              method = 'scmap', nb.features.scmap = 500, threshold.scmap = 0.7,
                                               predict.unassignedCells = FALSE, threshold.svm = 0.5, threshold.rf = 0.5)
 {
   # seurat.obj = ms; redefine.clusters = TRUE; predict.unassignedCells = FALSE;
@@ -111,11 +249,6 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
   
   rdsfile.saved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds')
   saveRDS(seurat.obj, file = rdsfile.saved)
-  ## compare scmap and seurat reference-based annotation
-  ## decide which methods and how many features to use or how to integrate different methods
-  seurat.obj = readRDS(seurat.obj, file = rdsfile.saved)
-  
-  compare.reference.based.annotation.scmap.seurat(seurat.obj)
   
   ##########################################
   # step 2): predict unassigned cells using assgined cells with rf and svm
@@ -123,6 +256,32 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
   if(predict.unassignedCells){
     seurat.obj = prediction.unassinged.cells.rf.svm(seurat.obj) 
   }
+  
+  return(seurat.obj)
+  
+}
+
+
+########################################################
+########################################################
+# Section : here manual annotate BWM lineages using various information:
+# 1) clusters (splitting and merging if necessay)
+# 2) predicted labels from seurat and scmap 
+# 3) cell size info and estimated timing
+# 4) cluster connection by PAGA or VarID 
+# 5) RNA velocity (not sure ...)
+########################################################
+########################################################
+annotate.clusters.using.predicted.id = function(seurat.obj, redefine.clusters = FALSE)
+{
+  ## current clusters were define using 3000 variable genes and resolution = 12
+  ## those clusters are relatively small owe to the high value of resolution
+  
+  ## compare scmap and seurat reference-based annotation
+  ## decide which methods and how many features to use or how to integrate different methods
+  seurat.obj = readRDS(seurat.obj, file = rdsfile.saved)
+  
+  compare.reference.based.annotation.scmap.seurat(seurat.obj)
   
   ##########################################
   # step 3):  refine clusters (split or merge)
@@ -133,14 +292,6 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
   # step 4): focus short list of cell identities and manual annotate with other information
   ##########################################
   
-  return(seurat.obj)
-  
-}
-
-annotate.clusters.using.predicted.id = function(seurat.obj, redefine.clusters = FALSE)
-{
-  ## current clusters were define using 3000 variable genes and resolution = 12
-  ## those clusters are relatively small owe to the high value of resolution
   
   # seurat.obj = readRDS(file = paste0(RdataDir, 'processed_5.4k.cells_scran.normalized_scmapProjection.rds'))
   
@@ -310,219 +461,6 @@ clustering.splitting.kmean.outlier.detection = function(seurat.obj, sels, redefi
   
 }
 
-##########################################
-# import Murray scRNA data and select the cell identities of interest (MS and some early stage cells)
-##########################################
-process.import.Murray.scRNA = function()
-{
-  library(VisCello.celegans)
-  eset = readRDS(file = paste0('data/Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
-  pmeda = data.frame(pData(eset))
-  
-  ## select the cells for MS lineages
-  kk = grep('^MS', pmeda$lineage)
-  kk1 = which(pmeda$lineage == '28_cell_or_earlier'| pmeda$lineage == 'ABaxx'| pmeda$lineage == 'Cx'|
-                pmeda$lineage == 'Dx'|pmeda$lineage == 'Dxa'|pmeda$lineage == 'Exx')
-  
-  kk = unique(c(kk, kk1))
-  cat('nb of cell in reference -- ', length(kk), '\n')
-  cat('nb of cell states in reference -- ', length(unique(pmeda$lineage[kk])), '\n')
-  
-  ee = CreateSeuratObject(counts = eset@assayData$exprs[,kk], assay = 'RNA', meta.data = pmeda[kk, ])
-  ee@assays$RNA@data = eset@assayData$norm_exprs[,kk]
-  
-  return(ee)
-  
-}
-
-reference.based.cell.projection.rf.svm = function()
-{
-  # prepare train and test tables
-  #ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = 500)
-  #table(rowData(ee)$scmap_features)
-  features.sel = rownames(ee)[rowData(ee)$scmap_features]
-  features.sel = features.sel[!is.na(match(features.sel, rownames(sce)))]
-  ee.sel = ee[match(features.sel, rownames(ee)),]
-  sce.sel = sce[match(features.sel, rownames(sce))]
-  
-  train = logcounts(ee.sel)
-  study = logcounts(sce.sel)
-  train = t(train)
-  train <- as.data.frame(train)
-  y <- as.factor(ee.sel$lineage)
-  study = t(study)
-  study <- as.data.frame(study)
-  rownames(train) <- NULL
-  rownames(study) <- NULL
-  
-  if(method == 'rf'){
-    rf.res = run.classifier.rf(train, study)
-    
-    pred.prob.threshod = 0.5
-    
-    predicted.id = rf.res$label
-    predicted.id[which(rf.res$prob < pred.prob.threshod)] = NA
-    seurat.obj$predicted.id = predicted.id
-    
-    DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
-            na.value = "grey10") + 
-      ggtitle(paste0("projection with RF (threshold = ", pred.prob.threshod, ")")) +
-      scale_colour_hue(drop = FALSE) + 
-      NoLegend()
-  }
-  
-  if(method == 'svm'){
-    svm.res = run.classifier.svm(train, study)
-    predicted.id = svm.res$label
-    predicted.id[which(svm.res$prob < 0.5)] = NA
-    seurat.obj$predicted.id = predicted.id
-    
-    DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
-            na.value = "grey10") + 
-      ggtitle("projection with SVM ") +
-      scale_colour_hue(drop = FALSE) + 
-      NoLegend()
-  }
-  
-}
-
-test.scmap.similarity = function(ee_ref, sce)
-{
-  ee.sel = as.matrix(metadata(ee_ref)$scmap_cluster_index)
-  features.sel = rownames(ee.sel)
-  features.sel = features.sel[!is.na(match(features.sel, rownames(sce)))]
-  
-  ee.sel = ee.sel[match(features.sel, rownames(ee.sel)),]
-  sce.sel = sce[match(features.sel, rownames(sce))]
-  
-  train = ee.sel
-  study = logcounts(sce.sel)
-  
-  library(lsa)
-  for(n in 1:nrow(study))
-  {
-    # n = 1
-    xx1 = cor(study[,n], train, method = 'pearson')
-    kk1 = which.max(xx1)
-    xx1 = xx1[which.max(xx1)]
-    xx2 = cor(study[,n], train, method = 'spearman')
-    kk2 = which.max(xx2)
-    xx2 = xx2[which.max(xx2)]
-    xx3= lsa::cosine(study[,n], train)
-    kk3 = which.max(xx3)
-    xx3 = xx3[which.max(xx3)]
-    
-    cat(colnames(study)[n], ': ', xx1, xx2, xx3, colnames(train)[c(kk1, kk2, kk3)],  '\n',
-        colnames(sce)[n], ': scamp -- ', scmapCluster_results$scmap_cluster_siml[n], '\n')
-    n = n + 1
-    #readline() 
-    #break()
-  }
-}
-
-
-##########################################
-# Aleks' cell-state assignment using correlation 
-##########################################
-cell.state.assignment.correlation.based.aleks = function()
-{
-  dir.processed.data = "/Users/jiwang/workspace/imp/scRNAseq_MS_lineage_dev/results_aleks/results/all_batches_202005/Rdata/"
-  load(paste0(dir.processed.data, "all_batches_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata"))
-  
-  library(dplyr)
-  #library(dplyr)
-  #setwd("/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/results_aleks/results/all_batches_202005/Rdata/")
-  #load("./all_batches_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata")
-  
-  ms <- FindNeighbors(object = ms, reduction = "mnn", k.param = 20, dims = 1:20)
-  ms <- FindClusters(ms, resolution = 12, algorithm = 3)
-  
-  DimPlot(object = ms, cells = colnames(ms), group.by = 'ident', label = TRUE, pt.size = 4)
-  all_ms.markers <- FindAllMarkers(ms, min.pct = 0.25, logfc.threshold = 0.25)
-  all_ms.top10 <- all_ms.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
-  
-  lin_sc_expr_190602 <- readRDS("data/lin_sc_expr_190602.rds")
-  MS_names <- lin_sc_expr_190602[,grepl(pattern = "MS.", x = colnames(lin_sc_expr_190602))]
-  #lin_sc_expr_190602[,MS_names]
-  #load(file = paste0(dir.processed.data, 'ms_correlation_idents.rds'))
-  
-  combined_MS_names <- data.frame(matrix(NA, dim(MS_names)[1], 1))
-  used_cells <- c()
-  
-  for (cell in colnames(MS_names)){
-    if (cell %in% used_cells){next}
-    indx <- (MS_names[1:100,] == MS_names[1:100,cell])[1,]
-    indx_name <- colnames(MS_names)[indx]
-    tmp_df <- data.frame(MS_names[,indx_name[1]])
-    colnames(tmp_df) <- paste(indx_name, collapse = "/")
-    combined_MS_names <- cbind(combined_MS_names,tmp_df)
-    used_cells <- c(used_cells, indx_name)
-  }
-  
-  JM_data <- combined_MS_names[,-1]
-  my_MS <- as.matrix(ms[["SCT"]]@data)
-  
-  indexes <- match(all_ms.top10$gene, rownames(my_MS))
-  my_MS <- my_MS[indexes,]
-  indexes <- match(rownames(my_MS), rownames(JM_data))
-  mathed_gene_names <- rownames(JM_data)[indexes[!is.na(indexes)]]
-  JM_data <- JM_data[mathed_gene_names,]
-  my_MS <- my_MS[mathed_gene_names,]
-  
-  cor_vec <- c()
-  
-  combined_df <- data.frame(row.names = 1:(dim(JM_data)[2]))
-  combined_df_corv <- data.frame(row.names = 1:(dim(JM_data)[2]))
-  
-  library(progress)
-  pb <- progress_bar$new(
-    format = " progress [:bar] :percent eta: :eta",
-    total = length(colnames(my_MS)))
-  
-  for (a in colnames(my_MS)){
-    for (i in 1:dim(JM_data)[2]){
-      cor_vec[i] <- cor(my_MS[,a], JM_data[,i])
-    }
-    combined_df[,a] <- colnames(JM_data)[order(cor_vec, decreasing = T)]
-    combined_df_corv[,a] <- cor_vec[order(cor_vec, decreasing = T)]
-    pb$tick()
-  }
-  
-  
-  View(combined_df_corv[1:10,1:40])
-  cell.names <- colnames(combined_df)
-  
-  Idents(ms, cells = cell.names) <- combined_df[1,]
-  
-  pb <- progress_bar$new(
-    format = " progress [:bar] :percent eta: :eta",
-    total = length(levels(Idents(ms))))
-  
-  pdfname = paste0(paste0(resDir, "/idents_correlation_aleks.pdf"))
-  pdf(pdfname, width=16, height = 16)
-  
-  for (idntt in levels(Idents(ms))){
-    
-    #pdfname = paste0(paste0("~/Documents/plots/", which(levels(Idents(test_ms)) == idntt), ".pdf"))
-    #pdf(pdfname, width=8, height = 8)
-    
-    cells_to_show <- list(c(WhichCells(ms, idents = idntt)))
-    names(cells_to_show) <- idntt
-    print(DimPlot(ms, reduction = "umap", label = F, cells.highlight = cells_to_show))
-    #dev.off()
-    pb$tick()
-    
-  }
-  
-  dev.off()
-  
-  ms_correlation_idents <- ms
-  
-  saveRDS(ms_correlation_idents, file = paste0(RdataDir,  'ms_correlation_idents.rds'))
-  saveRDS(combined_df, file = paste0(RdataDir,  'cell.states_assignment_to_reference.JM_correlation_idents.rds'))
-  saveRDS(combined_df_corv, file = paste0(RdataDir,  'cell.states.correlation_assignment_to_reference.JM_correlation_idents.rds'))
-  
-}
 
 ########################################################
 # Section : Clustering section by integrating various informations: 

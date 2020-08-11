@@ -5,7 +5,8 @@
 # So we start with the PCs from fastMNN in scran, with which we define distance for clustering
 # 1) different clustering methods will be tested  
 # 2) special design matrix will be used for DE analysis 
-# http://bioconductor.org/packages/devel/workflows/vignettes/simpleSingleCell/inst/doc/de.html#2_blocking_on_uninteresting_factors_of_variation
+# http://bioconductor.org/packages/devel/workflows/vignettes/simpleSingleCell/inst/
+# doc/de.html#2_blocking_on_uninteresting_factors_of_variation
 ########################################################
 ########################################################
 source.my.script <- function(name.of.function){
@@ -214,7 +215,8 @@ if(Correction.Batch.using.fastMNN){
   # c('R7130', 'R8729', 'R8612', 'R8526', 'R7926', # 3 plates for each request
   # 'R6875','R8613','R8348') # 1 plate for each request
   for(n in 1:length(bcs)) 
-    eval(parse(text= paste0('p', n, '=  DimPlot(ms, cols.highlight = "red", cells.highlight = as.list(which(ms$request =="', bcs[n], '"))) + NoLegend() + ggtitle("', bcs[n], '")')))
+    eval(parse(text= paste0('p', n, '=  DimPlot(ms, cols.highlight = "red", cells.highlight = as.list(which(ms$request =="', 
+                            bcs[n], '"))) + NoLegend() + ggtitle("', bcs[n], '")')))
   
   CombinePlots(plots = list(p1, p2, p3, p4, p5, p6, p7, p8), ncol = 4)
   
@@ -234,8 +236,10 @@ if(Correction.Batch.using.fastMNN){
   ms@tools$RunFastMNN = msc@tools$RunFastMNN
   
   nb.pcs = 30; n.neighbors = 30; min.dist = 0.3;
-  ms <- RunUMAP(object = ms, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-  ms <- RunUMAP(ms, reduction = "mnn", reduction.name = "umap_mnn", reduction.key = 'umap_mnn_',dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+  ms <- RunUMAP(object = ms, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+                n.neighbors = n.neighbors, min.dist = min.dist)
+  ms <- RunUMAP(ms, reduction = "mnn", reduction.name = "umap_mnn", reduction.key = 'umap_mnn_',
+                dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
   
   p0 =DimPlot(ms, reduction = 'umap',  group.by = c("request"))
   p1 = DimPlot(ms, reduction = 'umap_mnn', group.by = c("request"))
@@ -265,7 +269,8 @@ library(ggplot2)
 #ms <- FindNeighbors(object = ms, reduction = 'pca', dims = 1:20)
 nb.pcs = 50; n.neighbors = 50; min.dist = 0.4;
 
-ms <- RunUMAP(object = ms, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+ms <- RunUMAP(object = ms, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, 
+              min.dist = min.dist)
 DimPlot(ms, reduction = "umap", group.by = 'SCT_snn_res.12', label = TRUE) 
 
 Idents(ms) = ms$SCT_snn_res.12
@@ -281,11 +286,27 @@ saveRDS(ms, file = paste0(RdataDir, 'processed_6.5k.cells_scran.normalized.rds')
 
 ##########################################
 # mapping reference with scmap, seurat, svm, rf
+# alternatively, sysmatic marker-gene-based cluster annotation can be also applied given that the clusters is well defined, which is 
+# also a challenging problem (see Cellassign and Garnet)
 ##########################################
 ms = readRDS(file = paste0(RdataDir, 'processed_6.5k.cells_scran.normalized.rds'))
 source.my.script("scRNA_cluster_annotation_functions.R")
 
-reference.based.cluster.annotation.scmap(seurat.obj = ms)
+ms = reference.based.cluster.annotation(seurat.obj = ms, redefine.clusters = TRUE, predict.unassignedCells = FALSE)
+
+
+########################################################
+########################################################
+# Section : 
+# 
+########################################################
+########################################################
+rdsfile.saved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds')
+ms = readRDS(seurat.obj, file = rdsfile.saved)
+
+source.my.script("scRNA_cluster_annotation_functions.R")
+ms = 
+
 
 
 
