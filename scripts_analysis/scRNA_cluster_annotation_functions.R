@@ -276,6 +276,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms)
   rdsfile.saved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds')
   seurat.obj = readRDS(seurat.obj, file = rdsfile.saved)
   
+  ##########################################
+  # step 1) overview of all given clusters and predicted labels
+  ##########################################
   ## current 54 clusters were define using 3000 variable genes and resolution =3, 20 pcs and k = 10
   p0 = DimPlot(seurat.obj, group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
           na.value = "gray") + 
@@ -290,7 +293,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms)
   overview.and.compare.predicted.labels(seurat.obj)
   
   ##########################################
-  # focus short list of cell identities and manual annotate with other information
+  # step 2) focus short list of cell identities and manual annotate with other information
   ##########################################
   seurat.obj$predicted.id.scmap[which(is.na(seurat.obj$predicted.id.scmap))] = 'unassigned'
   

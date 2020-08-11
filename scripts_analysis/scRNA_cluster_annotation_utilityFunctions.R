@@ -339,7 +339,7 @@ reference.based.cell.projection.rf.svm = function()
 # here compare scmap and seurat, two reference-based cluster annotation
 # the clusters were also given here in seurat.obj$seurat_clusters
 ##########################################
-compare.reference.based.annotation.scmap.seurat = function(seurat.obj)
+overview.and.compare.predicted.labels = function(seurat.obj)
 {
   library("pheatmap")
   library("RColorBrewer")
@@ -355,8 +355,8 @@ compare.reference.based.annotation.scmap.seurat = function(seurat.obj)
   plot(p0)
   
   # umap with predicted ids 
-  seurat.obj$predicted.ids = seurat.obj$scmap.pred.id.500
-  seurat.obj$predicted.scores = seurat.obj$scmap.corr.500
+  seurat.obj$predicted.ids = seurat.obj$seurat.predicted.id
+  seurat.obj$predicted.scores = seurat.obj$seurat.prediction.score.max
   
   p1 = DimPlot(seurat.obj, group.by = "predicted.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
                label.size = 4,
@@ -368,36 +368,27 @@ compare.reference.based.annotation.scmap.seurat = function(seurat.obj)
   plot(p1)
   
   # compositions of predicted labels for all clusters 
+  counts <- table(seurat.obj$seurat_clusters, seurat.obj$predicted.ids)
+  #legend.text = rownames(counts)
+  legend.text = NULL
+  barplot(counts, main="predicted label composition for each cluster ",
+          xlab="subcluster index", col=c(1:nrow(counts)), las = 2,
+          legend = legend.text)
+  
+  for(n in 1:ncol(counts)) counts[,n] = counts[,n]/sum(counts[,n])
+  barplot(counts, main="predicted label composition for each cluster ",
+          xlab="subcluster index", col=c(1:nrow(counts)), las = 2,
+          legend = legend.text)
+  
+  # compositions of predicted labels for all clusters 
   counts <- table(seurat.obj$predicted.ids, seurat.obj$seurat_clusters)
   #legend.text = rownames(counts)
   legend.text = NULL
-  barplot(counts, main="composition of subclusters ",
-          xlab="subcluster index", col=c(1:nrow(counts)),
+  barplot(counts, main="predicted label composition for each cluster ",
+          xlab="subcluster index", col=c(1:nrow(counts)), las = 2,
           legend = legend.text)
   
-  
-  ## another way of summarizing the mapping between cluster index and predicted cell identities
-  predicted.labels = as.data.frame(seurat.obj@meta.data)
-  predicted.labels = predicted.labels[, grep('seurat.predicted.id|seurat.prediction.score.', colnames(predicted.labels))]
-  res = data.frame(clusters = Idents(seurat.obj), predicted.labels, stringsAsFactors = FALSE)
-  colnames(res) = gsub('seurat.', '', colnames(res))
-  
-  labels.pred =  unique(res$predicted.id)
-  clusters = unique(res$clusters)
-  res.map = matrix(0, nrow = length(labels.pred), ncol = length(clusters))
-  rownames(res.map) = labels.pred
-  colnames(res.map) = as.character(clusters)
-  res.map = res.map[, order(as.integer(colnames(res.map)))]
-  
-  for(n in 1:ncol(res.map))
-  {
-    # n = 1
-    predicted.ids = res$predicted.id[which(res$clusters == colnames(res.map)[n])]
-    stats.ids = table(predicted.ids)
-    stats.ids = stats.ids[match(rownames(res.map), names(stats.ids))]
-    stats.ids[is.na(stats.ids)] = 0
-    res.map[,n] = stats.ids/sum(stats.ids)
-  }
+  ## heatmap of summarizing the mapping between cluster index and predicted cell identities
   
   cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
   pheatmap(res.map, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
