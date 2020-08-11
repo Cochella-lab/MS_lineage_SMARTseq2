@@ -328,6 +328,13 @@ reference.based.cell.projection.rf.svm = function()
   
 }
 
+########################################################
+########################################################
+# Section : utility functions for manual a nnotation for BWM lineage
+# 
+########################################################
+########################################################
+
 ##########################################
 # here compare scmap and seurat, two reference-based cluster annotation
 # the clusters were also given here in seurat.obj$seurat_clusters
@@ -463,6 +470,119 @@ compare.reference.based.annotation.scmap.seurat = function(seurat.obj)
   # 
     
 }
+
+
+
+clustering.splitting.kmean.outlier.detection = function(seurat.obj, sels, redefine.gene.to.use = FALSE, nfeatures = 3000,
+                                                        cluster.split.method = 'dbscan')
+{
+  # n = 6;  sels = which(seurat.obj$seurat_clusters == cluster.ids[n])
+  subobj = subset(seurat.obj, cells = sels)
+  
+  p1 = DimPlot(subobj,
+               group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 3, label.size = 4,
+               na.value = "gray") +
+    ggtitle(paste0("cluster ", cluster.ids[n]))
+  
+  # plot(p1)
+  
+  if(redefine.gene.to.use){
+    subobj <- FindVariableFeatures(subobj, selection.method = "vst", nfeatures = nfeatures, verbose = FALSE)
+    # subobj = ScaleData(subobj, features = rownames(subobj))
+    # subobj <- RunPCA(object = subobj, features = VariableFeatures(subobj), verbose = FALSE)
+    # ElbowPlot(subobj, ndims = 50)
+    # subobj <- FindNeighbors(object = subobj, reduction = "pca", k.param = 20, dims = 1:20)
+    # subobj <- FindClusters(subobj, resolution = 1, algorithm = 3)
+    ss = subset(subobj, features = VariableFeatures(subobj))
+    sc = SCseq(ss@assays$RNA@counts)
+    
+  }else{
+    sc = SCseq(subobj@assays$RNA@counts)
+  }
+  
+  if(cluster.split.method == 'kmean')
+  {
+    library(RaceID) # refer to the vignett https://cran.r-project.org/web/packages/RaceID/vignettes/RaceID.html
+    library(Matrix)
+    
+    # test example from viggnette
+    #sc <- SCseq(intestinalData)
+    sc <- filterdata(sc, mintotal=2000, minexpr = 10, minnumber = 2)
+    fdata <- getfdata(sc)
+    #cat('nb of genes after filtering :', fdata@Dim[1], '\n')
+    #cat('nb of cells after filtering :', fdata@Dim[2], '\n')
+    
+    #sc <- compdist(sc,metric="pearson", FSelect = FALSE)
+    cat('use pca to calculate Pearson correlation and then distance and then k-mean\n')
+    subobj.pca = subobj@reductions$pca@cell.embeddings[, c(1:30)]
+    mat.dist = 1- cor(t(subobj.pca))
+    sc@distances = mat.dist
+    sc <- clustexp(sc, FUNcluster = 'kmedoids', verbose = FALSE)
+    
+    par(mfrow = c(1, 1))
+    plotsaturation(sc,disp=FALSE)
+    plotsaturation(sc,disp=TRUE)
+    #plotjaccard(sc)
+    
+    nb.subcluster = sc@cluster$clb$nc
+    cat('optimal subclusters found :', nb.subcluster, '\n')
+    
+    sc <- clustexp(sc,cln=nb.subcluster, sat=FALSE, verbose = FALSE)
+    
+    #sc <- findoutliers(sc, outminc = 10, outlg = 10)
+    #plotbackground(sc)
+    
+    #plotoutlierprobs(sc)
+    #clustheatmap(sc)
+    
+    #sc <- compumap(sc)
+    #sc <- compfr(sc,knn=10)
+    #plotmap(sc,um=TRUE)
+    #plotmap(sc,fr=TRUE)
+    
+    subobj$seurat_clusters_split = sc@cluster$kpart
+    
+  }
+  
+  if(cluster.split.method == 'dbscan'){
+    library('dbscan')
+    library('lsa')
+    #library("fpc")
+    
+    #sc <- compdist(sc,metric="pearson", FSelect = FALSE)
+    cat('use pca to calculate Pearson correlation and then distance and then dbscan clustering \n')
+    subobj.pca = subobj@reductions$pca@cell.embeddings[, c(1:20)]
+    #mat.dist = dist(1- cor(t(subobj.pca)))
+    mat.dist = dist(lsa::cosine(t(subobj.pca)))
+    #mat.dist = dist(subobj.pca, method = 'euclidean')
+    
+    dbscan::kNNdistplot(mat.dist, k = 4)
+    abline(h = 1, lty = 2)
+    
+    res.db <- dbscan(mat.dist, eps = 0.5, minPts = 4)
+    cat('nb of clusters found by dbscan -- ', length(unique(res.db$cluster)), '\n')
+    
+    subobj$seurat_clusters_split = res.db$cluster
+    
+  }
+  
+  p2 = DimPlot(subobj,
+               group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 3, label.size = 4,
+               na.value = "gray") +
+    ggtitle(paste0("cluster ", cluster.ids[n]))
+  
+  plot(CombinePlots(list(p1, p2)))
+  
+  par(mfrow=c(1, 1))
+  counts <- table(subobj$predicted.id.scmap, subobj$seurat_clusters_split)
+  barplot(counts, main="composition of subclusters ",
+          xlab="subcluster index", col=c(1:nrow(counts)),
+          legend = rownames(counts))
+  
+  return(subobj)
+  
+}
+
 
 ########################################################
 ########################################################

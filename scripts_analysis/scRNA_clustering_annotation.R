@@ -305,7 +305,7 @@ rdsfile.saved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.bas
 ms = readRDS(seurat.obj, file = rdsfile.saved)
 
 source.my.script("scRNA_cluster_annotation_functions.R")
-ms = 
+ms = manual.annotation.for.BWM.clusters(seurat.obj = ms)
 
 
 
