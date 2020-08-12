@@ -419,7 +419,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   cells.sels = which(!is.na(match(seurat.obj$predicted.ids, ids)))
   cells.fitered = cells.sels[which(seurat.obj$predicted.scores[cells.sels] > threshold)]
   cat(length(cells.sels), ' cells with predicted labels \n')
+  cat('clusters involved : '); print(as.character(unique(seurat.obj$seurat_clusters[cells.sels])));
   cat(length(cells.fitered), ' cells after filtering with predicted labels \n')
+  cat('clusters involved after fitering : '); print(as.character(unique(seurat.obj$seurat_clusters[cells.fitered])));
   
   p0 = DimPlot(seurat.obj, 
                cells.highlight = colnames(seurat.obj)[cells.sels],
