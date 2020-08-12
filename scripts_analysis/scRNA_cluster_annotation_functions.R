@@ -244,6 +244,8 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
   ## tranfer Murray labels with scmap
   seurat.obj = scmap.transfer.labels.from.Murray.scRNA(seurat.obj, ee)
   
+  seurat.obj = scmap.transfer.labels.from.Tintor.scRNA(seurat.obj)
+  
   ## transfer Murray labels with seurat
   seurat.obj = seurat.transfer.labels.from.Murray.scRNA.to.scRNA(seurat.obj, ee)
   

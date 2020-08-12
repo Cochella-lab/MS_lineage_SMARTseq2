@@ -148,6 +148,83 @@ scmap.transfer.labels.from.Murray.scRNA = function(seurat.obj, ee, run.scmap.cel
   
 }
 
+
+scmap.transfer.labels.from.Tintor.scRNA = function(seurat.obj)
+{
+  library(SingleCellExperiment)
+  library(scmap)
+  
+  tintori = readRDS(file = paste0("results/scATAC_earlyEmbryo_20200302/Rdata/", 
+                                  'Tintori.et.al_rawCounts_processed_sizefactorNormalization.rds')) 
+  
+  # process aleks data for scmap
+  sce = Seurat::as.SingleCellExperiment(seurat.obj)
+  sce <- sce[!duplicated(rownames(sce)), ]
+  rowData(sce)$feature_symbol <- rownames(sce)
+  counts(sce) = as.matrix(counts(sce)) # sce object converted from seurat object was using spare matrix
+  logcounts(sce) = as.matrix(logcounts(sce))
+  
+  tintori = Seurat::as.SingleCellExperiment(tintori)
+  counts(tintori) = as.matrix(counts(tintori))
+  logcounts(tintori) = as.matrix(logcounts(tintori))
+  rowData(tintori)$feature_symbol <- rownames(tintori)
+  tintori$lineage[which(tintori$lineage == 'MSx1')] = 'MSx'
+  tintori$lineage[which(tintori$lineage == 'MSx2')] = 'MSx'
+  
+  tintori$cell_type1 = tintori$lineage
+  
+  cat('nb of features selected : ', nb.features.scmap, '\n')
+  
+  ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = nb.features.scmap)
+  #table(rowData(ee)$scmap_features)
+  ee_ref = indexCluster(ee)
+  
+  #head(metadata(ee_ref)$scmap_cluster_index)
+  #heatmap(as.matrix(metadata(ee_ref)$scmap_cluster_index))
+  
+  scmapCluster_results <- scmapCluster(
+    projection = sce, 
+    index_list = list(
+      murray = metadata(ee_ref)$scmap_cluster_index
+    ),
+    threshold = 0
+  )
+  
+  #seurat.obj = AddMetaData(seurat.obj, as.factor(scmapCluster_results$scmap_cluster_labs), 
+  #                         col.name = paste0('scmap.pred.id.features.', nb.features.scmap))
+  
+  keep = data.frame(keep, as.character(scmapCluster_results$scmap_cluster_labs), 
+                    as.numeric(scmapCluster_results$scmap_cluster_siml), 
+                    stringsAsFactors = FALSE)
+  
+  #length(scmapCluster_results$scmap_cluster_labs)
+  #length(scmapCluster_results$combined_labs)
+  ident.murray = unique(ee$lineage)
+  ident.projection = unique(scmapCluster_results$scmap_cluster_labs)
+  ident.missed = ident.murray[which(is.na(match(ident.murray, ident.projection)))]
+  cat('cell identities missed : ')
+  print(ident.missed)
+  #head(scmapCluster_results$scmap_cluster_labs)
+  #head(scmapCluster_results$scmap_cluster_siml)
+  
+  hist(scmapCluster_results$scmap_cluster_siml, breaks = 100)
+  #abline(v = threshold.scmap, col = 'red')
+  head(scmapCluster_results$combined_labs)
+  
+  predicted.id = scmapCluster_results$scmap_cluster_labs
+  counts.pred.ids = table(predicted.id)
+  counts.pred.ids = counts.pred.ids[order(-counts.pred.ids)]
+  # print(counts.pred.ids)
+  
+  predicted.id[which(predicted.id == 'unassigned')] = NA
+  
+  cat('nb of assigned cells :',  length(predicted.id[!is.na(predicted.id)]), '\n')
+  cat('percent of assigned cells: ', length(predicted.id[!is.na(predicted.id)])/length(predicted.id), '\n')
+  
+  
+  
+}
+
 seurat.transfer.labels.from.Murray.scRNA.to.scRNA = function(seurat.obj, ee)
 {
   # seurat.obj = ms
