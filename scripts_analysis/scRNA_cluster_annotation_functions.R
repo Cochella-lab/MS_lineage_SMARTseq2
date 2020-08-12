@@ -272,47 +272,278 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
 # 5) RNA velocity (not sure ...)
 ########################################################
 ########################################################
-manual.annotation.for.BWM.clusters = function(seurat.obj = ms) 
+##########################################
+# here compare scmap and seurat, two reference-based cluster annotation
+# the clusters were also given here in seurat.obj$seurat_clusters
+##########################################
+overview.and.compare.predicted.labels = function(seurat.obj)
 {
-  rdsfile.saved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds')
-  seurat.obj = readRDS(seurat.obj, file = rdsfile.saved)
+  library("pheatmap")
+  library("RColorBrewer")
+  library(grid)
   
-  ##########################################
-  # step 1) overview of all given clusters and predicted labels
-  ##########################################
-  ## current 54 clusters were define using 3000 variable genes and resolution =3, 20 pcs and k = 10
-  p0 = DimPlot(seurat.obj, group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
-          na.value = "gray") + 
-    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
+  # inital clusters
+  p0 = DimPlot(seurat.obj, group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
+               label.size = 6,
+               na.value = "gray") + 
+    ggtitle(paste0("clusters ")) +
     scale_colour_hue(drop = FALSE) + 
     NoLegend()
-  
   plot(p0)
   
-  ## compare scmap and seurat reference-based annotation
-  source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
-  overview.and.compare.predicted.labels(seurat.obj)
-  
   ##########################################
-  # step 2) focus short list of cell identities and manual annotate with other information
+  # check the predicted labels and cluster-label mapping without filtering
   ##########################################
-  seurat.obj$manual.ids = NA
-  seurat.obj$manual.ids[1] = 'unknown'
+  # here use seurat prediction as example
+  seurat.obj$predicted.ids = seurat.obj$seurat.predicted.id
+  seurat.obj$predicted.scores = seurat.obj$seurat.prediction.score.max
+  threshold = 0.5
   
-  DimPlot(seurat.obj, group.by = "manual.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
-          na.value = "gray") + 
-    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
+  pdfname = paste0(resDir, "/Overview_predictedLabels_seuratClusters_mapping_seurat.pdf")
+  pdf(pdfname, width=16, height = 12)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  p1 = DimPlot(seurat.obj, group.by = "predicted.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
+               label.size = 4,
+               na.value = "gray") + 
+    ggtitle(paste0("projection into Murray data with scmap (nfeature = 500)")) +
     scale_colour_hue(drop = FALSE) + 
     NoLegend()
   
-  source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
+  plot(p1)
   
-  seurat.obj = manual.annotation.for.cell.identities(seurat.obj)
+  # compositions of predicted labels for all clusters 
+  counts <- table(seurat.obj$predicted.ids, seurat.obj$seurat_clusters)
+  sels.bwm = c(match(c('MSx', 'MSxa', 'MSxap', 
+                       'MSapaap', 'MSapaapp', 'MSappaaa', 
+                       'MSpappa', 'MSpappax', 'MSppaap', 'MSppaapp', 'MSpppaaa'), rownames(counts)), 
+               grep('MSxapp|MSxp', rownames(counts)))
+  counts = counts[sels.bwm, ]
+  
+  counts.norm = counts
+  for(n in 1:nrow(counts)) counts.norm[n,] = counts.norm[n, ] /sum(counts.norm[n, ])
+  cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
+  
+  par(mfrow = c(2, 1))
+  legend.text = NULL
+  barplot(t(counts), main="cluster compositions for predicted labels ",
+          xlab=NULL, col=c(1:nrow(counts)), las = 2,
+          legend = legend.text)
+  barplot(t(counts.norm), main="cluster compositions for predicted labels ",
+          xlab=NULL, col=c(1:nrow(counts)), las = 2,
+          legend = legend.text)
+  
+  pheatmap(counts.norm, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
+           cluster_cols=FALSE, main = paste0("cluster -- predicted labels mapping"), na_col = "white",
+           color = cols, 
+           #annotation_col = my_sample_col,
+           #gaps_row = c(1:nrow(map)-1),
+           fontsize_col = 10,
+           height = 8,
+           width = 30
+  )
+  #dev.off()
+  
+  # compositions of predicted labels for all clusters 
+  #legend.text = rownames(counts)
+  legend.text = NULL
+  counts.norm = counts
+  for(n in 1:ncol(counts)) {
+    ss = sum(counts.norm[,n])
+    if(ss>0) counts.norm[,n] = counts.norm[ ,n] /ss
+  }
+  
+  par(mfrow = c(2, 1))
+  barplot(counts, main="predicted label composition for each cluster ",
+          xlab="subcluster index", col=c(1:nrow(counts)), las = 2,
+          legend = legend.text)
+  
+  
+  barplot(counts.norm, main="cluster compositions for predicted labels ",
+          xlab=NULL, col=c(1:nrow(counts)), las = 2,
+          legend = legend.text)
+  
+  ## heatmap of summarizing the mapping between cluster index and predicted cell identities
+  #cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
+  pheatmap(counts.norm, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
+           cluster_cols=FALSE, main = paste0("resolution -- 0.8"), na_col = "white",
+           color = cols, 
+           #annotation_col = my_sample_col,
+           #gaps_row = c(1:nrow(map)-1),
+           fontsize_col = 10,
+           height = 8,
+           width = 30
+  )
+  
+  ##########################################
+  # # keep the confident ones by filtering the prediction scores
+  ##########################################
+  #threshold = quantile(as.numeric(seurat.obj$predicted.scores), probs = 0.4, na.rm = TRUE);
+  par(mfrow = c(1, 1))
+  hist(seurat.obj$predicted.scores, breaks = 100)
+  abline(v= threshold, col = 'red')
+  
+  seurat.obj$predicted.ids[which(seurat.obj$predicted.scores < threshold)] = NA
+  p2 = DimPlot(seurat.obj, group.by = "predicted.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
+               label.size = 4,
+               na.value = "gray") + 
+    ggtitle(paste0("filtered by threshold")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  plot(p2)
+  
+  dev.off()
   
 }
 
-
-
+manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
+{
+  library("pheatmap")
+  library("RColorBrewer")
+  library(grid)
+  
+  
+  # given the fact that scmap seems to be working better than seurat 
+  # for the manual annotation, the scmap predicted labels will be mainly considered
+  
+  
+  ids = c('MSx', 'MSxa', 'MSxp')
+  ids = c('MSx')
+  
+  # first visualize cells predicted to be with selected ids
+  seurat.obj$predicted.ids = seurat.obj$scmap.pred.id.500
+  seurat.obj$predicted.scores = seurat.obj$scmap.corr.500
+  threshold = 0.7
+  
+  cells.sels = which(!is.na(match(seurat.obj$predicted.ids, ids)))
+  cells.fitered = cells.sels[which(seurat.obj$predicted.scores[cells.sels] > threshold)]
+  cat(length(cells.sels), ' cells with predicted labels \n')
+  cat(length(cells.fitered), ' cells after filtering with predicted labels \n')
+  
+  p0 = DimPlot(seurat.obj, 
+               cells.highlight = colnames(seurat.obj)[cells.sels],
+               group.by = "predicted.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 4,
+               sizes.highlight = 2,
+               na.value = "gray") + 
+    ggtitle(paste0("cells predicted by seruat ")) +
+    NoLegend()
+  plot(p0)
+  
+  ##########################################
+  # check the predicted labels and cluster-label mapping without filtering
+  ##########################################
+  # here use seurat prediction as example
+  seurat.obj$predicted.ids = seurat.obj$seurat.predicted.id
+  seurat.obj$predicted.scores = seurat.obj$seurat.prediction.score.max
+  threshold = 0.5
+  
+  pdfname = paste0(resDir, "/Overview_predictedLabels_seuratClusters_mapping_seurat.pdf")
+  pdf(pdfname, width=16, height = 12)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  p1 = DimPlot(seurat.obj, group.by = "predicted.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
+               label.size = 4,
+               na.value = "gray") + 
+    ggtitle(paste0("projection into Murray data with scmap (nfeature = 500)")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  plot(p1)
+  
+  # compositions of predicted labels for all clusters 
+  counts <- table(seurat.obj$predicted.ids, seurat.obj$seurat_clusters)
+  sels.bwm = c(match(c('MSx', 'MSxa', 'MSxap', 
+                       'MSapaap', 'MSapaapp', 'MSappaaa', 
+                       'MSpappa', 'MSpappax', 'MSppaap', 'MSppaapp', 'MSpppaaa'), rownames(counts)), 
+               grep('MSxapp|MSxp', rownames(counts)))
+  counts = counts[sels.bwm, ]
+  
+  counts.norm = counts
+  for(n in 1:nrow(counts)) counts.norm[n,] = counts.norm[n, ] /sum(counts.norm[n, ])
+  cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
+  
+  par(mfrow = c(2, 1))
+  legend.text = NULL
+  barplot(t(counts), main="cluster compositions for predicted labels ",
+          xlab=NULL, col=c(1:nrow(counts)), las = 2,
+          legend = legend.text)
+  barplot(t(counts.norm), main="cluster compositions for predicted labels ",
+          xlab=NULL, col=c(1:nrow(counts)), las = 2,
+          legend = legend.text)
+  
+  pheatmap(counts.norm, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
+           cluster_cols=FALSE, main = paste0("cluster -- predicted labels mapping"), na_col = "white",
+           color = cols, 
+           #annotation_col = my_sample_col,
+           #gaps_row = c(1:nrow(map)-1),
+           fontsize_col = 10,
+           height = 8,
+           width = 30
+  )
+  #dev.off()
+  
+  # compositions of predicted labels for all clusters 
+  #legend.text = rownames(counts)
+  legend.text = NULL
+  counts.norm = counts
+  for(n in 1:ncol(counts)) {
+    ss = sum(counts.norm[,n])
+    if(ss>0) counts.norm[,n] = counts.norm[ ,n] /ss
+  }
+  
+  par(mfrow = c(2, 1))
+  barplot(counts, main="predicted label composition for each cluster ",
+          xlab="subcluster index", col=c(1:nrow(counts)), las = 2,
+          legend = legend.text)
+  
+  
+  barplot(counts.norm, main="cluster compositions for predicted labels ",
+          xlab=NULL, col=c(1:nrow(counts)), las = 2,
+          legend = legend.text)
+  
+  ## heatmap of summarizing the mapping between cluster index and predicted cell identities
+  #cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
+  pheatmap(counts.norm, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
+           cluster_cols=FALSE, main = paste0("resolution -- 0.8"), na_col = "white",
+           color = cols, 
+           #annotation_col = my_sample_col,
+           #gaps_row = c(1:nrow(map)-1),
+           fontsize_col = 10,
+           height = 8,
+           width = 30
+  )
+  
+  ##########################################
+  # # keep the confident ones by filtering the prediction scores
+  ##########################################
+  #threshold = quantile(as.numeric(seurat.obj$predicted.scores), probs = 0.4, na.rm = TRUE);
+  par(mfrow = c(1, 1))
+  hist(seurat.obj$predicted.scores, breaks = 100)
+  abline(v= threshold, col = 'red')
+  
+  seurat.obj$predicted.ids[which(seurat.obj$predicted.scores < threshold)] = NA
+  p2 = DimPlot(seurat.obj, group.by = "predicted.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
+               label.size = 4,
+               na.value = "gray") + 
+    ggtitle(paste0("filtered by threshold")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  plot(p2)
+  
+  dev.off()
+  
+  
+  seurat.obj$manual.annot.ids[1] = 'unknown'
+  
+  DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+          na.value = "gray") + 
+    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+}
 ########################################################
 # Section : Clustering section by integrating various informations: 
 # gene expression, fac info, estimated timing and velocity 

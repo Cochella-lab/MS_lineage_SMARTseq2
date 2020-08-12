@@ -297,15 +297,43 @@ ms = reference.based.cluster.annotation(seurat.obj = ms, redefine.clusters = TRU
 
 ########################################################
 ########################################################
-# Section : 
+# Section : here manual annotate BWM lineages using various information:
+# 1) clusters (splitting and merging if necessay) 
+# 2) predicted labels from seurat and scmap 
+# 3) cell size info and estimated timing
+# 3.5) marker genes
+# 4) cluster connection by PAGA or VarID 
+# 5) RNA velocity (not sure ...)
 # 
 ########################################################
 ########################################################
 rdsfile.saved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds')
-ms = readRDS(seurat.obj, file = rdsfile.saved)
+seurat.obj = readRDS(seurat.obj, file = rdsfile.saved)
 
-source.my.script("scRNA_cluster_annotation_functions.R")
-ms = manual.annotation.for.BWM.clusters(seurat.obj = ms)
+##########################################
+# 1) overview of all given clusters and predicted labels
+##########################################
+## current 54 clusters were define using 3000 variable genes and resolution =3, 20 pcs and k = 10
+p0 = DimPlot(seurat.obj, group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+             na.value = "gray") + 
+  ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
+  scale_colour_hue(drop = FALSE) + 
+  NoLegend()
+
+plot(p0)
+
+## compare scmap and seurat reference-based annotation
+source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
+
+overview.and.compare.predicted.labels(seurat.obj)
+
+##########################################
+# 2) focus short list of cell identities and manual annotate with other information
+##########################################
+seurat.obj$manual.annot.ids = NA
+source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
+
+seurat.obj = manual.annotation.for.cell.identities(seurat.obj)
 
 
 
