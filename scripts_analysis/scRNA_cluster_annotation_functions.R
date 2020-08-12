@@ -264,9 +264,10 @@ reference.based.cluster.annotation = function(seurat.obj, redefine.clusters = TR
 ########################################################
 ########################################################
 # Section : here manual annotate BWM lineages using various information:
-# 1) clusters (splitting and merging if necessay)
+# 1) clusters (splitting and merging if necessay) 
 # 2) predicted labels from seurat and scmap 
 # 3) cell size info and estimated timing
+# 3.5) marker genes
 # 4) cluster connection by PAGA or VarID 
 # 5) RNA velocity (not sure ...)
 ########################################################
@@ -295,59 +296,18 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms)
   ##########################################
   # step 2) focus short list of cell identities and manual annotate with other information
   ##########################################
-  seurat.obj$predicted.id.scmap[which(is.na(seurat.obj$predicted.id.scmap))] = 'unassigned'
+  seurat.obj$manual.ids = NA
+  seurat.obj$manual.ids[1] = 'unknown'
   
-  seurat.obj$seurat_clusters = seurat.obj$RNA_snn_res.5
-  seurat.obj$cluster.idents = seurat.obj$seurat_clusters
-  cluster.ids = unique(seurat.obj$seurat_clusters)
-  cluster.ids = cluster.ids[order(cluster.ids)]
+  DimPlot(seurat.obj, group.by = "manual.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+          na.value = "gray") + 
+    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
   
-  pdfname = paste0(resDir, "/annotate_clusters_using_predicted.ids_split_merge_test1.pdf")
-  pdf(pdfname, width=16, height = 8)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
   
-  for(n in 1:10)
-  #for(n in 1:length(cluster.ids))
-  {
-    # n = 6
-    cat('cluster ', as.character(cluster.ids[n]), '\n')
-    
-    sels = which(seurat.obj$seurat_clusters == cluster.ids[n])
-    
-    p1 = DimPlot(seurat.obj, 
-            cells.highlight = colnames(seurat.obj)[sels],
-            group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 4,
-            sizes.highlight = 2,
-            na.value = "gray") + 
-      ggtitle(paste0("cluster ", cluster.ids[n])) +
-      NoLegend()
-    
-    p2 = DimPlot(seurat.obj, 
-            cells = colnames(seurat.obj)[sels],
-            group.by = "predicted.id.scmap", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 3, label.size = 4,
-            na.value = "gray") + 
-      ggtitle(paste0("cluster ", cluster.ids[n])) 
-    
-    plot(CombinePlots(list(p1, p2), ncol = 2))
-    
-    pred.ids = seurat.obj$predicted.id.scmap[sels]
-    pred.ids[which(is.na(pred.ids))] = 'unassigned'
-    
-    par(mfrow = c(1, 1))
-    par(mar=c(5,8,4,2)) # increase y-axis margin.
-    barplot(table(pred.ids)/length(pred.ids), las = 2, horiz = TRUE, xlim =c(0, 1), main = paste0("cluster ", cluster.ids[n]))
-    
-    par(mfrow = c(1, 2))
-    hist(seurat.obj$BSC_log2[sels], breaks = 20)
-    hist(seurat.obj$FSC_log2[sels], breaks = 20)
-    
-    ## refine clusters by splitting or outlier detection (k mean cluster and RaceID)
-    clustering.splitting.kmean.outlier.detection(seurat.obj, sels, redefine.gene.to.use = TRUE, nfeatures = 200)
-    cat('---------\n')
-    
-  }
-  
-  dev.off()
+  seurat.obj = manual.annotation.for.cell.identities(seurat.obj)
   
 }
 
