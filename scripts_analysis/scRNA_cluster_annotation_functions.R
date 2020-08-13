@@ -303,6 +303,11 @@ overview.and.compare.predicted.labels = function(seurat.obj)
   seurat.obj$predicted.scores = seurat.obj$scmap.corr.500
   threshold = 0.7
   
+  seurat.obj$predicted.ids.filtered = seurat.obj$predicted.ids
+  seurat.obj$predicted.ids.filtered[which(seurat.obj$predicted.ids.filtered == 'unassigned')] = NA
+  seurat.obj$predicted.ids.filtered[which(seurat.obj$predicted.scores < threshold)] = NA
+  
+  
   pdfname = paste0(resDir, "/Overview_predictedLabels_seuratClusters_mapping_scmap.pdf")
   pdf(pdfname, width=16, height = 12)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
@@ -320,8 +325,7 @@ overview.and.compare.predicted.labels = function(seurat.obj)
   hist(seurat.obj$predicted.scores, breaks = 100)
   abline(v= threshold, col = 'red')
   
-  seurat.obj$predicted.ids[which(seurat.obj$predicted.scores < threshold)] = NA
-  p2 = DimPlot(seurat.obj, group.by = "predicted.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
+  p2 = DimPlot(seurat.obj, group.by = "predicted.ids.filtered", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, 
                label.size = 4,
                na.value = "gray") + 
     ggtitle(paste0("filtered by threshold")) +
@@ -330,7 +334,7 @@ overview.and.compare.predicted.labels = function(seurat.obj)
   
   plot(p2)
   
-  seurat.obj$predicted.ids[which(seurat.obj$predicted.scores < threshold)] = 'unassigned'
+  #seurat.obj$predicted.ids[which(seurat.obj$predicted.scores < threshold)] = 'unassigned'
   # compositions of predicted labels for all clusters 
   counts <- table(seurat.obj$predicted.ids, seurat.obj$seurat_clusters)
   sels.bwm = c(match(c('MSx', 'MSxa', 'MSxap', 
@@ -338,21 +342,12 @@ overview.and.compare.predicted.labels = function(seurat.obj)
                        'MSpappa', 'MSpappax', 'MSppaap', 'MSppaapp', 'MSpppaaa'), rownames(counts)), 
                grep('MSxapp|MSxp', rownames(counts)))
   counts = counts[sels.bwm, ]
-  
+  counts = counts[!is.na(rownames(counts)), ]
   counts = counts[, apply(counts, 2, sum) >0]
   
   counts.norm = counts
   for(n in 1:nrow(counts)) counts.norm[n,] = counts.norm[n, ] /sum(counts.norm[n, ])
   cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
-  
-  #par(mfrow = c(2, 1))
-  legend.text = NULL
-  barplot(t(counts), main="cluster compositions for predicted labels ",
-          xlab=NULL, col=c(1:nrow(counts)), las = 2,
-          legend = legend.text)
-  barplot(t(counts.norm), main="cluster compositions for predicted labels ",
-          xlab=NULL, col=c(1:nrow(counts)), las = 2,
-          legend = legend.text)
   
   pheatmap(counts.norm, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
            cluster_cols=FALSE, main = paste0("cluster -- predicted labels mapping"), na_col = "white",
@@ -363,12 +358,10 @@ overview.and.compare.predicted.labels = function(seurat.obj)
            height = 8,
            width = 30
   )
-  #dev.off()
   
   # compositions of predicted labels for all clusters 
   #legend.text = rownames(counts)
-  cat('here \n')
-  
+  #cat('here \n')
   counts.norm = counts
   for(n in 1:ncol(counts)) {
     ss = sum(counts.norm[,n])
@@ -398,7 +391,15 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   library("RColorBrewer")
   library(grid)
   
- 
+  # seurat.obj = ms
+  ee = process.import.Murray.scRNA()
+  murray.ids = unique(ee$lineage)
+  bwms = unique(c('MSx', 'MSxa', 'MSxap', 
+           'MSapaap', 'MSapaapp', 'MSappaaa', 
+           'MSpappa', 'MSpappax', 'MSppaap', 'MSppaapp', 'MSpppaaa',
+           murray.ids[grep('MSxapp|MSxp', murray.ids)]))
+               
+  
   #ids = c('MSx')
   ids = c('MSxa', 'MSxp')
   
@@ -448,19 +449,24 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   counts <- table(predicted.ids, seurat.obj$seurat_clusters)
   counts = counts[, match(cluster.sels, colnames(counts))]
   
+  ## select only BWM ids
+  counts = counts[!is.na(match(rownames(counts), c(bwms, 'unassigned'))), ]
   counts = counts[apply(counts, 1, sum)>0, ]
+  
   
   counts.norm = counts
   for(n in 1:nrow(counts)) counts.norm[n,] = counts.norm[n, ] /sum(counts.norm[n, ])
-  #cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
+  cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
+  
   
   par(mfrow = c(1, 2))
   barplot(t(counts), main="cluster compositions for predicted labels ",
           xlab=NULL, col=c(1:nrow(counts)), las = 2,
-          legend = rownames(counts))
+          legend = colnames(counts))
   barplot(t(counts.norm), main="cluster compositions for predicted labels ",
           xlab=NULL, col=c(1:nrow(counts)), las = 2,
           legend = NULL)
+  
   
   pheatmap(counts.norm, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
            cluster_cols=FALSE, main = paste0("cluster -- predicted labels mapping"), na_col = "white",
@@ -489,7 +495,12 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   #sub.obj = RunTSNE(sub.obj, seed.use = 1, dims = 1:20)
   #DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'tsne', label = TRUE, label.size = 5)
   
-  ## check the manually annotated ids
+  
+  
+  
+  ##########################################
+  # check the update of manually annotated ids
+  ##########################################
   seurat.obj$manual.annot.ids[1] = 'unknown'
   
   DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
@@ -497,6 +508,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
     scale_colour_hue(drop = FALSE) + 
     NoLegend()
+  
+  
+  
   
 }
 ########################################################
