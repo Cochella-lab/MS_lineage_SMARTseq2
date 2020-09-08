@@ -329,9 +329,9 @@ overview.and.compare.predicted.labels(seurat.obj = ms)
 # 2) focus short list of cell identities and manual annotate with other information
 ##########################################
 ms$manual.annot.ids = NA
-
 source.my.script('scRNA_cluster_annotation_functions.R')
-ms = manual.annotation.for.cell.identities(seurat.obj = ms)
+
+ms = manual.annotation.for.BWM.clusters(seurat.obj = ms)
 
 
 

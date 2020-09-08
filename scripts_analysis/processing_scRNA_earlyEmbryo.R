@@ -75,7 +75,7 @@ process.Murray.scRNAseq = function(Install.VisCello.celegans = FALSE)
   
   library(VisCello.celegans)
   cello.data.path = "../VisCello.celegans/inst/app/data/"
- 
+  
   ## clusters with coordinates in reduced dimensions (PCA, UMAP)
   clist <- readRDS(paste0(cello.data.path, "clist.rds"))
   elist <- readRDS(paste0(cello.data.path, "elist.rds"))

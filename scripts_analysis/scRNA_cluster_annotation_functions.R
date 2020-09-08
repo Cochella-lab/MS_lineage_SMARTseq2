@@ -385,27 +385,40 @@ overview.and.compare.predicted.labels = function(seurat.obj)
   
 }
 
+##########################################
+# here is the main function for BWM cluster manual annotation
+##########################################
 manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
 {
+  library(ggplot2)
+  library(patchwork)
   library("pheatmap")
   library("RColorBrewer")
   library(grid)
   
-  # seurat.obj = ms
   ee = process.import.Murray.scRNA()
   murray.ids = unique(ee$lineage)
   bwms = unique(c('MSx', 'MSxa', 'MSxap', 
            'MSapaap', 'MSapaapp', 'MSappaaa', 
            'MSpappa', 'MSpappax', 'MSppaap', 'MSppaapp', 'MSpppaaa',
            murray.ids[grep('MSxapp|MSxp', murray.ids)]))
-               
   
-  #ids = c('MSx')
-  ids = c('MSxa', 'MSxp')
+  markers = read.xlsx('data/Supplementary_Tables_190611.xlsx', sheet = 4, startRow = 8, colNames = TRUE)
+  markers = markers[!is.na(match(markers$Lineage, bwms)), ]
+  #write.csv(markers, file = paste0(tabDir, 'JM_marker_genes_BWM.csv'))
+  
+  seurat.obj = readRDS(file = paste0(RdataDir, 
+                                     'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds'))
+  
+  
   
   pdfname = paste0(resDir, "/Overview_predictedLabels_seuratClusters_mapping_seurat.pdf")
   pdf(pdfname, width=16, height = 12)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  #ids = c('MSx')
+  ids = c('MSx', 'MSxa', 'MSxap', 'MSxapp','MSxappa', 'MSxappp', 'MSxp', 'MSxpa', 'MSxpp')
+  ids = c('MSxa', 'MSxap', 'MSxp', 'MSxpa', 'MSxpp')
   
   # given the fact that scmap seems to be working better than seurat 
   # for the manual annotation, the scmap predicted labels will be mainly considered, 
@@ -413,7 +426,6 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # seurat.obj$predicted.ids = seurat.obj$scmap.tintori.id
   # seurat.obj$predicted.scores = seurat.obj$scmap.tintori.cor
   # threshold = 0.7
-  
   seurat.obj$predicted.ids = seurat.obj$scmap.pred.id.500
   seurat.obj$predicted.scores = seurat.obj$scmap.corr.500
   threshold = 0.7
@@ -433,44 +445,46 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   cluster.sels =  unique(seurat.obj$seurat_clusters[cells.fitered])
   cat('clusters involved after fitering : '); print(as.character(cluster.sels));
   
-  p0 = DimPlot(seurat.obj, 
+  p0 = DimPlot(seurat.obj,
                cells.highlight = colnames(seurat.obj)[cells.fitered],
                group.by = "predicted.ids.fitered", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 4,
                sizes.highlight = 1,
                na.value = "gray") + 
     ggtitle(paste0("cells predicted by scmap with 500 features and threshold 0.7 ")) +
     NoLegend()
-  plot(p0)
   
-  # compositions of predicted labels for all clusters
+  p00 = DimPlot(seurat.obj,
+               cells.highlight = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))],
+               group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 4,
+               sizes.highlight = 1,
+               na.value = "gray") +
+    #ggtitle(paste0("cells predicted by scmap with 500 features and threshold 0.7 ")) +
+    NoLegend()
+  
+  p0 + p00
+  ##########################################
+  # found involved clusters to consider in the following 
+  ##########################################
+  # make the count table for ids considered and involved cluster index
   predicted.ids = seurat.obj$predicted.ids.fitered
   predicted.ids[is.na(predicted.ids)] = 'unassigned'
-  
   counts <- table(predicted.ids, seurat.obj$seurat_clusters)
-  counts = counts[, match(cluster.sels, colnames(counts))]
+  counts = counts[grep('MS|unassigned', rownames(counts)), ]
   
-  ## select only BWM ids
+  nb.cells.clusters = apply(counts[rownames(counts) != 'unassigned', ], 2, sum)
+  
   counts = counts[!is.na(match(rownames(counts), c(bwms, 'unassigned'))), ]
-  counts = counts[apply(counts, 1, sum)>0, ]
+  nb.cells.bwm.clusters = apply(counts[rownames(counts) != 'unassigned',], 2, sum)
   
+  counts = counts[!is.na(match(rownames(counts), c(ids, 'unassigned'))), ]
+  nb.cells.ids.clusters = apply(counts[rownames(counts) != 'unassigned',], 2, sum)
   
-  counts.norm = counts
-  for(n in 1:nrow(counts)) counts.norm[n,] = counts.norm[n, ] /sum(counts.norm[n, ])
-  cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
-  
-  
-  par(mfrow = c(1, 2))
-  barplot(t(counts), main="cluster compositions for predicted labels ",
-          xlab=NULL, col=c(1:nrow(counts)), las = 2,
-          legend = colnames(counts))
-  barplot(t(counts.norm), main="cluster compositions for predicted labels ",
-          xlab=NULL, col=c(1:nrow(counts)), las = 2,
-          legend = NULL)
-  
-  
-  pheatmap(counts.norm, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, 1, by = 0.1),
+  cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(max(counts)))
+  pheatmap(counts, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, max(counts), by = 1),
            cluster_cols=FALSE, main = paste0("cluster -- predicted labels mapping"), na_col = "white",
            color = cols, 
+           #display_numbers = TRUE,
+           #number_format = "%.0f",
            #annotation_col = my_sample_col,
            #gaps_row = c(1:nrow(map)-1),
            fontsize_col = 10,
@@ -478,24 +492,113 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
            width = 30
   )
   
-  dev.off()
+  ## filter clusters that are not likely for the considered ids due to noise
+  kk = which(nb.cells.ids.clusters >0 ) # > 0 cell in the cluster
+  cat(length(kk), 'clusters for considered ids \n')
+  print(colnames(counts)[kk])
   
-  cluster.sels = c(40, 32, 35, 29, 42)
+  rr.bwm = (nb.cells.bwm.clusters/nb.cells.clusters)[kk]
+  barplot(rr.bwm, main = '% of predited cells found in BWM');abline(h=0.5, col ='red')
+  rr.ids = (nb.cells.ids.clusters/nb.cells.clusters)[kk]
+  
+  #kk = 
+  kk = which(nb.cells.ids.clusters > 0 
+             & nb.cells.ids.clusters/nb.cells.bwm.clusters > 0.5 # >50% of bwm cells have the ids considered 
+             & nb.cells.bwm.clusters/nb.cells.clusters > 0.5 # > 50% of cell predicted to be in bwm
+             ) 
+  
+  counts = counts[, kk]
+  
+  par(mfrow = c(1, 2))
+  barplot(t(counts), main="cluster compositions for predicted labels ",
+          xlab=NULL, col=c(1:nrow(counts)), las = 2,
+          legend = colnames(counts)
+          )
+  
+  barplot((counts), main="cluster compositions for predicted labels ",
+          xlab=NULL, col=c(1:nrow(counts)), las = 2,
+          legend = rownames(counts))
+  
+  
+  #counts.norm1 = counts
+  #for(n in 1:nrow(counts)) counts.norm[n,] = counts.norm[n, ] /sum(counts.norm[n, ])
+  
+  #dev.off()
+  
+  cluster.sels = colnames(counts)
+  cluster.sels = c('29', '32', '35', '40', '42')
+  
   sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
+  sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
   
   sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 1000)
   sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
   sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
   ElbowPlot(sub.obj, ndims = 50)
   
-  nb.pcs = 20; n.neighbors = 20; min.dist = 0.1;
+  nb.pcs = 20; n.neighbors = 10; min.dist = 0.1;
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, 
                 min.dist = min.dist)
   DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5)
   #sub.obj = RunTSNE(sub.obj, seed.use = 1, dims = 1:20)
   #DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'tsne', label = TRUE, label.size = 5)
   
+  library(RaceID) # refer to the vignett https://cran.r-project.org/web/packages/RaceID/vignettes/RaceID.html
+  library(Matrix)
+  sc = SCseq(sub.obj@assays$RNA@counts)
+  sc <- filterdata(sc, mintotal=2000, minexpr = 10, minnumber = 2)
+  #sc <- compdist(sc,metric="pearson", FSelect = FALSE)
+  cat('use pca to calculate Pearson correlation and then distance and then k-mean\n')
+  sub.obj.pca = sub.obj@reductions$pca@cell.embeddings[, c(1:20)]
+  mat.dist = 1- cor(t(sub.obj.pca))
+  sc@distances = mat.dist
+  sc <- clustexp(sc, FUNcluster = 'kmedoids', verbose = FALSE)
   
+  par(mfrow = c(1, 1))
+  plotsaturation(sc,disp=FALSE)
+  plotsaturation(sc,disp=TRUE)
+  #plotjaccard(sc)
+  
+  nb.subcluster = sc@cluster$clb$nc
+  cat('optimal subclusters found :', nb.subcluster, '\n')
+  
+  sc <- clustexp(sc,cln=nb.subcluster, sat=FALSE, verbose = FALSE)
+  
+  sub.obj$seurat_clusters_split = sc@cluster$kpart
+  
+ 
+  p1  = DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5, 
+          pt.size = 3)
+  
+  p2 = DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 3, 
+          label.size = 6,
+               na.value = "gray", combine = TRUE) 
+  
+  p1 + p2
+  
+  p3 = DimPlot(sub.obj, group.by = "timingEst", reduction = 'umap', label = FALSE, repel = FALSE, pt.size = 3, 
+          label.size = 6,
+          na.value = "gray") 
+  
+  FeaturePlot(sub.obj, features = c('hnd-1', 'pha-4', 'sdz-1', 'sdz-31'), reduction = 'umap')
+  
+  
+  par(mfrow=c(1, 1))
+  counts <- table(sub.obj$predicted.ids.fitered, sub.obj$seurat_clusters_split)
+  counts = counts[!is.na(match(rownames(counts), c(ids, 'unassigned'))), ]
+  
+  barplot(counts, main="composition of subclusters ",
+          xlab="subcluster index", col=c(1:nrow(counts)),
+          legend = rownames(counts))
+  
+  # marker genes
+  Idents(sub.obj) = sub.obj$seurat_clusters_split 
+  markers <- FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
+  
+  top.markers <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+  
+  #Idents(seurat.cistopic) = $lineage
+  DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend() 
   
   
   ##########################################
