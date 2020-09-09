@@ -395,6 +395,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   library("pheatmap")
   library("RColorBrewer")
   library(grid)
+  library(RaceID) # refer to the vignett https://cran.r-project.org/web/packages/RaceID/vignettes/RaceID.html
+  library(Matrix)
+  library(lsa)
   
   ee = process.import.Murray.scRNA()
   murray.ids = unique(ee$lineage)
@@ -407,9 +410,14 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   markers = markers[!is.na(match(markers$Lineage, bwms)), ]
   #write.csv(markers, file = paste0(tabDir, 'JM_marker_genes_BWM.csv'))
   
+  dataDir.Hashimsholy = '../data/Hashimsholy_et_al'
+  load(file =paste0(dataDir.Hashimsholy, "/timer_genes_with_ac_pval.Rdata"))
+  timerGenes.pval=0.00001; timerGenes.ac=0.7
+  sels.timerGenes = which(timers$ac.max > timerGenes.ac & timers$pval.box < timerGenes.pval)
+  timers = rownames(timers[sels.timerGenes, -c(1:4)])
+  
   seurat.obj = readRDS(file = paste0(RdataDir, 
                                      'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds'))
-  
   
   
   pdfname = paste0(resDir, "/Overview_predictedLabels_seuratClusters_mapping_seurat.pdf")
@@ -462,6 +470,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     NoLegend()
   
   p0 + p00
+  
   ##########################################
   # found involved clusters to consider in the following 
   ##########################################
@@ -525,36 +534,58 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   #dev.off()
   
-  cluster.sels = colnames(counts)
+  #cluster.sels = colnames(counts)
   cluster.sels = c('29', '32', '35', '40', '42')
+  #cluster.sels = c('29', '32', '35')
   
   sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
   sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
+  sub.obj$timingEst = as.numeric(as.character(sub.obj$timingEst))
   
   sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 1000)
+  
+  #length(intersect(VariableFeatures(sub.obj), timers))
+  #VariableFeatures(sub.obj) = setdiff(VariableFeatures(sub.obj), timers)
+  cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(sub.obj)), '\n')
+  
   sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
   sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
   ElbowPlot(sub.obj, ndims = 50)
   
-  nb.pcs = 20; n.neighbors = 10; min.dist = 0.1;
+  
+  nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
+  n.neighbors = 10; min.dist = 0.2;
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, 
                 min.dist = min.dist)
   DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5)
   #sub.obj = RunTSNE(sub.obj, seed.use = 1, dims = 1:20)
   #DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'tsne', label = TRUE, label.size = 5)
   
-  library(RaceID) # refer to the vignett https://cran.r-project.org/web/packages/RaceID/vignettes/RaceID.html
-  library(Matrix)
+  ##########################################
+  # redo the clustering using k-mean from RaceID
+  ##########################################
+  # library("reticulate")
+  # py_install("python-igraph")
+  # py_install("leidenalg")
+  
+  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:10)
+  sub.obj <- FindClusters(sub.obj, resolution = 0.4, algorithm = 3)
+  
+  DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5)
+  
+  
   sc = SCseq(sub.obj@assays$RNA@counts)
   sc <- filterdata(sc, mintotal=2000, minexpr = 10, minnumber = 2)
   #sc <- compdist(sc,metric="pearson", FSelect = FALSE)
   cat('use pca to calculate Pearson correlation and then distance and then k-mean\n')
-  sub.obj.pca = sub.obj@reductions$pca@cell.embeddings[, c(1:20)]
-  mat.dist = 1- cor(t(sub.obj.pca))
+  sub.obj.pca = sub.obj@reductions$pca@cell.embeddings[, c(1:nb.pcs)]
+  
+  #mat.dist = 1- cor(t(sub.obj.pca))
+  mat.dist = 1 - lsa::cosine(t(sub.obj.pca))
   sc@distances = mat.dist
   sc <- clustexp(sc, FUNcluster = 'kmedoids', verbose = FALSE)
   
-  par(mfrow = c(1, 1))
+  par(mfrow = c(1, 2))
   plotsaturation(sc,disp=FALSE)
   plotsaturation(sc,disp=TRUE)
   #plotjaccard(sc)
@@ -566,31 +597,35 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   sub.obj$seurat_clusters_split = sc@cluster$kpart
   
- 
-  p1  = DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5, 
+  
+  p1  = DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,
           pt.size = 3)
   
   p2 = DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 3, 
           label.size = 6,
-               na.value = "gray", combine = TRUE) 
+               na.value = "gray", combine = TRUE)
   
   p1 + p2
   
-  p3 = DimPlot(sub.obj, group.by = "timingEst", reduction = 'umap', label = FALSE, repel = FALSE, pt.size = 3, 
-          label.size = 6,
-          na.value = "gray") 
+  VlnPlot(sub.obj, features = c('hnd-1', 'pha-4', 'sdz-1', 'sdz-31', 'ceh-51', 'ceh-36', 'unc-39', 'unc-120'),
+          group.by = 'seurat_clusters_split')
   
-  FeaturePlot(sub.obj, features = c('hnd-1', 'pha-4', 'sdz-1', 'sdz-31'), reduction = 'umap')
+  #sub.obj$timingEst = as.numeric(sub.obj$timingEst)
+  VlnPlot(sub.obj, features = c('timingEst', "FSC_log2", "BSC_log2"), ncol = 3, 
+          group.by = 'seurat_clusters_split')
   
-  
-  par(mfrow=c(1, 1))
-  counts <- table(sub.obj$predicted.ids.fitered, sub.obj$seurat_clusters_split)
-  counts = counts[!is.na(match(rownames(counts), c(ids, 'unassigned'))), ]
-  
-  barplot(counts, main="composition of subclusters ",
-          xlab="subcluster index", col=c(1:nrow(counts)),
-          legend = rownames(counts))
-  
+  # p3 = DimPlot(sub.obj, group.by = "timingEst", reduction = 'umap', label = FALSE, repel = FALSE, pt.size = 3, 
+  #         label.size = 6,
+  #         na.value = "gray") 
+  # 
+  # par(mfrow=c(1, 1))
+  # counts <- table(sub.obj$predicted.ids.fitered, sub.obj$seurat_clusters_split)
+  # counts = counts[!is.na(match(rownames(counts), c(ids, 'unassigned'))), ]
+  # 
+  # barplot(counts, main="composition of subclusters ",
+  #         xlab="subcluster index", col=c(1:nrow(counts)),
+  #         legend = rownames(counts))
+  # 
   # marker genes
   Idents(sub.obj) = sub.obj$seurat_clusters_split 
   markers <- FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
