@@ -557,47 +557,58 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   n.neighbors = 10; min.dist = 0.2;
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, 
                 min.dist = min.dist)
-  DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5)
-  #sub.obj = RunTSNE(sub.obj, seed.use = 1, dims = 1:20)
-  #DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'tsne', label = TRUE, label.size = 5)
+  p0 = DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5)
+  p1 = DimPlot(sub.obj, group.by = 'request', reduction = 'umap', label = FALSE, label.size = 5)
+  p0 + p1
   
   ##########################################
-  # redo the clustering using k-mean from RaceID
+  # redo the clustering using seurat FindCluster (SLM alogrithm) after testing k-mean from RaceID
   ##########################################
-  # library("reticulate")
-  # py_install("python-igraph")
-  # py_install("leidenalg")
+  FindClusters_subclusters = function(sub.obj, resolution = 0.4)
+  {
+    sub.obj <- FindClusters(sub.obj, resolution = resolution, algorithm = 3)
+    return(sub.obj$seurat_clusters)
+  }
   
   sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:10)
-  sub.obj <- FindClusters(sub.obj, resolution = 0.4, algorithm = 3)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.4)
   
-  DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5)
+  #DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5)
   
+  p1  = DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,
+                pt.size = 2)
+  p2 = DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, 
+               label.size = 5,
+               na.value = "gray", combine = TRUE)
+  p1 + p2
   
-  sc = SCseq(sub.obj@assays$RNA@counts)
-  sc <- filterdata(sc, mintotal=2000, minexpr = 10, minnumber = 2)
-  #sc <- compdist(sc,metric="pearson", FSelect = FALSE)
-  cat('use pca to calculate Pearson correlation and then distance and then k-mean\n')
-  sub.obj.pca = sub.obj@reductions$pca@cell.embeddings[, c(1:nb.pcs)]
+  VlnPlot(sub.obj, features = c('hnd-1', 'pha-4', 'sdz-1', 'sdz-31', 'ceh-51', 'ceh-36', 'unc-39', 'unc-120'),
+          group.by = 'seurat_clusters_split')
   
-  #mat.dist = 1- cor(t(sub.obj.pca))
-  mat.dist = 1 - lsa::cosine(t(sub.obj.pca))
-  sc@distances = mat.dist
-  sc <- clustexp(sc, FUNcluster = 'kmedoids', verbose = FALSE)
+  VlnPlot(sub.obj, features = c('timingEst', "FSC_log2", "BSC_log2"), ncol = 3, 
+          group.by = 'seurat_clusters_split')
   
-  par(mfrow = c(1, 2))
-  plotsaturation(sc,disp=FALSE)
-  plotsaturation(sc,disp=TRUE)
-  #plotjaccard(sc)
-  
-  nb.subcluster = sc@cluster$clb$nc
-  cat('optimal subclusters found :', nb.subcluster, '\n')
-  
-  sc <- clustexp(sc,cln=nb.subcluster, sat=FALSE, verbose = FALSE)
-  
-  sub.obj$seurat_clusters_split = sc@cluster$kpart
-  
-  
+  # sc = SCseq(sub.obj@assays$RNA@counts)
+  # sc <- filterdata(sc, mintotal=2000, minexpr = 10, minnumber = 2)
+  # #sc <- compdist(sc,metric="pearson", FSelect = FALSE)
+  # cat('use pca to calculate Pearson correlation and then distance and then k-mean\n')
+  # sub.obj.pca = sub.obj@reductions$pca@cell.embeddings[, c(1:nb.pcs)]
+  # #mat.dist = 1- cor(t(sub.obj.pca))
+  # mat.dist = 1 - lsa::cosine(t(sub.obj.pca))
+  # sc@distances = mat.dist
+  # sc <- clustexp(sc, FUNcluster = 'kmedoids', verbose = FALSE)
+  # 
+  # par(mfrow = c(1, 2))
+  # plotsaturation(sc,disp=FALSE)
+  # plotsaturation(sc,disp=TRUE)
+  # #plotjaccard(sc)
+  # 
+  # nb.subcluster = sc@cluster$clb$nc
+  # cat('optimal subclusters found :', nb.subcluster, '\n')
+  # 
+  # sc <- clustexp(sc,cln=nb.subcluster, sat=FALSE, verbose = FALSE)
+  # sub.obj$seurat_clusters_split = sc@cluster$kpart
+  # 
   p1  = DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,
           pt.size = 3)
   

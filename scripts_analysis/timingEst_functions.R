@@ -230,7 +230,6 @@ find.timer.genes = function(plot.test = FALSE)
   return(timers)
 }
 
-
 estimate.timing.with.timer.genes = function(vec, timerGenes.pval=0.001, timerGenes.ac=0.5, timerGenes.sd = 0, loess.span = 0.15,
                                             use = 'lowFilter.timers', lowFilter.threshold.timer = -6, lowFilter.threshold.target = -6, 
                                             reprocess.timer.genes = FALSE, PLOT.test = FALSE)
