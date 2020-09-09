@@ -419,10 +419,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   seurat.obj = readRDS(file = paste0(RdataDir, 
                                      'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds'))
   
-  
-  pdfname = paste0(resDir, "/Overview_predictedLabels_seuratClusters_mapping_seurat.pdf")
-  pdf(pdfname, width=16, height = 12)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  seurat.obj$manual.annot.ids = NA
   
   #ids = c('MSx')
   ids = c('MSx', 'MSxa', 'MSxap', 'MSxapp','MSxappa', 'MSxappp', 'MSxp', 'MSxpa', 'MSxpp')
@@ -536,7 +533,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   #cluster.sels = colnames(counts)
   cluster.sels = c('29', '32', '35', '40', '42')
-  #cluster.sels = c('29', '32', '35')
+  #cluster.sels = c('29')
   
   sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
   sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
@@ -552,6 +549,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
   ElbowPlot(sub.obj, ndims = 50)
   
+  pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_1.pdf")
+  pdf(pdfname, width=18, height = 10)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
   n.neighbors = 10; min.dist = 0.2;
@@ -582,81 +582,34 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
                na.value = "gray", combine = TRUE)
   p1 + p2
   
-  VlnPlot(sub.obj, features = c('hnd-1', 'pha-4', 'sdz-1', 'sdz-31', 'ceh-51', 'ceh-36', 'unc-39', 'unc-120'),
-          group.by = 'seurat_clusters_split')
-  
   VlnPlot(sub.obj, features = c('timingEst', "FSC_log2", "BSC_log2"), ncol = 3, 
           group.by = 'seurat_clusters_split')
   
-  # sc = SCseq(sub.obj@assays$RNA@counts)
-  # sc <- filterdata(sc, mintotal=2000, minexpr = 10, minnumber = 2)
-  # #sc <- compdist(sc,metric="pearson", FSelect = FALSE)
-  # cat('use pca to calculate Pearson correlation and then distance and then k-mean\n')
-  # sub.obj.pca = sub.obj@reductions$pca@cell.embeddings[, c(1:nb.pcs)]
-  # #mat.dist = 1- cor(t(sub.obj.pca))
-  # mat.dist = 1 - lsa::cosine(t(sub.obj.pca))
-  # sc@distances = mat.dist
-  # sc <- clustexp(sc, FUNcluster = 'kmedoids', verbose = FALSE)
-  # 
-  # par(mfrow = c(1, 2))
-  # plotsaturation(sc,disp=FALSE)
-  # plotsaturation(sc,disp=TRUE)
-  # #plotjaccard(sc)
-  # 
-  # nb.subcluster = sc@cluster$clb$nc
-  # cat('optimal subclusters found :', nb.subcluster, '\n')
-  # 
-  # sc <- clustexp(sc,cln=nb.subcluster, sat=FALSE, verbose = FALSE)
-  # sub.obj$seurat_clusters_split = sc@cluster$kpart
-  # 
-  p1  = DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,
-          pt.size = 3)
-  
-  p2 = DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 3, 
-          label.size = 6,
-               na.value = "gray", combine = TRUE)
-  
-  p1 + p2
-  
-  VlnPlot(sub.obj, features = c('hnd-1', 'pha-4', 'sdz-1', 'sdz-31', 'ceh-51', 'ceh-36', 'unc-39', 'unc-120'),
+  VlnPlot(sub.obj, features = c('hnd-1', 'pha-4', 'sdz-1', 'sdz-31'),
           group.by = 'seurat_clusters_split')
   
-  #sub.obj$timingEst = as.numeric(sub.obj$timingEst)
-  VlnPlot(sub.obj, features = c('timingEst', "FSC_log2", "BSC_log2"), ncol = 3, 
-          group.by = 'seurat_clusters_split')
-  
-  # p3 = DimPlot(sub.obj, group.by = "timingEst", reduction = 'umap', label = FALSE, repel = FALSE, pt.size = 3, 
-  #         label.size = 6,
-  #         na.value = "gray") 
-  # 
-  # par(mfrow=c(1, 1))
-  # counts <- table(sub.obj$predicted.ids.fitered, sub.obj$seurat_clusters_split)
-  # counts = counts[!is.na(match(rownames(counts), c(ids, 'unassigned'))), ]
-  # 
-  # barplot(counts, main="composition of subclusters ",
-  #         xlab="subcluster index", col=c(1:nrow(counts)),
-  #         legend = rownames(counts))
-  # 
-  # marker genes
-  Idents(sub.obj) = sub.obj$seurat_clusters_split 
-  markers <- FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
-  
-  top.markers <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
-  
-  #Idents(seurat.cistopic) = $lineage
-  DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend() 
+  dev.off()
   
   
   ##########################################
-  # check the update of manually annotated ids
+  # update of manually annotated ids
   ##########################################
-  seurat.obj$manual.annot.ids[1] = 'unknown'
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '6')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSx'
   
   DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
           na.value = "gray") + 
     ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
     scale_colour_hue(drop = FALSE) + 
     NoLegend()
+  
+  #Idents(sub.obj) = sub.obj$seurat_clusters_split 
+  #markers <- FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
+  #top.markers <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+  #Idents(seurat.cistopic) = $lineage
+  #DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend() 
+  
+  
   
   
   
