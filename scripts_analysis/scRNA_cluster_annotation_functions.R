@@ -423,7 +423,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   #ids = c('MSx')
   ids = c('MSx', 'MSxa', 'MSxap', 'MSxapp','MSxappa', 'MSxappp', 'MSxp', 'MSxpa', 'MSxpp')
-  ids = c('MSxa', 'MSxap', 'MSxp', 'MSxpa', 'MSxpp')
+  ids = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSpappa', 'MSxp', 'MSxpa', 'MSxpp')
   
   # given the fact that scmap seems to be working better than seurat 
   # for the manual annotation, the scmap predicted labels will be mainly considered, 
@@ -485,6 +485,10 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   counts = counts[!is.na(match(rownames(counts), c(ids, 'unassigned'))), ]
   nb.cells.ids.clusters = apply(counts[rownames(counts) != 'unassigned',], 2, sum)
   
+  kk = which(nb.cells.ids.clusters >0 ) # > 0 cell in the cluster
+  cat(length(kk), 'clusters for considered ids \n')
+  print(colnames(counts)[kk])
+  
   cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(max(counts)))
   pheatmap(counts, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, max(counts), by = 1),
            cluster_cols=FALSE, main = paste0("cluster -- predicted labels mapping"), na_col = "white",
@@ -499,15 +503,10 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   )
   
   ## filter clusters that are not likely for the considered ids due to noise
-  kk = which(nb.cells.ids.clusters >0 ) # > 0 cell in the cluster
-  cat(length(kk), 'clusters for considered ids \n')
-  print(colnames(counts)[kk])
-  
   rr.bwm = (nb.cells.bwm.clusters/nb.cells.clusters)[kk]
   barplot(rr.bwm, main = '% of predited cells found in BWM');abline(h=0.5, col ='red')
   rr.ids = (nb.cells.ids.clusters/nb.cells.clusters)[kk]
   
-  #kk = 
   kk = which(nb.cells.ids.clusters > 0 
              & nb.cells.ids.clusters/nb.cells.bwm.clusters > 0.5 # >50% of bwm cells have the ids considered 
              & nb.cells.bwm.clusters/nb.cells.clusters > 0.5 # > 50% of cell predicted to be in bwm
@@ -525,21 +524,30 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
           xlab=NULL, col=c(1:nrow(counts)), las = 2,
           legend = rownames(counts))
   
-  
-  #counts.norm1 = counts
-  #for(n in 1:nrow(counts)) counts.norm[n,] = counts.norm[n, ] /sum(counts.norm[n, ])
-  
-  #dev.off()
+  ##########################################
+  # split the chosen clusters and manual annotate them
+  ##########################################
+  pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_3.pdf")
+  pdf(pdfname, width=18, height = 10)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   #cluster.sels = colnames(counts)
-  cluster.sels = c('29', '32', '35', '40', '42')
-  #cluster.sels = c('29')
+  #cluster.sels = c('29', '32',  '40', '42', '6', '14', '44', '4')
+  #cluster.sels = c('29', '32', '35', '40', '42')
+  cluster.sels = c('4',  '22', '24', '3', '5', '16', '30') # cluster 4 and 22 have some cells in Msxp lineage
+  
+  features.sels = c( 'nhr-67', 'tbx-8', 'cwn-2', 'unc-120', 'hnd-1')
   
   sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
   sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
   sub.obj$timingEst = as.numeric(as.character(sub.obj$timingEst))
   
-  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 1000)
+  DimPlot(sub.obj, reduction = 'umap', label = TRUE)
+  
+  FeaturePlot(sub.obj, reduction = 'umap', features = c('pha-4', 'hnd-1', 'nhr-67', 'pat-4'))
+  
+    
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 2000)
   
   #length(intersect(VariableFeatures(sub.obj), timers))
   #VariableFeatures(sub.obj) = setdiff(VariableFeatures(sub.obj), timers)
@@ -549,10 +557,6 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
   ElbowPlot(sub.obj, ndims = 50)
   
-  pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_2.pdf")
-  pdf(pdfname, width=18, height = 10)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  
   nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
   n.neighbors = 10; min.dist = 0.2;
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, 
@@ -560,6 +564,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   p0 = DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5)
   p1 = DimPlot(sub.obj, group.by = 'request', reduction = 'umap', label = FALSE, label.size = 5)
   p0 + p1
+  
+  FeaturePlot(sub.obj, reduction = 'umap', features = c( 'nhr-67', 'tbx-8', 'cwn-2', 'unc-120', 'hnd-1'))
   
   ##########################################
   # redo the clustering using seurat FindCluster (SLM alogrithm) after testing k-mean from RaceID
@@ -571,9 +577,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   }
   
   sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:10)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.4)
-  
-  #DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.0)
   
   p1  = DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,
                 pt.size = 2)
@@ -582,26 +586,36 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
                na.value = "gray", combine = TRUE)
   p1 + p2
   
-  VlnPlot(sub.obj, features = c('timingEst', "FSC_log2", "BSC_log2"), ncol = 3, 
+  VlnPlot(sub.obj, features = c("FSC_log2", "BSC_log2", 'timingEst'), ncol = 3, 
           group.by = 'seurat_clusters_split')
   
-  VlnPlot(sub.obj, features = c('hnd-1', 'pha-4', 'sdz-1', 'sdz-31'),
+  VlnPlot(sub.obj, features = features.sels,
           group.by = 'seurat_clusters_split')
   
-  FeaturePlot(sub.obj, features = c('hnd-1', 'pha-4'), reduction = 'umap')
-  
+  FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
   dev.off()
-  
   
   ##########################################
   # update of manually annotated ids
   ##########################################
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '6')]
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '7')]
   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSx'
   
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '1')]
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '0')]
   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxa/p'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '4')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxap'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '5')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxap'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '6')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpp'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '2')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpa'
   
   source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
   seurat.obj = split.cluster.with.specific.gene.exrepssion(seurat.obj)
@@ -612,7 +626,14 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     scale_colour_hue(drop = FALSE) + 
     NoLegend()
   
-  VlnPlot(seurat.obj, features = c('hnd-1', 'pha-4'), group.by = 'manual.annot.ids')
+  #DimPlot(sub.obj, reduction = 'umap', group.by = 'manual.annot.ids')
+  
+  #VlnPlot(seurat.obj, features = c('hnd-1', 'pha-4', 'ceh-76', 'fbxb-70'), group.by = 'manual.annot.ids')
+  
+  
+  saveRDS(seurat.obj, 
+          file = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_1.rds'))
+  
   #Idents(sub.obj) = sub.obj$seurat_clusters_split 
   #markers <- FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
   #top.markers <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
@@ -620,248 +641,4 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   #DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend() 
   
 }
-########################################################
-# Section : Clustering section by integrating various informations: 
-# gene expression, fac info, estimated timing and velocity 
-########################################################
-########################################################
-cluster.by.integration.gene.expression.fac.timingEst.velocity = function()
-{
-  library(scater)
-  library(scran)
-  library(scRNA.seq.funcs)
-  library(matrixStats)
-  #library(M3Drop)
-  library(RColorBrewer)
-  library(SingleCellExperiment)
-  
-  load(file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_normalized_SCE_seuratCellCycleCorrected_v2_bcMNN.Rdata')) 
-  
-  Seurat.clustering = TRUE
-  Test.scran.clustering = FALSE
-  fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=12))
-  
-  ## double check the umap and tsnet visulization and 
-  set.seed(100)
-  sce <- runUMAP(sce, use_dimred="MNN", n_dimred = 15)
-  p1 = plotUMAP(sce, ncomponents = 2, colour_by="batches", size_by = "FSC_log2", point_size= 0.01) + ggtitle("Corrected-umap") 
-  plot(p1)
-  
-  sce = runTSNE(sce, use_dimred="MNN", perplexity = 20, n_dimred = 15)
-  p2 = plotTSNE(sce, ncomponents = 2, colour_by="batches", size_by = "FSC_log2", point_size= 0.01) + ggtitle("Corrected-tSNE") 
-  plot(p2)
-  
-  p1 = plotUMAP(sce, colour_by="pha-4", size_by = "FSC_log2") + 
-    fontsize + ggtitle("MNN corrected")
-  p2 = plotUMAP(sce, colour_by="hnd-1", size_by = "FSC_log2") + 
-    fontsize + ggtitle("MNN corrected")
-  multiplot(p1, p2, cols = 2)
-  
-  
-  p1 = plotTSNE(sce, colour_by="pha-4", size_by = "FSC_log2") + 
-    fontsize + ggtitle("MNN corrected")
-  p2 = plotTSNE(sce, colour_by="hnd-1", size_by = "FSC_log2") + 
-    fontsize + ggtitle("MNN corrected")
-  multiplot(p1, p2, cols = 2)
-  
-  ##########################################
-  # (test clustering method) but Seurat method is used at the end 
-  # https://master.bioconductor.org/packages/release/workflows/vignettes/simpleSingleCell/inst/doc/work-1-reads.html/
-  # DE analysis is tested with scran but will be considered to be replaced by MAST or Seurat
-  # DE analysis (or marker gene finding) following the cluster analysis
-  ##########################################
-  if(Seurat.clustering)
-  { 
-    require(Seurat)
-    library(cowplot)
-    
-    check.individualExample.geneMarker = FALSE
-    ntops = 3 # nb of top gene markers
-    resolutions = c(0.4, 0.6, 0.8, seq(1.0, 4.0, by = 0.5))
-    
-    for(rr in resolutions){
-      
-      rr = 1.2
-      cat("--- resolution is :", rr, "---\n")
-      
-      pdfname = paste0(resDir, "/scRNAseq_QCed_filtered_normalized_batchCorrected_clustering.Seurat_geneMarkers.scran_resolution_", 
-                       rr, ".pdf")
-      pdf(pdfname, width=22, height = 18)
-      par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-      
-      ##########################################
-      # test graph-based Louvain algorithm 
-      ##########################################
-      pbmc = as.Seurat(sce)
-      #pbmc <- FindVariableFeatures(pbmc, selection.method = "vst", nfeatures = 2000)
-      #pbmc <- ScaleData(pbmc, features = rownames(pbmc))
-      # pbmc <- RunPCA(pbmc, features = VariableFeatures(object = pbmc))
-      pbmc = FindNeighbors(object = pbmc, reduction = "MNN", k.param = 20, dims = 1:20)
-      pbmc = FindClusters(pbmc, resolution = rr, algorithm = 3)
-      
-      # note that you can set `label = TRUE` or use the LabelClusters function to help label
-      # individual clusters
-      #pbmc <- Seurat::RunUMAP(pbmc, dims = 1:10, reduction = "MNN", reduction.key = "umap", n.neighbors = 15, repulsion.strength = 2)
-      #DimPlot(pbmc, reduction = "umap")
-      #FeaturePlot(pbmc, features = c("pha-4", "hnd-1"), reduction = "umap")
-      # FeaturePlot(pbmc, features = c("pha-4", "hnd-1"), reduction = "UMAP")
-      sce$cluster_seurat <- factor(pbmc@active.ident)
-      sce$cluster <- factor(pbmc@active.ident)
-      
-      plotUMAP(sce, colour_by="cluster", size_by = "FSC_log2") + 
-        fontsize + ggtitle("Seurat clustering")
-      
-      plotTSNE(sce, colour_by="cluster", size_by = "FSC_log2") + 
-        fontsize + ggtitle("Seurat clustering")
-      
-      p1 = plotUMAP(sce, colour_by="pha-4", size_by = "FSC_log2") + 
-        fontsize + ggtitle("Seurat clustering")
-      p2 = plotUMAP(sce, colour_by="hnd-1", size_by = "FSC_log2") + 
-        fontsize + ggtitle("Seurat clustering")
-      multiplot(p1, p2, cols = 2)
-      
-      p1 = plotTSNE(sce, colour_by="pha-4", size_by = "FSC_log2") + 
-        fontsize + ggtitle("Seurat clustering")
-      p2 = plotTSNE(sce, colour_by="hnd-1", size_by = "FSC_log2") + 
-        fontsize + ggtitle("Seurat clustering")
-      multiplot(p1, p2, cols = 2)
-      
-      my.clusters = as.numeric(as.character(sce$cluster_seurat))
-      cat(table(my.clusters), "\n")
-      
-      ## run the find markers and then collect markers for each clusters (scran) 
-      # https://bioconductor.org/packages/3.10/workflows/vignettes/simpleSingleCell/inst/doc/de.html#blocking-on-uninteresting-factors-of-variation
-      #design <- model.matrix( ~ sce$batches)
-      #design <- design[,-1,drop=FALSE]
-      markers <- findMarkers(sce, my.clusters, block=sce$batches, direction="up")
-      top.markers = c()
-      
-      for(n in unique(my.clusters)){
-        #n = 0
-        marker.set <- markers[[as.character(n)]]
-        #marker.set <- markers[["1"]]
-        #head(marker.set, 5)
-        top.markers <- c(top.markers, rownames(marker.set)[marker.set$Top <= ntops])  
-      }
-      
-      top.markers = unique(top.markers)
-      cat(length(top.markers), " gene markers found by scran \n")
-      
-      plotHeatmap(sce, features=top.markers,
-                  columns=order(sce$cluster_seurat), 
-                  colour_columns_by=c("cluster",  "FSC_log2", "batches"),
-                  cluster_cols=FALSE, show_colnames = FALSE,
-                  center=TRUE, symmetric=TRUE, zlim=c(-5, 5))
-      
-      if(check.individualExample.geneMarker){
-        for(n in 1:length(top.markers)) {
-          xx = plotTSNE(sce, colour_by = top.markers[n]) 
-          plot(xx)
-        }
-      }
-      
-      dev.off()
-      
-    }
-    
-  }
-  
-  ##########################################
-  # here select subset of whole dataset to redo clustering
-  # and marker gene finding
-  # this is the beginning of iterative clustering, 
-  # the gene marker finding will be a criterion to stop iteration
-  ##########################################
-  Select.Early.timePoints = FALSE
-  if(Select.Early.timePoints){
-    
-    pbmc = as.Seurat(sce)
-    #Seurat::DimPlot(pbmc, dims = c(1, 2), reduction = "MNN")
-    pbmc = FindNeighbors(object = pbmc, reduction = "MNN", k.param = 10, dims = 1:10)
-    pbmc = FindClusters(pbmc, resolution = 2, algorithm = 3)
-    sce$cluster_seurat <- factor(pbmc@active.ident)
-    sce$cluster <- factor(pbmc@active.ident)
-    
-    xx = table(sce$cluster,sce$Batch)
-    #colnames(xx) = sce$Batch
-    cluster4early = rownames(xx)[which(xx[, 1]>=5|xx[,2]>=5)]
-    
-    mm = match(sce$cluster, factor(cluster4early))
-    
-    sels = which(!is.na(mm))
-    
-    cat("estimated cell in early stage -- ", length(cluster4early), 
-        "clusters with", length(sels),  "cells\n")
-    
-    sce.sel = sce[, sels ]
-    # here rerun the clustering for clusters or stages
-    pcs <- reducedDim(sce.sel, "MNN")
-    my.dist <- dist(pcs[, c(1:20)])
-    my.tree <- hclust(my.dist, method="ward.D2")
-    
-    #hist(my.tree)
-    library(dynamicTreeCut)
-    my.clusters <- unname(cutreeDynamic(my.tree,
-                                        distM=as.matrix(my.dist), 
-                                        minClusterSize=5, verbose=0))
-    
-    table(my.clusters, sce.sel$Batch)
-    
-    sce.sel$cluster <- factor(my.clusters)
-    
-    set.seed(100)
-    sce.sel <- runTSNE(sce.sel,  use_dimred = "MNN", perplexity = 20, n_dimred = 20)
-    
-    set.seed(100)
-    sce.sel = runUMAP(sce.sel, use_dimred="MNN", perplexity = 20, n_dimred = 20)
-    
-    plotTSNE(sce.sel, colour_by="cluster", size_by = "total_features_by_counts") + 
-      fontsize + ggtitle("scran -- hcluster")
-    plotUMAP(sce.sel, colour_by="cluster", size_by = "total_features_by_counts", shape_by = "Batch") + 
-      fontsize + ggtitle("scran -- hcluster")
-    
-    design <- model.matrix( ~ sce.sel$Batch)
-    design <- design[,-1,drop=FALSE]
-    
-    markers <- findMarkers(sce.sel, sce.sel$cluster, design=design, direction = 'any')
-    
-    ntops = 5;
-    top.markers = c()
-    
-    for(n in unique(my.clusters)){
-      #n = 0
-      marker.set <- markers[[as.character(n)]]
-      #marker.set <- markers[["1"]]
-      #head(marker.set, 5)
-      top.markers <- c(top.markers, rownames(marker.set)[marker.set$Top <= ntops])  
-    }
-    top.markers = unique(top.markers)
-    
-    pdfname = paste0(resDir, "/scRNAseq_QCed_filtered_normalized_batchCorrected_clustering_markerGenes_earlyTimepoint_tSNEexample.pdf")
-    pdf(pdfname, width=12, height = 10)
-    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-    
-    plotTSNE(sce.sel, colour_by="cluster", size_by = "total_features_by_counts") + 
-      fontsize + ggtitle("scran -- hcluster (tSNE)")
-    plotUMAP(sce.sel, colour_by="cluster", size_by = "total_features_by_counts", shape_by = "Batch") + 
-      fontsize + ggtitle("scran -- hcluster (UMAP)")
-    
-    plotHeatmap(sce.sel, features=top.markers,
-                columns=order(sce.sel$cluster), 
-                colour_columns_by=c("cluster"),
-                cluster_cols=FALSE, show_colnames = FALSE,
-                center=TRUE, symmetric=TRUE, zlim = c(-5, 5))
-    
-    for(n in 1:length(top.markers)) {
-      xx = plotTSNE(sce.sel, colour_by = top.markers[n]) 
-      plot(xx)
-    }
-    
-    dev.off()
-    
-  }
-}
-
-
-
 
