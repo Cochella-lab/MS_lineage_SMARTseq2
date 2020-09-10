@@ -549,7 +549,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
   ElbowPlot(sub.obj, ndims = 50)
   
-  pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_1.pdf")
+  pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_2.pdf")
   pdf(pdfname, width=18, height = 10)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
@@ -588,6 +588,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   VlnPlot(sub.obj, features = c('hnd-1', 'pha-4', 'sdz-1', 'sdz-31'),
           group.by = 'seurat_clusters_split')
   
+  FeaturePlot(sub.obj, features = c('hnd-1', 'pha-4'), reduction = 'umap')
+  
+  
   dev.off()
   
   
@@ -597,22 +600,24 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '6')]
   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSx'
   
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '1')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxa/p'
+  
+  source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
+  seurat.obj = split.cluster.with.specific.gene.exrepssion(seurat.obj)
+  
   DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
           na.value = "gray") + 
     ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
     scale_colour_hue(drop = FALSE) + 
     NoLegend()
   
+  VlnPlot(seurat.obj, features = c('hnd-1', 'pha-4'), group.by = 'manual.annot.ids')
   #Idents(sub.obj) = sub.obj$seurat_clusters_split 
   #markers <- FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
   #top.markers <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
   #Idents(seurat.cistopic) = $lineage
   #DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend() 
-  
-  
-  
-  
-  
   
 }
 ########################################################
