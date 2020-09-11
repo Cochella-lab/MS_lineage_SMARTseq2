@@ -1028,6 +1028,119 @@ split.cluster.with.specific.gene.exrepssion = function(seurat.obj)
   return(seurat.obj)
   
 }
+
+##########################################
+# check potential ids for selected clusters 
+##########################################
+propose.potential.ids = function(seurat.obj)
+{
+  # #ids = c('MSx')
+  # ids = c('MSx', 'MSxa', 'MSxap', 'MSxapp','MSxappa', 'MSxappp', 'MSxp', 'MSxpa', 'MSxpp')
+  # ids = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSpappa', 'MSxp', 'MSxpa', 'MSxpp')
+  
+  # given the fact that scmap seems to be working better than seurat 
+  # for the manual annotation, the scmap predicted labels will be mainly considered, 
+  # sstart with scmap projection with nb.features = 500 and threshold = 0.7
+  # seurat.obj$predicted.ids = seurat.obj$scmap.tintori.id
+  # seurat.obj$predicted.scores = seurat.obj$scmap.tintori.cor
+  # threshold = 0.7
+  seurat.obj$predicted.ids = seurat.obj$scmap.pred.id.500
+  seurat.obj$predicted.scores = seurat.obj$scmap.corr.500
+  threshold = 0.7
+  
+  seurat.obj$predicted.ids[which(seurat.obj$predicted.ids == 'unassigned')] = NA
+  seurat.obj$predicted.ids.fitered = seurat.obj$predicted.ids
+  seurat.obj$predicted.ids.fitered[which(seurat.obj$predicted.scores < threshold)] = NA;
+  
+  ##########################################
+  # check the predicted labels and cluster-label mapping without filtering
+  ##########################################
+  cells.sels = which(!is.na(match(seurat.obj$predicted.ids, ids)))
+  cells.fitered = cells.sels[which(seurat.obj$predicted.scores[cells.sels] > threshold)]
+  #cat(length(cells.sels), ' cells with predicted labels \n')
+  cat(length(cells.fitered), ' cells after filtering with predicted labels \n')
+  #cat('clusters involved : '); print(as.character(unique(seurat.obj$seurat_clusters[cells.sels])));
+  cluster.sels =  unique(seurat.obj$seurat_clusters[cells.fitered])
+  cat('clusters involved after fitering : '); print(as.character(cluster.sels));
+  
+  p0 = DimPlot(seurat.obj,
+               cells.highlight = colnames(seurat.obj)[cells.fitered],
+               group.by = "predicted.ids.fitered", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 4,
+               sizes.highlight = 1,
+               na.value = "gray") + 
+    ggtitle(paste0("cells predicted by scmap with 500 features and threshold 0.7 ")) +
+    NoLegend()
+  
+  p00 = DimPlot(seurat.obj,
+                cells.highlight = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))],
+                group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 4,
+                sizes.highlight = 1,
+                na.value = "gray") +
+    #ggtitle(paste0("cells predicted by scmap with 500 features and threshold 0.7 ")) +
+    NoLegend()
+  
+  p0 + p00
+  
+  ##########################################
+  # found involved clusters to consider in the following 
+  ##########################################
+  # make the count table for ids considered and involved cluster index
+  predicted.ids = seurat.obj$predicted.ids.fitered
+  predicted.ids[is.na(predicted.ids)] = 'unassigned'
+  counts <- table(predicted.ids, seurat.obj$seurat_clusters)
+  counts = counts[grep('MS|unassigned', rownames(counts)), ]
+  
+  nb.cells.clusters = apply(counts[rownames(counts) != 'unassigned', ], 2, sum)
+  
+  counts = counts[!is.na(match(rownames(counts), c(bwms, 'unassigned'))), ]
+  nb.cells.bwm.clusters = apply(counts[rownames(counts) != 'unassigned',], 2, sum)
+  
+  counts = counts[!is.na(match(rownames(counts), c(ids, 'unassigned'))), ]
+  nb.cells.ids.clusters = apply(counts[rownames(counts) != 'unassigned',], 2, sum)
+  
+  kk = which(nb.cells.ids.clusters >0 ) # > 0 cell in the cluster
+  cat(length(kk), 'clusters for considered ids \n')
+  print(colnames(counts)[kk])
+  
+  cols = c(colorRampPalette((brewer.pal(n = 7, name="Reds")))(max(counts)))
+  pheatmap(counts, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, breaks = seq(0, max(counts), by = 1),
+           cluster_cols=FALSE, main = paste0("cluster -- predicted labels mapping"), na_col = "white",
+           color = cols, 
+           #display_numbers = TRUE,
+           #number_format = "%.0f",
+           #annotation_col = my_sample_col,
+           #gaps_row = c(1:nrow(map)-1),
+           fontsize_col = 10,
+           height = 8,
+           width = 30
+  )
+  
+  ## filter clusters that are not likely for the considered ids due to noise
+  rr.bwm = (nb.cells.bwm.clusters/nb.cells.clusters)[kk]
+  barplot(rr.bwm, main = '% of predited cells found in BWM');abline(h=0.5, col ='red')
+  rr.ids = (nb.cells.ids.clusters/nb.cells.clusters)[kk]
+  
+  kk = which(nb.cells.ids.clusters > 0 
+             & nb.cells.ids.clusters/nb.cells.bwm.clusters > 0.5 # >50% of bwm cells have the ids considered 
+             & nb.cells.bwm.clusters/nb.cells.clusters > 0.5 # > 50% of cell predicted to be in bwm
+  ) 
+  
+  counts = counts[, kk]
+  
+  par(mfrow = c(1, 2))
+  barplot(t(counts), main="cluster compositions for predicted labels ",
+          xlab=NULL, col=c(1:nrow(counts)), las = 2,
+          legend = colnames(counts)
+  )
+  
+  barplot((counts), main="cluster compositions for predicted labels ",
+          xlab=NULL, col=c(1:nrow(counts)), las = 2,
+          legend = rownames(counts))
+  
+  
+  
+}
+
 ########################################################
 ########################################################
 # Section :
