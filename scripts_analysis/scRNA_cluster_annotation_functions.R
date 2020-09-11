@@ -421,9 +421,26 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   seurat.obj$manual.annot.ids = NA
   
-  #ids = c('MSx')
-  ids = c('MSx', 'MSxa', 'MSxap', 'MSxapp','MSxappa', 'MSxappp', 'MSxp', 'MSxpa', 'MSxpp')
-  ids = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSpappa', 'MSxp', 'MSxpa', 'MSxpp')
+  ##########################################
+  # split the chosen clusters and manual annotate them
+  ##########################################
+  pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_3.pdf")
+  pdf(pdfname, width=18, height = 10)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  #cluster.sels = colnames(counts)
+  #cluster.sels = c('29', '32',  '40', '42', '6', '14', '44', '4')
+  #cluster.sels = c('29', '32', '35', '40', '42')
+  cluster.sels = c('4',  '22', '24', '3', '5', '16', '30') # cluster 4 and 22 have some cells in Msxp lineage
+  
+  features.sels = c( 'nhr-67', 'tbx-8', 'cwn-2', 'unc-120', 'hnd-1')
+  
+  ##########################################
+  # check potential ids for selected clusters 
+  ##########################################
+  # #ids = c('MSx')
+  # ids = c('MSx', 'MSxa', 'MSxap', 'MSxapp','MSxappa', 'MSxappp', 'MSxp', 'MSxpa', 'MSxpp')
+  # ids = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSpappa', 'MSxp', 'MSxpa', 'MSxpp')
   
   # given the fact that scmap seems to be working better than seurat 
   # for the manual annotation, the scmap predicted labels will be mainly considered, 
@@ -459,10 +476,10 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     NoLegend()
   
   p00 = DimPlot(seurat.obj,
-               cells.highlight = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))],
-               group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 4,
-               sizes.highlight = 1,
-               na.value = "gray") +
+                cells.highlight = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))],
+                group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 4,
+                sizes.highlight = 1,
+                na.value = "gray") +
     #ggtitle(paste0("cells predicted by scmap with 500 features and threshold 0.7 ")) +
     NoLegend()
   
@@ -510,7 +527,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   kk = which(nb.cells.ids.clusters > 0 
              & nb.cells.ids.clusters/nb.cells.bwm.clusters > 0.5 # >50% of bwm cells have the ids considered 
              & nb.cells.bwm.clusters/nb.cells.clusters > 0.5 # > 50% of cell predicted to be in bwm
-             ) 
+  ) 
   
   counts = counts[, kk]
   
@@ -518,25 +535,13 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   barplot(t(counts), main="cluster compositions for predicted labels ",
           xlab=NULL, col=c(1:nrow(counts)), las = 2,
           legend = colnames(counts)
-          )
+  )
   
   barplot((counts), main="cluster compositions for predicted labels ",
           xlab=NULL, col=c(1:nrow(counts)), las = 2,
           legend = rownames(counts))
   
-  ##########################################
-  # split the chosen clusters and manual annotate them
-  ##########################################
-  pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_3.pdf")
-  pdf(pdfname, width=18, height = 10)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
-  #cluster.sels = colnames(counts)
-  #cluster.sels = c('29', '32',  '40', '42', '6', '14', '44', '4')
-  #cluster.sels = c('29', '32', '35', '40', '42')
-  cluster.sels = c('4',  '22', '24', '3', '5', '16', '30') # cluster 4 and 22 have some cells in Msxp lineage
-  
-  features.sels = c( 'nhr-67', 'tbx-8', 'cwn-2', 'unc-120', 'hnd-1')
   
   sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
   sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
