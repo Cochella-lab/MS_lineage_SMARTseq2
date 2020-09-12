@@ -1122,7 +1122,6 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # 
   ########################################################
   ########################################################
-  
   seurat.obj = readRDS(
     file = paste0(RdataDir, 
                   'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_4.rds'))
@@ -1291,6 +1290,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   saveRDS(seurat.obj, 
           file = paste0(RdataDir, 
                         'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_5.rds'))
+  
   
   
   
