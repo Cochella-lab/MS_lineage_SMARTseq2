@@ -426,10 +426,10 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   ##########################################
   seurat.obj = readRDS(
     file = paste0(RdataDir, 
-                  'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_2.rds'))
+                  'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_4.rds'))
   
   
-  pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_MSxapp_5.pdf")
+  pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_MSxapp_6.pdf")
   pdf(pdfname, width=18, height = 10)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
@@ -439,8 +439,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   cluster.sels = c('4',  '22', '24', '3', '5', '16', '30') # cluster 4 and 22 have some cells in Msxp lineage
   cluster.sels = c('4',  '22', '24') # cluster 4 and 22 have some cells in Msxp lineage
   #cluster.sels = c('14', '6', '3')
-  cells.sels = colnames(seurat.obj)[seurat.obj$manual.annot.ids == 'MSxap' |seurat.obj$manual.annot.ids == 'MSxa'| 
-    seurat.obj$manual.annot.ids == 'MSxapp' |
+  cells.sels = colnames(seurat.obj)[seurat.obj$manual.annot.ids == 'MSxapp' |
                                       seurat.obj$manual.annot.ids == 'MSxappp'|
                                       seurat.obj$manual.annot.ids == 'MSpappa'|
                                       seurat.obj$manual.annot.ids == 'MSxappp/Mspappa.daugther']
@@ -469,10 +468,12 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
           legend = rownames(counts)
   )
   
+  counts.seurat = table(sub.obj$seurat.pred.id, sub.obj$manual.annot.ids)
+  
   ##########################################
   # find new set of variable genes and redo pca and umap
   ##########################################
-  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 2000)
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 1000)
   
   #length(intersect(VariableFeatures(sub.obj), timers))
   #VariableFeatures(sub.obj) = setdiff(VariableFeatures(sub.obj), timers)
@@ -483,13 +484,14 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   ElbowPlot(sub.obj, ndims = 50)
   
   nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 20; min.dist = 0.1;
+  n.neighbors = 10; min.dist = 0.1;
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, 
                 min.dist = min.dist)
   p0 = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5)
   p1 = DimPlot(sub.obj, group.by = 'request', reduction = 'umap', label = FALSE, label.size = 5)
   p0 + p1
   
+  FeaturePlot(sub.obj, reduction = 'umap', features = c('nhr-67', 'hnd-1', 'pat-9'))
   ##########################################
   # redo the clustering using seurat FindCluster (SLM alogrithm) after testing k-mean from RaceID
   ##########################################
@@ -500,7 +502,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   }
   
   sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:10)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.5)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.6)
   
   p1  = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,
                 pt.size = 2)
@@ -509,7 +511,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
                na.value = "gray", combine = TRUE)
   p1 + p2
   
-  manual.discovery.new.features = FALSE
+  manual.discovery.new.features = TRUE
   if(manual.discovery.new.features){
     Idents(sub.obj) = sub.obj$seurat_clusters_split
     markers <- FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
@@ -518,7 +520,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     
   }
   
-  features.sels = c( 'nhr-67', 'pat-9', 'ceh-37', 'hlh-1', 'tbx-8', 'lin-39')
+  features.sels = c( 'nhr-67', 'pat-9', 'hlh-1', 'tbx-8', 'cwn-2', 'tab-1', 'gana-1', 'spp-15', 'F37H8.5', 'tnt-3',
+                     'asic-2', 'skpo-1')
   Idents(sub.obj) = sub.obj$seurat_clusters_split
   p3 = VlnPlot(sub.obj, features = features.sels,  group.by = 'seurat_clusters_split'
                )
@@ -529,10 +532,13 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
           group.by = 'seurat_clusters_split')
   
   counts = table(predicted.ids, as.character(sub.obj$seurat_clusters_split))
+  
   barplot(counts, main="cluster compositions for predicted labels ",
           xlab=NULL, col=c(1:nrow(counts)), las = 2,
           legend = rownames(counts)
   )
+  
+  counts = table(sub.obj$seurat.pred.id, sub.obj$manual.annot.ids)
   
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
@@ -544,12 +550,13 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # update of manually annotated ids
   ##########################################
   ##########################################
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '2')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxapppa'
+  
+  #cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '1')]
+  #seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxapp'
   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '3')]
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxap'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '1')]
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxapp'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '6')]
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxapp'
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxappp'
   
   # cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '4')]
   # seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSpappa'
@@ -573,9 +580,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   saveRDS(seurat.obj, 
           file = paste0(RdataDir, 
-                        'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_3.rds'))
+                        'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_4.rds'))
   
- 
+  
+  
+  
   
 }
 
