@@ -424,19 +424,23 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   ########################################################
   ########################################################
-  # Section : iteration 7
+  # Section : iteration 8
   #  refine MSxpaa, MSxpaaa and MSxpaap and MSxpap and its daughters
   ########################################################
   ########################################################
-  seurat.obj = readRDS(
-    file = paste0(RdataDir, 
-                  'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_6.rds'))
+  nb.iteration = 8
+  Refine.annotated.ids = TRUE;
+  
+  RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
+                    nb.iteration -1, '.rds')
+  pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_MSxp_lineage_iteration_", nb.iteration, ".pdf")
+  RDS2save =  paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
+                      nb.iteration, '.rds')
+  seurat.obj = readRDS(file = RDSsaved)
   
   
-  pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_MSxp_lineage_iteration_7.pdf")
   pdf(pdfname, width=18, height = 10)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  
   #cluster.sels = colnames(counts)
   #cluster.sels = c('29', '32',  '40', '42', '6', '14', '44', '4')
   #cluster.sels = c('29', '32', '35', '40', '42')
@@ -450,7 +454,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
                                       seurat.obj$manual.annot.ids == 'MSxpap'|
                                       seurat.obj$manual.annot.ids == 'MSxpapa'|
                                       seurat.obj$manual.annot.ids == 'MSxpapp']
-  Refine.annotated.ids = TRUE;
+ 
   if(Refine.annotated.ids){by.group = 'manual.annot.ids';
   }else{by.group = 'seurat_clusters'}
   
@@ -608,9 +612,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   #VlnPlot(seurat.obj, features = c('hnd-1', 'pha-4', 'ceh-76', 'fbxb-70'), group.by = 'manual.annot.ids')
   
-  saveRDS(seurat.obj, 
-          file = paste0(RdataDir, 
-                        'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_7.rds'))
+  saveRDS(seurat.obj, file = RDS2save)
   
   
 }
