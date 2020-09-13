@@ -1689,6 +1689,201 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
                         'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_7.rds'))
   
   
+  ########################################################
+  ########################################################
+  # Section : iteration 8
+  #  refine MSxpaa, MSxpaaa and MSxpaap and MSxpap and its daughters
+  ########################################################
+  ########################################################
+  nb.iteration = 8
+  Refine.annotated.ids = TRUE;
+  
+  RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
+                    nb.iteration -1, '.rds')
+  pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_MSxp_lineage_iteration_", nb.iteration, ".pdf")
+  RDS2save =  paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
+                     nb.iteration, '.rds')
+  
+  seurat.obj = readRDS(file = RDSsaved)
+  if(Refine.annotated.ids){by.group = 'manual.annot.ids';
+  }else{by.group = 'seurat_clusters'}
+  
+  pdf(pdfname, width=18, height = 10)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  #cluster.sels = colnames(counts)
+  #cluster.sels = c('29', '32',  '40', '42', '6', '14', '44', '4')
+  #cluster.sels = c('29', '32', '35', '40', '42')
+  #cluster.sels = c('4',  '22', '24', '3', '5', '16', '30') # cluster 4 and 22 have some cells in Msxp lineage
+  #cluster.sels = c('4', '22', '24', '3', '5', '16', '30') # cluster 4 and 22 have some cells in Msxp lineage
+  #cells.sels = colnames(seurat.obj)[(!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) 
+  #                                   & is.na(seurat.obj$manual.annot.ids))]
+  
+  cells.sels = colnames(seurat.obj)[seurat.obj$manual.annot.ids == 'MSxppp' |
+                                      seurat.obj$manual.annot.ids == 'MSxppa' |
+                                      seurat.obj$manual.annot.ids == 'MSxpppa/MSxpppp'|
+                                      seurat.obj$manual.annot.ids == 'MSxppaa'|
+                                      seurat.obj$manual.annot.ids == 'MSxppaa/MSxppap' |
+                                      seurat.obj$manual.annot.ids == 'MSxpppa/MSxpppp daughters']
+  
+  sub.obj = subset(seurat.obj, cells = cells.sels)
+  sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
+  sub.obj$timingEst = as.numeric(as.character(sub.obj$timingEst))
+  
+  DimPlot(sub.obj, reduction = 'umap', label = TRUE, group.by = by.group)
+  
+  #FeaturePlot(sub.obj, reduction = 'umap', features = c('pha-4', 'hnd-1', 'nhr-67', 'pat-4'))
+  
+  ##########################################
+  # check potential ids for selected clusters 
+  ##########################################
+  #DimPlot(sub.obj, reduction = 'umap', group.by = 'scmap.pred.id.500')
+  threshold = 0.7
+  predicted.ids = sub.obj$scmap.pred.id.500
+  predicted.ids[which(sub.obj$scmap.corr.500 <0.7)] = 'unassigned'
+  if(Refine.annotated.ids){
+    counts = table(predicted.ids, sub.obj$manual.annot.ids)
+    counts.seurat = table(sub.obj$seurat.pred.id, sub.obj$manual.annot.ids)
+  }else{
+    counts = table(predicted.ids, as.character(sub.obj$seurat_clusters))
+    counts.seurat = table(sub.obj$seurat.pred.id, sub.obj$seurat_clusters)
+  }
+  barplot(counts, main="cluster compositions by scmap ",
+          xlab=NULL, col=c(1:nrow(counts)), las = 2,
+          legend = rownames(counts))
+  
+  barplot(counts.seurat, main="cluster compositions by seurat ",
+          xlab=NULL, col=c(1:nrow(counts)), las = 2,
+          legend = rownames(counts))
+  
+  ##########################################
+  # find new set of variable genes and redo pca and umap
+  ##########################################
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 1000)
+  
+  #length(intersect(VariableFeatures(sub.obj), timers))
+  #VariableFeatures(sub.obj) = setdiff(VariableFeatures(sub.obj), timers)
+  cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(sub.obj)), '\n')
+  
+  sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
+  sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
+  ElbowPlot(sub.obj, ndims = 50)
+  
+  nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
+  n.neighbors = 10; min.dist = 0.1;
+  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, 
+                     min.dist = min.dist)
+  p0 = DimPlot(sub.obj, group.by = 'timingEst', reduction = 'umap', label = FALSE, label.size = 5)
+  p1 = DimPlot(sub.obj, group.by = 'request', reduction = 'umap', label = FALSE, label.size = 5)
+  p0 + p1
+  
+  #FeaturePlot(sub.obj, reduction = 'umap', features = c('hnd-1'))
+  ##########################################
+  # redo the clustering using seurat FindCluster (SLM alogrithm) after testing k-mean from RaceID
+  ##########################################
+  FindClusters_subclusters = function(sub.obj, resolution = 0.4)
+  {
+    sub.obj <- FindClusters(sub.obj, resolution = resolution, algorithm = 3)
+    return(sub.obj$seurat_clusters)
+  }
+  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:10)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.8)
+  
+  p1  = DimPlot(sub.obj, group.by = by.group, reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,
+                pt.size = 2)
+  p2 = DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, 
+               label.size = 5,
+               na.value = "gray", combine = TRUE)
+  p1 + p2
+  
+  manual.discovery.new.features = TRUE
+  if(manual.discovery.new.features){
+    Idents(sub.obj) = sub.obj$seurat_clusters_split
+    markers <- FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
+    top.markers <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+    DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()
+    
+  }
+  
+  #p3 = VlnPlot(sub.obj, features = features.sels,  group.by = 'seurat_clusters_split')
+  p3 = VlnPlot(sub.obj, features = c("FSC_log2", "BSC_log2", 'timingEst'), ncol = 3, 
+               group.by = 'seurat_clusters_split')
+  
+  (p1 + p2) / p3
+  
+  counts = table(predicted.ids, as.character(sub.obj$seurat_clusters_split))
+  counts.seurat = table(sub.obj$seurat.pred.id, sub.obj$seurat_clusters_split)
+  
+  barplot(counts, main="cluster compositions for predicted labels ",
+          xlab=NULL, col=c(1:nrow(counts)), las = 2,
+          legend = rownames(counts)
+  )
+  
+  dev.off()
+  
+  ##########################################
+  ##########################################
+  # update of manually annotated ids
+  ##########################################
+  ##########################################
+  
+  ##########################################
+  # repeat marker genes to annote obtained clusters
+  ##########################################
+  #features.sels = c('unc-120', 'hnd-1', 'hlh-1', 'abts-1', 'ref-2', 'tbx-7', 'unc-39', 'cup-4', 'ins-2', 'F40H3.3', 'hot-1')
+  features.sels = c('hnd-1', 'tbx-7', 'unc-120', 'abts-1', 'Y66D12A.13', 'F41D9.2') # markers for MSxpaaa
+  features.sels = c('unc-39', 'ref-2', 'tbx-7', 'unc-120') # markers for MSxpaa
+  features.sels = c('hlh-1', 'tbx-8', 'hnd-1', 'unc-39', 'ref-2', 'unc-120')
+  features.sels = c('tbx-8', 'hlh-1', 'ZK180.5', 'F19C6.4', 'zig-8', 'hnd-1', 'unc-39', 'unc-120', 'F40H3.3', 'ins-2', 'Y42H9B.3')
+  
+  features.sels = c('col-118', 'unc-120', 'C03B1.1', 'F53C3.7')
+  
+  features.sels = c('hlh-1', 'ins-2', 'sul-2', 'camt-1', 'tbx-8')
+  
+  features.sels = c('hlh-1', 'unc-120', 'F19C6.4', 'col-118', 'F53C3.7', 'C03B1.1')
+  
+  
+  Idents(sub.obj) = sub.obj$seurat_clusters_split
+  idents.sel = as.character(c(0:6))
+  idents.sel = setdiff(idents.sel, c('0', '4', '1', '6'))
+  VlnPlot(sub.obj, features = features.sels,  group.by = 'seurat_clusters_split', idents = idents.sel)
+  
+  
+  FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
+  
+  ##########################################
+  # update the manual annotation if good marker genes or mapped ids were found
+  ##########################################
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '0')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxppp'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '4')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxppa'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '1')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpppa'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '6')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpppp'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '5')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxppaa'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '2')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxppap'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '2')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxppap'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '3')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxppppx/MSxpppax'
+  
+  DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+          na.value = "gray") + 
+    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
+    scale_colour_hue(drop = FALSE)
+  
+  
+  saveRDS(seurat.obj, file = RDS2save)
   
   
   
