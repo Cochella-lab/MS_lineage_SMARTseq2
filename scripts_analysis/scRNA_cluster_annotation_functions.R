@@ -586,6 +586,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '5')]
   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpapa'
  
+  
   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '0')]
   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpapp'
   
