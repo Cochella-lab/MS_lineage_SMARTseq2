@@ -1450,10 +1450,10 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpaaa'
   
   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '1')]
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpaa/MSxpaaa'
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpaa/MSxpaap'
   
   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '10')]
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpaa/MSxpaaa'
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpaa/MSxpaap'
   
   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '3')]
   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpap'
@@ -1464,7 +1464,6 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '11')]
   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpapa'
   
-  
   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '9')]
   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxppa'
   
@@ -1474,8 +1473,15 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '2')]
   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpppa/MSxpppp'
   
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '7')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpppa/MSxpppp daughters'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '8')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpppa/MSxpppp daughters'
+  
   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '0')]
   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxppaa/MSxppap'
+  
   
   
   DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
