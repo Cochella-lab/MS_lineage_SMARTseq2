@@ -1691,11 +1691,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   ########################################################
   ########################################################
-  # Section : iteration 8
-  #  refine MSxpaa, MSxpaaa and MSxpaap and MSxpap and its daughters
+  # Section : iteration 9
+  #  try to find MSppaap and MSapaap instead of symetric MSxpaap 
   ########################################################
   ########################################################
-  nb.iteration = 8
+  nb.iteration = 9
   Refine.annotated.ids = TRUE;
   
   RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
