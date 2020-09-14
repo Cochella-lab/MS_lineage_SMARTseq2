@@ -399,6 +399,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   library(Matrix)
   library(lsa)
   library(dplyr)
+  library(openxlsx)
   
   ee = process.import.Murray.scRNA()
   murray.ids = unique(ee$lineage)
@@ -407,8 +408,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
            'MSpappa', 'MSpappax', 'MSppaap', 'MSppaapp', 'MSpppaaa',
            murray.ids[grep('MSxapp|MSxp', murray.ids)]))
   
-  markers = read.xlsx('data/Supplementary_Tables_190611.xlsx', sheet = 4, startRow = 8, colNames = TRUE)
-  markers = markers[!is.na(match(markers$Lineage, bwms)), ]
+  markers = read.xlsx('data/Supplementary_Tables_190611.xlsx', sheet=  4, startRow = 8, colNames = TRUE)
+  #markers = markers[!is.na(match(markers$Lineage, bwms)), ]
   #write.csv(markers, file = paste0(tabDir, 'JM_marker_genes_BWM.csv'))
   
   dataDir.Hashimsholy = '../data/Hashimsholy_et_al'
@@ -582,29 +583,30 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   ##########################################
   # repeat marker genes to annote obtained clusters
   ##########################################
-  #features.sels = c('unc-120', 'hnd-1', 'hlh-1', 'abts-1', 'ref-2', 'tbx-7', 'unc-39', 'cup-4', 'ins-2', 'F40H3.3', 'hot-1')
-  features.sels = c('hnd-1', 'tbx-7', 'unc-120', 'abts-1', 'Y66D12A.13', 'F41D9.2') # markers for MSxpaaa
-  features.sels = c('unc-39', 'ref-2', 'tbx-7', 'unc-120') # markers for MSxpaa
-  features.sels = c('hlh-1', 'tbx-8', 'hnd-1', 'unc-39', 'ref-2', 'unc-120')
-  features.sels = c('tbx-8', 'hlh-1', 'ZK180.5', 'F19C6.4', 'zig-8', 'hnd-1', 'unc-39', 'unc-120', 'F40H3.3', 'ins-2', 'Y42H9B.3')
-  
-  features.sels = c('col-118', 'unc-120', 'C03B1.1', 'F53C3.7')
-  features.sels = c('hlh-1', 'ins-2', 'sul-2', 'camt-1', 'tbx-8')
-  features.sels = c('hlh-1', 'unc-120', 'F19C6.4', 'col-118', 'F53C3.7', 'C03B1.1')
-  
-  features.sels = c('nhr-111', 'ehn-3')
-  features.sels = c('cup-4', 'lgc-23', 'let-381')
-  
   Idents(sub.obj) = sub.obj$seurat_clusters_split
   idents.sel = as.character(c(0:9))
-  idents.sel = setdiff(idents.sel, c('5', '0', '1', '4'))
-  VlnPlot(sub.obj, features = features.sels,  group.by = 'seurat_clusters_split', idents = idents.sel)
+  idents.sel = setdiff(idents.sel, c('5', '0', '1', '4', '3', '2', '9'))
   
-  ## chcek the mapped ids for the rest of clusters
+  ## chcek the reference-mapped ids for the rest of clusters
   counts.sel = counts[, !is.na(match(colnames(counts), idents.sel))]
   counts.seurat.sel = counts.seurat[, !is.na(match(colnames(counts.seurat), idents.sel))]
+  counts.sel = counts.sel[apply(as.matrix(counts.sel), 1, sum) >0, ]
+  counts.seurat.sel = counts.seurat.sel[apply(as.matrix(counts.seurat.sel), 1, sum)>0, ]
   
-  FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
+  ids.sel = c('MSxpppaa')
+  source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
+  find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers)
+  
+  #features.sels = c('unc-120', 'hnd-1', 'hlh-1', 'abts-1', 'ref-2', 'tbx-7', 'unc-39', 'cup-4', 'ins-2', 'F40H3.3', 'hot-1')
+  features.sels = c('hot-1', 'wago-1', 'pde-6', 'rrc-1')
+  
+  VlnPlot(sub.obj, features = features.sels,  group.by = 'seurat_clusters_split', idents = idents.sel)
+  
+  # to find new marker genes
+  DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()
+  
+  FeaturePlot(sub.obj, reduction = 'umap', features = 'R09F10.5')
+  
   ##########################################
   # update the manual annotation if good marker genes or mapped ids were found
   ##########################################
@@ -619,6 +621,14 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '4')]
   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpapaa'
   
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '3')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSapaapp'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '2')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'MSxpaaaa/MSxpaaaax'
+  
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == '9')]
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = 'weirdos.possible.doublets'
   
   DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
           na.value = "gray") + 

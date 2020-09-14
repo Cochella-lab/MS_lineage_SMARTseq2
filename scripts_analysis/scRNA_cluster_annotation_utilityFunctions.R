@@ -1137,7 +1137,18 @@ propose.potential.ids = function(seurat.obj)
           xlab=NULL, col=c(1:nrow(counts)), las = 2,
           legend = rownames(counts))
   
-  
+}
+
+find.markerGenes.used.in.JM.scRNAseq = function(ids = c('MSxpaaaa'), markers = markers)
+{
+  for(n in 1:length(ids)) ids[n] = gsub('[.]', '/', ids[n])
+  kk = match(ids, markers$Lineage)
+  if(sum(is.na(kk))>0) {
+    cat('ids NOT FOUND ')
+    print(ids[is.na(kk)])
+  }
+  kk = kk[!is.na(kk)]
+  if(length(kk)>0) print(markers[kk, ])
   
 }
 
