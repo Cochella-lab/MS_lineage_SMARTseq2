@@ -408,7 +408,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
            'MSpappa', 'MSpappax', 'MSppaap', 'MSppaapp', 'MSpppaaa',
            murray.ids[grep('MSxapp|MSxp', murray.ids)]))
   
-  markers = read.xlsx('data/Supplementary_Tables_190611.xlsx', sheet=  4, startRow = 8, colNames = TRUE)
+  markers.JM = read.xlsx('data/Supplementary_Tables_190611.xlsx', sheet=  4, startRow = 8, colNames = TRUE)
   #markers = markers[!is.na(match(markers$Lineage, bwms)), ]
   #write.csv(markers, file = paste0(tabDir, 'JM_marker_genes_BWM.csv'))
   
@@ -425,11 +425,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   ########################################################
   ########################################################
-  # Section : iteration 9
-  # Continue with terminal cells that are in well separated clusters 
+  # Section : iteration 10
+  # manual annotate terminal cells BWM_1 without transition
   ########################################################
   ########################################################
-  nb.iteration = 9
+  nb.iteration = 10
   Refine.annotated.ids = FALSE;
   
   RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
@@ -451,15 +451,16 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   #cluster.sels = c('4',  '22', '24', '3', '5', '16', '30') # cluster 4 and 22 have some cells in Msxp lineage
   cluster.sels = c('4',  '22', '24',  # middle time point for convergence branche
                    '3', '5', '16', '30', # middle time points for MSxp
-                   '23', '43', '17', '41', '45', '31', '34', '50', '53', # well-separated clusters with clear mapped ids
-                   #'23', '43', '17', '41', '45', '34', '31', '34', '50', '53', # well-separated clusters without clear mapped ids
-                   '44', '28', '52', # unknow yet 
+                   '23', '43', '17', '41', '45', '34', '50', # well-separated clusters with clear mapped ids
+                   '44', '28', '52', '31', '53',  # # well-separated clusters without clear mapped ids
                    '25', '36', '8', '39', '2', '19', '27', # BWM-1 cluster_25 transition to it and possibly cluster_28, 51 transition to BWM_2 
                    '24', '13', '1', '11', '33', '48', '18', '46', '15', '26' # BWM-2
                    )
   
-  cluster.sels = c('23', '43', '17', '41', '45', '34', '31', '50', '53' # well-separated clusters with clear mapped ids
+  cluster.sels = c('22','30', '25', '36', '8', '39', '2', '19', '27', # BWM-1 without transition cluster_25
+                   '24', '13', '1', '11', '33', '48', '18', '46', '15', '26' # BWM-2
                   )
+  
   #cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) & is.na(seurat.obj$manual.annot.ids)]
 
   cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
@@ -487,7 +488,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   #DimPlot(sub.obj, reduction = 'umap', group.by = 'scmap.pred.id.500')
   threshold = 0.7
   predicted.ids = sub.obj$scmap.pred.id.500
-  predicted.ids[which(sub.obj$scmap.corr.500 <0.7)] = 'unassigned'
+  #predicted.ids[which(sub.obj$scmap.corr.500 < threshold)] = 'unassigned'
+  
   if(Refine.annotated.ids){
     counts = table(predicted.ids, sub.obj$manual.annot.ids)
     counts.seurat = table(as.character(sub.obj$seurat.pred.id), sub.obj$manual.annot.ids)
@@ -506,7 +508,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   ##########################################
   # find new set of variable genes and redo pca and umap
   ##########################################
-  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 1000)
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 2000)
   
   #length(intersect(VariableFeatures(sub.obj), timers))
   #VariableFeatures(sub.obj) = setdiff(VariableFeatures(sub.obj), timers)
@@ -517,7 +519,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   ElbowPlot(sub.obj, ndims = 50)
   
   nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 10; min.dist = 0.1;
+  n.neighbors = 30; min.dist = 0.1;
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, 
                      min.dist = min.dist)
   DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 6)
@@ -539,7 +541,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     return(sub.obj$seurat_clusters)
   }
   sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:10)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.4)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.5)
   
   p1  = DimPlot(sub.obj, group.by = by.group, reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,
                 pt.size = 2)
@@ -584,8 +586,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # repeat marker genes to annote obtained clusters
   ##########################################
   Idents(sub.obj) = sub.obj$seurat_clusters_split
-  idents.sel = as.character(c(0:9))
-  idents.sel = setdiff(idents.sel, c('5', '0', '1', '4', '3', '2', '9', '8'))
+  idents.sel = as.character(levels(sub.obj$seurat_clusters_split))
+  #idents.sel = setdiff(idents.sel, c('5', '0', '1', '4', '3', '2', '9', '8'))
   
   ## chcek the reference-mapped ids for the rest of clusters
   counts.sel = counts[, !is.na(match(colnames(counts), idents.sel))]
@@ -593,18 +595,19 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   counts.sel = counts.sel[apply(as.matrix(counts.sel), 1, sum) >0, ]
   counts.seurat.sel = counts.seurat.sel[apply(as.matrix(counts.seurat.sel), 1, sum)>0, ]
   
-  ids.sel = c('MSxapapp', 'MSxppaaa', 'MSxapppax')
+  ids.sel = c('MSxpppax')
   source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
-  find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers)
+  find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
   
   #features.sels = c('unc-120', 'hnd-1', 'hlh-1', 'abts-1', 'ref-2', 'tbx-7', 'unc-39', 'cup-4', 'ins-2', 'F40H3.3', 'hot-1')
-  features.sels = c('pha-4', 'unc-62', 'C45G7.4', 'asp-4', 'cup-4', 'lgc-23', 'hlh-1')
+  features.sels = c('unc-120', 'hot-1', 'wago-1', 'pde-6', 'rrc-1', 'maph-1.2', 'kvs-5')
+  
   VlnPlot(sub.obj, features = features.sels,  group.by = 'seurat_clusters_split', idents = idents.sel)
   
   # to find new marker genes
   DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()
   
-  FeaturePlot(sub.obj, reduction = 'umap', features = c('pha-4', 'T21D12.7'))
+  FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
   ##########################################
   # update the manual annotation if good marker genes or mapped ids were found
@@ -644,7 +647,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
     scale_colour_hue(drop = FALSE)
   
-  FeaturePlot(seurat.obj, reduction = 'umap', features = 'pha-4')  
+  FeaturePlot(seurat.obj, reduction = 'umap', features = c('hot-1', 'wago-1', 'pde-6', 'rrc-1', 'maph-1.2'))  
   
   saveRDS(seurat.obj, file = RDS2save)
   
