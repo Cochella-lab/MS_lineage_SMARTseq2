@@ -532,6 +532,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   p0 + p1
   
   #FeaturePlot(sub.obj, reduction = 'umap', features = c('hnd-1'))
+  
   ##########################################
   # redo the clustering using seurat FindCluster (SLM alogrithm) after testing k-mean from RaceID
   ##########################################
@@ -576,15 +577,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   dev.off()
   
-  ##########################################
-  ##########################################
-  # update of manually annotated ids
-  ##########################################
-  ##########################################
-  
-  ##########################################
-  # repeat marker genes to annote obtained clusters
-  ##########################################
+  #################################################################################################################################
+  # update of manually annotated ids using marker genes and potential mapped labels from scmap or seurat
+  ##################################################################################################################################
   Idents(sub.obj) = sub.obj$seurat_clusters_split
   idents.sel = as.character(levels(sub.obj$seurat_clusters_split))
   #idents.sel = setdiff(idents.sel, c('5', '0', '1', '4', '3', '2', '9', '8'))
@@ -600,8 +595,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
   
   #features.sels = c('unc-120', 'hnd-1', 'hlh-1', 'abts-1', 'ref-2', 'tbx-7', 'unc-39', 'cup-4', 'ins-2', 'F40H3.3', 'hot-1')
-  features.sels = c('unc-120', 'hot-1', 'wago-1', 'pde-6', 'rrc-1', 'maph-1.2', 'kvs-5')
-  
+  features.sels = c('unc-120', 'hot-1', 'wago-1', 'pde-6', 'rrc-1', 'maph-1.2', 'kvs-5', 'hlh-1', 'tnt-3', 'spp-15', 'gana-1', 'lin-39')
+
   VlnPlot(sub.obj, features = features.sels,  group.by = 'seurat_clusters_split', idents = idents.sel)
   
   # to find new marker genes
