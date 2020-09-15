@@ -148,6 +148,97 @@ scmap.transfer.labels.from.Murray.scRNA = function(seurat.obj, ee, run.scmap.cel
   
 }
 
+process.import.Murray.scRNA = function(filter.ref.MS = FALSE)
+{
+  library(VisCello.celegans)
+  eset = readRDS(file = paste0('data/Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
+  pmeda = data.frame(pData(eset))
+  
+  if(filter.ref.MS){
+    ## select the cells for MS lineages
+    kk = grep('^MS', pmeda$lineage)
+    kk1 = which(pmeda$lineage == '28_cell_or_earlier'| pmeda$lineage == 'ABaxx'| pmeda$lineage == 'Cx'|
+                  pmeda$lineage == 'Dx'|pmeda$lineage == 'Dxa'|pmeda$lineage == 'Exx')
+    
+    kk = unique(c(kk, kk1))
+    cat('nb of cell in reference -- ', length(kk), '\n')
+    cat('nb of cell states in reference -- ', length(unique(pmeda$lineage[kk])), '\n')
+    
+    ee = CreateSeuratObject(counts = eset@assayData$exprs[,kk], assay = 'RNA', meta.data = pmeda[kk, ])
+    ee@assays$RNA@data = eset@assayData$norm_exprs[,kk] 
+  }else{
+    ee = CreateSeuratObject(counts = eset@assayData$exprs, assay = 'RNA', meta.data = pmeda)
+    ee@assays$RNA@data = eset@assayData$norm_exprs 
+  }
+  
+  return(ee)
+  
+}
+
+find.reference.mapped.ids.variableGenes.scamp = function(sub.obj, nfeatures = 1000, filter.ref.MS = FALSE)
+{
+  library(SingleCellExperiment)
+  library(scmap)
+  # nfeatures = 1000
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
+  variable.genes = VariableFeatures(sub.obj)
+  
+  # process aleks data for scmap
+  sce = Seurat::as.SingleCellExperiment(sub.obj)
+  sce <- sce[!duplicated(rownames(sce)), ]
+  rowData(sce)$feature_symbol <- rownames(sce)
+  counts(sce) = as.matrix(counts(sce)) # sce object converted from seurat object was using spare matrix
+  logcounts(sce) = as.matrix(logcounts(sce))
+  
+  ee = process.import.Murray.scRNA(filter.ref.MS = filter.ref.MS);
+  ee = Seurat::as.SingleCellExperiment(ee)
+  counts(ee) = as.matrix(counts(ee))
+  logcounts(ee) = as.matrix(logcounts(ee))
+  rowData(ee)$feature_symbol <- rownames(ee)
+  ee$cell_type1 = ee$lineage
+  
+  ## feature selection for scmap
+  #nb.features.scmap = 500
+  #threshold.scmap = 0.5
+  cat('nb of features selected : ', nfeatures, '\n')
+  
+  #ee_ref <- selectFeatures(ee, suppress_plot = TRUE, n_features = nfeatures)
+  #rowData(ee_ref)$scmap_features = !is.na(match(rownames(ee_ref), variable.genes))
+  ee_ref = setFeatures(ee, features = variable.genes[!is.na(match(variable.genes, rownames(ee)))])
+  #table(rowData(ee)$scmap_features)
+  ee_ref = indexCluster(ee_ref)
+
+  scmapCluster_results <- scmapCluster(
+    projection = sce, 
+    index_list = list(
+      murray = metadata(ee_ref)$scmap_cluster_index
+    ),
+    threshold = 0
+  )
+  
+  hist(scmapCluster_results$scmap_cluster_siml, breaks = 100)
+  #abline(v = threshold.scmap, col = 'red')
+  head(scmapCluster_results$combined_labs)
+  
+  #predicted.id = scmapCluster_results$scmap_cluster_labs
+  #counts.pred.ids = table(predicted.id)
+  #counts.pred.ids = counts.pred.ids[order(-counts.pred.ids)]
+  # print(counts.pred.ids)
+  #predicted.id[which(predicted.id == 'unassigned')] = NA
+  
+  #cat('nb of assigned cells :',  length(predicted.id[!is.na(predicted.id)]), '\n')
+  #cat('percent of assigned cells: ', length(predicted.id[!is.na(predicted.id)])/length(predicted.id), '\n')
+  
+  #colnames(keep)[-1] = paste0(rep(c('scmap.pred.id.', 'scmap.corr.'), 4), rep(c(500, 1000, 2000, 3000), each =2))
+  #rownames(keep) = colnames(seurat.obj)
+  #seurat.obj = AddMetaData(seurat.obj, metadata = keep[, -1])
+  sub.obj$predicted.ids.scmap.newfeatures = scmapCluster_results$scmap_cluster_labs
+  sub.obj$predicted.ids.scmap.newfeatures.cor = scmapCluster_results$scmap_cluster_siml
+  #saveRDS(seurat.obj, file = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.rds'))
+  
+  return(sub.obj)
+  
+}
 
 scmap.transfer.labels.from.Tintor.scRNA = function(seurat.obj)
 {
