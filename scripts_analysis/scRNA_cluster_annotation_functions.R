@@ -527,7 +527,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   ElbowPlot(sub.obj, ndims = 50)
   
   nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 30; min.dist = 0.1;
+  n.neighbors = 20; min.dist = 0.1;
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
                     spread = 1, n.neighbors = n.neighbors, 
                      min.dist = min.dist)
@@ -553,7 +553,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   }
   
   sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:10)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.0)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1)
   
   p1  = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,
                 pt.size = 2)
@@ -571,12 +571,14 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   sub.obj = find.reference.mapped.ids.variableGenes.scamp(sub.obj, nfeatures = 500, filter.ref.MS = TRUE)
   
   sub.obj$predicted.ids = sub.obj$predicted.ids.scmap.newfeatures
-  sub.obj$predicted.ids[sub.obj$predicted.ids.scmap.newfeatures.cor<0.5] = NA
+  #sub.obj$predicted.ids[sub.obj$predicted.ids.scmap.newfeatures.cor<0.5] = NA
   
   DimPlot(sub.obj, group.by = 'predicted.ids', reduction = 'umap', label =TRUE, label.size = 4, repel = TRUE) + NoLegend()
   
   counts = table(sub.obj$predicted.ids.scmap.newfeatures, as.character(sub.obj$seurat_clusters_split))
-  #counts.seurat = table(sub.obj$seurat.pred.id, sub.obj$seurat_clusters_split)
+  counts.annot = table(sub.obj$manual.annot.ids, sub.obj$seurat_clusters_split)
+  
+  counts[, c(1, which(colnames(counts) == '14'))]
   
   barplot(counts, main="cluster compositions for predicted labels ",
           xlab=NULL, col=c(1:nrow(counts)), las = 2,
@@ -606,9 +608,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   counts.sel = counts.sel[apply(as.matrix(counts.sel), 1, sum) >0, ]
   #counts.seurat.sel = counts.seurat[, !is.na(match(colnames(counts.seurat), idents.sel))]
   #counts.seurat.sel = counts.seurat.sel[apply(as.matrix(counts.seurat.sel), 1, sum)>0, ]
-  
+  # all terminal ids to aim
   ids.sel = c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
-              'MSxappppx', 'MSxapppax', 'MSpappax')
+              'MSxappppx', 'MSxapppax', 'MSpappax') 
   source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
   find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
   
