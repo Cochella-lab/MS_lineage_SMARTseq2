@@ -148,7 +148,7 @@ scmap.transfer.labels.from.Murray.scRNA = function(seurat.obj, ee, run.scmap.cel
   
 }
 
-process.import.Murray.scRNA = function(filter.ref.MS = FALSE)
+process.import.Murray.scRNA = function(filter.ref.MS = TRUE)
 {
   library(VisCello.celegans)
   eset = readRDS(file = paste0('data/Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
@@ -175,7 +175,64 @@ process.import.Murray.scRNA = function(filter.ref.MS = FALSE)
   
 }
 
-find.reference.mapped.ids.variableGenes.scamp = function(sub.obj, nfeatures = 1000, filter.ref.MS = FALSE)
+quick.analysis.JMurray.scRNA.MS = function()
+{
+  library(VisCello.celegans)
+  eset = readRDS(file = paste0('data/Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
+  pmeda = data.frame(pData(eset))
+  
+  terminals = c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
+                'MSxappppx', 'MSxapppax', 'MSpappax',
+                'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
+  
+  terminals = c('MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
+  kk = which(!is.na(match(pmeda$lineage, terminals)))
+  #jj = grep('MS', pmeda$lineage)
+  #kk1 = which(pmeda$lineage == '28_cell_or_earlier'| pmeda$lineage == 'ABaxx'| pmeda$lineage == 'Cx'|
+  #              pmeda$lineage == 'Dx'|pmeda$lineage == 'Dxa'|pmeda$lineage == 'Exx')
+  
+  #kk = unique(c(kk, kk1))
+  cat('nb of cell in reference -- ', length(kk), '\n')
+  cat('nb of cell states in reference -- ', length(unique(pmeda$lineage[kk])), '\n')
+  
+  eet = CreateSeuratObject(counts = eset@assayData$exprs[,kk], assay = 'RNA', meta.data = pmeda[kk, ])
+  eet@assays$RNA@data = eset@assayData$norm_exprs[,kk]
+  
+  par(mfrow=c(2,2))
+  hist(eet$n.umi)
+  hist(eet$nFeature_RNA)
+  hist(eet$n.umi/eet$nFeature_RNA, breaks = 10)
+  xx = (eet@assays$RNA@counts[,10]); xx = xx[which(xx>0)]
+  hist(xx, breaks = 20)
+  # Idents(ee) = 
+  # cells.sels = colnames(ee)[!is.na(match(ee$lineage, terminals))]
+  # #eet = ee[, is.na(jj)]
+  # xx = ee[, c(1:10)]
+  # eet = subset(ee, cells = cells.sels)
+  
+  
+  eet <- FindVariableFeatures(eet, selection.method = "vst", nfeatures = 1000)
+  #length(intersect(VariableFeatures(sub.obj), timers))
+  #VariableFeatures(sub.obj) = setdiff(VariableFeatures(sub.obj), timers)
+  cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(eet)), '\n')
+  
+  eet = ScaleData(eet, features = rownames(eet))
+  eet <- RunPCA(object = eet, features = VariableFeatures(eet), verbose = FALSE)
+  ElbowPlot(eet, ndims = 50)
+  
+  nb.pcs = 20 # nb of pcs depends on the considered clusters or ids 
+  n.neighbors = 20; min.dist = 0.1; spread = 1;
+  eet <- RunUMAP(object = eet, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+                     spread = spread, n.neighbors = n.neighbors, 
+                     min.dist = min.dist)
+  
+  #DimPlot(eet, group.by = 'seurat_clusters_split', reduction = 'umap', label = TRUE, label.size = 6)
+  DimPlot(eet, group.by = 'lineage', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE)
+  
+}
+
+find.reference.mapped.ids.for.terminalCells.scmap = function(sub.obj, nfeatures = 1000, filter.ref.MS = TRUE, 
+                                                         filter.ref.MS.terminal = TRUE)
 {
   library(SingleCellExperiment)
   library(scmap)
@@ -192,22 +249,70 @@ find.reference.mapped.ids.variableGenes.scamp = function(sub.obj, nfeatures = 10
   
   ee = process.import.Murray.scRNA(filter.ref.MS = filter.ref.MS);
   ee = Seurat::as.SingleCellExperiment(ee)
+  
+  if(filter.ref.MS.terminal){
+    terminals = c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
+                  'MSxappppx', 'MSxapppax', 'MSpappax',
+                  'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
+    ii = match(ee$lineage, terminals)
+    
+    ee = ee[, !is.na(ii)]
+  }
+  
   counts(ee) = as.matrix(counts(ee))
   logcounts(ee) = as.matrix(logcounts(ee))
   rowData(ee)$feature_symbol <- rownames(ee)
   ee$cell_type1 = ee$lineage
   
+  
   ## feature selection for scmap
   #nb.features.scmap = 500
   #threshold.scmap = 0.5
-  cat('nb of features selected : ', nfeatures, '\n')
+  ee_ref <- selectFeatures(ee, suppress_plot = TRUE, n_features = nfeatures)
   
-  #ee_ref <- selectFeatures(ee, suppress_plot = TRUE, n_features = nfeatures)
+  cat('nb of features selected : ', nfeatures, '\n')
   #rowData(ee_ref)$scmap_features = !is.na(match(rownames(ee_ref), variable.genes))
-  ee_ref = setFeatures(ee, features = variable.genes[!is.na(match(variable.genes, rownames(ee)))])
+  #ee_ref = setFeatures(ee, features = variable.genes[!is.na(match(variable.genes, rownames(ee)))])
   #table(rowData(ee)$scmap_features)
   ee_ref = indexCluster(ee_ref)
-
+  
+  check.diff.middle.terminal = FALSE
+  if(check.diff.middle.terminal){
+    refs = metadata(ee_ref)$scmap_cluster_index
+    ref.features = as.data.frame(rowData(ee_ref))
+    ref.features = ref.features$feature_symbol[ref.features$scmap_features]
+    #jj = !is.na(match(rownames(refs), ref.features))
+    refs = refs[!is.na(match(rownames(refs), ref.features)), ]
+    
+    attach(mtcars)
+    par(mfrow=c(3,3))
+    hist(refs[, match('MSxppp', colnames(refs))])
+    hist(refs[, match('MSxppa', colnames(refs))])
+    hist(refs[, match('MSxpaa', colnames(refs))])
+    
+    hist(refs[, match('MSxpapp', colnames(refs))])
+    hist(refs[, match('MSxpppp', colnames(refs))])
+    hist(refs[, match('MSxpapa', colnames(refs))])
+    
+    hist(refs[, match('MSxpapap', colnames(refs))])
+    hist(refs[, match('MSxpaaap', colnames(refs))])
+    hist(refs[, match('MSxppppp', colnames(refs))])
+    
+    par(mfrow=c(1,2))
+    xx = refs[, match('MSxpaaap', colnames(refs))]
+    xx = xx[xx>0]
+    cat('length of no-zero genes', length(xx), '\n')
+    var(xx)
+    hist(xx)
+    
+    xx = refs[, match('MSxpppp', colnames(refs))]
+    xx = xx[xx>0]
+    cat('length of no-zero genes', length(xx), '\n')
+    var(xx)
+    hist(xx)
+    
+  }
+  
   scmapCluster_results <- scmapCluster(
     projection = sce, 
     index_list = list(
@@ -239,6 +344,86 @@ find.reference.mapped.ids.variableGenes.scamp = function(sub.obj, nfeatures = 10
   return(sub.obj)
   
 }
+
+seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.obj)
+{
+  library(VisCello.celegans)
+  eset = readRDS(file = paste0('data/Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
+  pmeda = data.frame(pData(eset))
+  
+  terminals = c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
+                'MSxappppx', 'MSxapppax', 'MSpappax',
+                'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
+  
+  #terminals = c('MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
+  kk = which(!is.na(match(pmeda$lineage, terminals)))
+  #jj = grep('MS', pmeda$lineage)
+  #kk1 = which(pmeda$lineage == '28_cell_or_earlier'| pmeda$lineage == 'ABaxx'| pmeda$lineage == 'Cx'|
+  #              pmeda$lineage == 'Dx'|pmeda$lineage == 'Dxa'|pmeda$lineage == 'Exx')
+  
+  #kk = unique(c(kk, kk1))
+  cat('nb of cell in reference -- ', length(kk), '\n')
+  cat('nb of cell states in reference -- ', length(unique(pmeda$lineage[kk])), '\n')
+  
+  eet = CreateSeuratObject(counts = eset@assayData$exprs[,kk], assay = 'RNA', meta.data = pmeda[kk, ])
+  eet@assays$RNA@data = eset@assayData$norm_exprs[,kk]
+  
+  eet <- FindVariableFeatures(
+    object = eet,
+    nfeatures = 2000
+  )
+  
+  eet <- ScaleData(object = eet)
+  Idents(eet) = eet$lineage
+  
+  # Here, we process the gene activity matrix 
+  # in order to find anchors between cells in the scATAC-seq dataset 
+  # and the scRNA-seq dataset.
+  #Idents(seurat.obj) = seurat.obj$seurat_clusters
+  #DimPlot(seurat.obj, reduction = "umap", label = TRUE, pt.size = 2,  label.size = 5, repel = FALSE) + NoLegend()
+  DefaultAssay(seurat.obj) <- 'RNA'
+  transfer.anchors <- FindTransferAnchors(
+    reference = eet,
+    query = sub.obj,
+    features = unique(VariableFeatures(eet)),
+    #features = features.to.use,
+    reference.assay = 'RNA',
+    query.assay = 'RNA',
+    reduction = 'cca',
+    k.anchor = 10, # k.anchor is neighborhood size for MNN big k.anchor, the bigger, the more anchors found
+    k.filter = 200, # retain the anchor (cell from one dataset to annother) if within k.filter neighbors, the bigger, the more retained  
+    max.features = 200, # max nb of features used for anchor filtering
+    k.score = 30, 
+    npcs = 30, 
+    dims = 1:30
+  )
+  
+  cat('nb of cells in query and in reference as anchors : ', 
+      length(unique(transfer.anchors@anchors[, 1])), '--',  length(unique(transfer.anchors@anchors[, 2])), '\n')
+  
+  
+  predicted.labels <- TransferData(
+    anchorset = transfer.anchors,
+    #refdata = Idents(tintori),
+    refdata = Idents(eet),
+    #refdata = as.vector(Idents(seurat.obj)),
+    #weight.reduction = seurat.obj[['pca']],
+    weight.reduction = sub.obj[['pca']],
+    dims = 1:30,
+    k.weight = 50
+  )
+  
+  sub.obj$predicted.ids.seurat.terminal = predicted.labels$predicted.id
+  #colnames(predicted.labels) = paste0('seurat.', colnames(predicted.labels))
+  #seurat.obj <- AddMetaData(object = seurat.obj, metadata = predicted.labels)
+  
+  #saveRDS(seurat.obj, file = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds'))
+  
+  return(sub.obj)
+  
+}
+
+
 
 scmap.transfer.labels.from.Tintor.scRNA = function(seurat.obj)
 {
@@ -1243,6 +1428,12 @@ find.markerGenes.used.in.JM.scRNAseq = function(ids = c('MSxpaaaa'), markers = m
   
 }
 
+manual.assign.cluster.with.annotation = function(cluster.index = '0', id2assign = 'MSxpppp', sub.obj, seurat.obj)
+{
+  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
+  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
+  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
+}
 ########################################################
 ########################################################
 # Section :
