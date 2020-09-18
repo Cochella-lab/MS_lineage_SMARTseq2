@@ -362,11 +362,13 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.o
   #              pmeda$lineage == 'Dx'|pmeda$lineage == 'Dxa'|pmeda$lineage == 'Exx')
   
   #kk = unique(c(kk, kk1))
-  cat('nb of cell in reference -- ', length(kk), '\n')
-  cat('nb of cell states in reference -- ', length(unique(pmeda$lineage[kk])), '\n')
+  cat('nb of cell in the reference -- ', length(kk), '\n')
+  cat('nb of cell states in the reference -- ', length(unique(pmeda$lineage[kk])), '\n')
   
   eet = CreateSeuratObject(counts = eset@assayData$exprs[,kk], assay = 'RNA', meta.data = pmeda[kk, ])
   eet@assays$RNA@data = eset@assayData$norm_exprs[,kk]
+  
+  cat('nb of variable genes used in the reference -- ', nfeatures, '\n')
   
   eet <- FindVariableFeatures(
     object = eet,
@@ -414,11 +416,8 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.o
   )
   
   sub.obj$predicted.ids.seurat.terminal = predicted.labels$predicted.id
-  #colnames(predicted.labels) = paste0('seurat.', colnames(predicted.labels))
-  #seurat.obj <- AddMetaData(object = seurat.obj, metadata = predicted.labels)
-  
-  #saveRDS(seurat.obj, file = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds'))
-  
+  sub.obj$predicted.ids.seurat.terminal.prob = predicted.labels$prediction.score.max
+    
   return(sub.obj)
   
 }
