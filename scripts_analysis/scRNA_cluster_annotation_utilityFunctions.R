@@ -231,8 +231,12 @@ quick.analysis.JMurray.scRNA.MS = function()
   
 }
 
-find.reference.mapped.ids.for.terminalCells.scmap = function(sub.obj, nfeatures = 1000, filter.ref.MS = TRUE, 
-                                                         filter.ref.MS.terminal = TRUE)
+find.reference.mapped.ids.for.terminalCells.scmap = function(sub.obj, nfeatures = 2000, 
+                                                             terminals = c('MSxppppx', 'MSxpppax', 'MSxppapp', 
+                                                                       'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
+                                                                       'MSxappppx', 'MSxapppax', 'MSpappax',
+                                                                       'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 
+                                                                       'MSxpaaa', 'MSxappp', 'MSpappa') )
 {
   library(SingleCellExperiment)
   library(scmap)
@@ -247,17 +251,11 @@ find.reference.mapped.ids.for.terminalCells.scmap = function(sub.obj, nfeatures 
   counts(sce) = as.matrix(counts(sce)) # sce object converted from seurat object was using spare matrix
   logcounts(sce) = as.matrix(logcounts(sce))
   
-  ee = process.import.Murray.scRNA(filter.ref.MS = filter.ref.MS);
+  ee = process.import.Murray.scRNA(filter.ref.MS = TRUE);
   ee = Seurat::as.SingleCellExperiment(ee)
   
-  if(filter.ref.MS.terminal){
-    terminals = c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
-                  'MSxappppx', 'MSxapppax', 'MSpappax',
-                  'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
-    ii = match(ee$lineage, terminals)
-    
-    ee = ee[, !is.na(ii)]
-  }
+  ii = match(ee$lineage, terminals)
+  ee = ee[, !is.na(ii)]
   
   counts(ee) = as.matrix(counts(ee))
   logcounts(ee) = as.matrix(logcounts(ee))
@@ -345,15 +343,17 @@ find.reference.mapped.ids.for.terminalCells.scmap = function(sub.obj, nfeatures 
   
 }
 
-seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.obj)
+seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.obj, nfeatures = 2000,
+                                                                           terminals =  c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 
+                                                                                          'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 
+                                                                                          'MSxapppa', 
+                                                                                          'MSxappppx', 'MSxapppax', 'MSpappax',
+                                                                                          'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 
+                                                                                          'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa'))
 {
   library(VisCello.celegans)
   eset = readRDS(file = paste0('data/Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
   pmeda = data.frame(pData(eset))
-  
-  terminals = c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
-                'MSxappppx', 'MSxapppax', 'MSpappax',
-                'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
   
   #terminals = c('MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
   kk = which(!is.na(match(pmeda$lineage, terminals)))
@@ -370,7 +370,7 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.o
   
   eet <- FindVariableFeatures(
     object = eet,
-    nfeatures = 2000
+    nfeatures = nfeatures
   )
   
   eet <- ScaleData(object = eet)
@@ -390,7 +390,7 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.o
     reference.assay = 'RNA',
     query.assay = 'RNA',
     reduction = 'cca',
-    k.anchor = 10, # k.anchor is neighborhood size for MNN big k.anchor, the bigger, the more anchors found
+    k.anchor = 5, # k.anchor is neighborhood size for MNN big k.anchor, the bigger, the more anchors found
     k.filter = 200, # retain the anchor (cell from one dataset to annother) if within k.filter neighbors, the bigger, the more retained  
     max.features = 200, # max nb of features used for anchor filtering
     k.score = 30, 
