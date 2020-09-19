@@ -2295,10 +2295,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   ########################################################
   ########################################################
-  # Section : iteration 11
+  # Section : iteration 10.5
   # first try of manual annotate terminal cells by considering all BDW terminal and their mothers
   # we learnt that to select specific lineages in reference and to use variable gene for that time points help a lot 
   # for reference-based annotation, in particular seurat works well
+  # at the end of the this section, we quickly annotated potential BWM temrinal cells
   ########################################################
   ########################################################
   nb.iteration = 11
@@ -2596,7 +2597,6 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   saveRDS(seurat.obj, file = RDS2save)
   
   
-  
   ########################################################
   ########################################################
   # Section : iteration 11
@@ -2651,7 +2651,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   table(seurat.obj$manual.annot.ids)[grep('MSppaap', names(table(seurat.obj$manual.annot.ids)))]
   
-  xx = table(seurat.obj$seurat_clusters[which(seurat.obj$manual.annot.ids == 'MSapaapp')])
+  xx = table(seurat.obj$seurat_clusters[which(seurat.obj$manual.annot.ids == 'MSxppapp')])
   xx[which(xx > 0)]
   
   #cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) & is.na(seurat.obj$manual.annot.ids)]
@@ -2676,7 +2676,18 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # #seurat.obj$manual.annot.ids == 'MSapaapp'|
   # seurat.obj$manual.annot.ids == 'MSxpaaa'
   #]
-  cells.sels = colnames(seurat.obj)[seurat.obj$manual.annot.ids == 'BWD_terminal' | seurat.obj$manual.annot.ids == 'MSxppapp']
+  ids.annotated = c('BWD_terminal', 
+                    'MSxppapp', # from cluster 2 19 and 39
+                    'MSxapppa', # this annotation mainly from cluster 24 and 22 
+                    'MSxppppx/MSxpppax', # mainly from cluster 24
+                    'unknown.MSxapppax.MSxpppaa.MSxpppaa', # mainly from cluster 31
+                    'unknown.MSxpppaa' # mainly from cluster 50
+                    )
+  
+  cells.sels = colnames(seurat.obj)[seurat.obj$manual.annot.ids ==  | seurat.obj$manual.annot.ids == 'MSxppapp'|
+                                      seurat.obj$manual.annot.ids == 'MSpappa' | seurat.obj$manual.annot.ids == 'MSxapppa'|
+                                      
+                                      ]
   sub.obj = subset(seurat.obj, cells = cells.sels)
   
   sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
@@ -2910,7 +2921,6 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
   sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
   
   
   cluster.index = '2'; id2assign = 'MSxpaaap/MSxppapp/MSxpappp'
