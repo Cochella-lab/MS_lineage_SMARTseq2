@@ -533,7 +533,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   #FeaturePlot(sub.obj, reduction = 'umap', features = c('pha-4', 'hnd-1', 'nhr-67', 'pat-4'))
   
   ##########################################
-  # check potential ids for selected clusters 
+  # check potential ids for selected clusters
   ##########################################
   #DimPlot(sub.obj, reduction = 'umap', group.by = 'scmap.pred.id.500')
   threshold = 0.7
