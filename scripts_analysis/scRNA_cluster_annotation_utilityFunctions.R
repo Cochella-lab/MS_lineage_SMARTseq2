@@ -178,14 +178,35 @@ process.import.Murray.scRNA = function(filter.ref.MS = TRUE)
 quick.analysis.JMurray.scRNA.MS = function()
 {
   library(VisCello.celegans)
+  #cello.data.path = "../VisCello.celegans/inst/app/data/"
+  #eset = readRDS(paste0(cello.data.path, 'eset.rds'))
+  #saveRDS(eset, file =  paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
+  ## import the gene expression matrix and metadata
+  #eset = readRDS(file = paste0(RdataDir, 'cello_Parker_et_al_allData.rds'))
+  #pmeda = data.frame(pData(eset))
+  #eset = eset[, which(pmeda$to.filter == FALSE)]
+  #pmeda = data.frame(pData(eset))
+  #saveRDS(eset, file = paste0(RdataDir, 'Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
+  
   eset = readRDS(file = paste0('data/Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
   pmeda = data.frame(pData(eset))
   
   terminals = c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
-                'MSxappppx', 'MSxapppax', 'MSpappax',
-                'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
+                'MSxappppx', 'MSxapppax', 'MSpappax', 'MSxppppa', 'MSxppppp', 'MSxpppaa', 'MSxpppap',
+                'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa', 
+                'MSxppp', 'MSxppa', 'MSxpap', 'MSxpaa', 'MSxapp',
+                'MSxpp', 'MSxpa', 'MSxap', 
+                'MSxa', 'MSxp')
   
-  terminals = c('MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
+  check.cell.nb = FALSE
+  if(check.cell.nb){
+    nbs = table(ee$lineage)
+    cat('total nb of cell in MS lineage', sum(nbs), '\n')
+    jj = is.na(match(names(nbs), terminals))
+    cat('nb of cells of non-BWM ', sum(nbs[jj]), '\n')
+    
+  }
+  #terminals = c('MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
   kk = which(!is.na(match(pmeda$lineage, terminals)))
   #jj = grep('MS', pmeda$lineage)
   #kk1 = which(pmeda$lineage == '28_cell_or_earlier'| pmeda$lineage == 'ABaxx'| pmeda$lineage == 'Cx'|
@@ -211,7 +232,7 @@ quick.analysis.JMurray.scRNA.MS = function()
   # eet = subset(ee, cells = cells.sels)
   
   
-  eet <- FindVariableFeatures(eet, selection.method = "vst", nfeatures = 1000)
+  eet <- FindVariableFeatures(eet, selection.method = "vst", nfeatures = 2000)
   #length(intersect(VariableFeatures(sub.obj), timers))
   #VariableFeatures(sub.obj) = setdiff(VariableFeatures(sub.obj), timers)
   cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(eet)), '\n')
@@ -220,14 +241,15 @@ quick.analysis.JMurray.scRNA.MS = function()
   eet <- RunPCA(object = eet, features = VariableFeatures(eet), verbose = FALSE)
   ElbowPlot(eet, ndims = 50)
   
-  nb.pcs = 20 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 20; min.dist = 0.1; spread = 1;
+  nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
+  n.neighbors = 30; min.dist = 0.1; spread = 1;
   eet <- RunUMAP(object = eet, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
                      spread = spread, n.neighbors = n.neighbors, 
                      min.dist = min.dist)
   
   #DimPlot(eet, group.by = 'seurat_clusters_split', reduction = 'umap', label = TRUE, label.size = 6)
   DimPlot(eet, group.by = 'lineage', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE)
+  
   
 }
 
