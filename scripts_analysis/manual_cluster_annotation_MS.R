@@ -2682,7 +2682,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
                     'MSxppapp', # from cluster 2 19 and 39
                     'MSxapppa', # this annotation mainly from cluster 24 and 22 
                     'MSxppppx/MSxpppax', # mainly from cluster 24
-                    'unknown.MSxapppax.MSxpppaa.MSxpppaa' # mainly from cluster 31
+                    'unknown.MSxapppax.MSxpppaa.MSxpppaa' # mainly from cluster 31 and cluster 17
                     #'unknown.MSxpppaa' # mainly from cluster 50
                     )
   cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.annotated.sel))])
@@ -2734,7 +2734,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(sub.obj)), '\n')
   
   sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
-  sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, npcs = 100)
+  sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, npcs = 50)
   ElbowPlot(sub.obj, ndims = 50)
   
   nb.pcs = 50 # nb of pcs depends on the considered clusters or ids 
@@ -2781,7 +2781,6 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   #sub.obj$predicted.ids[sub.obj$predicted.ids.scmap.newfeatures.cor<0.5] = NA
   #counts = table(sub.obj$predicted.ids.scmap.newfeatures, as.character(sub.obj$seurat_clusters_split))
   sub.obj = seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells(sub.obj, nfeatures = 5000, terminals = terminals)
-  
   
   sub.obj$predicted.ids = sub.obj$predicted.ids.seurat.terminal
   sub.obj$predicted.ids.prob = sub.obj$predicted.ids.seurat.terminal.prob
@@ -2835,6 +2834,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     
     #sub.obj = find.reference.mapped.ids.for.terminalCells.scmap(sub.obj, nfeatures = 2000, terminals = terminals)
     sub.obj = seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells(sub.obj, nfeatures = 5000,  npcs = 50, terminals = terminals)
+  
   }
   
   sub.obj$predicted.ids = sub.obj$predicted.ids.seurat.terminal
@@ -2872,7 +2872,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   idents.sel = setdiff(idents.sel, c('0', '2', '5', '4', '7', '8', '3', '12', '13', '14', '11'))
   
   idents.sel = c('4', '10', '8', '6', '5', '15', '9')
-  
+  idents.sel = c('1', '12', '2', '17', '18', '14', '16')
+  idents.sel = c('13', '3', '0', '11', '7')
   ## chcek the reference-mapped ids for the rest of clusters
   counts = counts.seurat[, !is.na(match(colnames(counts.seurat), idents.sel))]; 
   counts.filtered = counts.seurat.filter[, !is.na(match(colnames(counts.seurat), idents.sel))]
@@ -2909,15 +2910,26 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # update the manual annotation if good marker genes or mapped ids were found
   ##########################################
   cluster.assingment = list(c('4', 'MSxappppx'), # orignal_clsuter 33
-                            c('5', 'MSxpppaa'),  c('6', 'MSxpppaa'), 
+                            c('5', 'MSxpppaa'),  
+                            c('6', 'MSxpppaa'), 
                             c('8', 'MSxppppp'), 
                             c('10', 'MSxappppx/MSxapppp/MSxapppax/MSxapppa'),
-                            c('15', ''),
-                            c('9', ''),
-                            
-                            
-                            
+                            c('15', 'MSxppppx'),
+                            c('9', 'MSxppppp/MSxappp'), 
+                            c('0', 'MSxpaaap/MSxppapp'), 
+                            c('11', 'MSxppapp'),
+                            c('13', 'MSxpapap'), 
+                            c('3', 'MSxpaaap/MSxpapap'),
+                            c('7', 'MSxpaaap/MSxppapp/MSxpapap/MSxppap'),
+                            c('1', 'MSxppppa/MSxppppp/MSxpppaa/MSxpappa'),
+                            c('2', 'MSxppap/MSxpaaa/MSxpaaap'),
+                            c('12', 'MSxpapp'),
+                            c('14', 'MSxappp'),
+                            c('16', 'likely_nonBWM_origCluster_31'),
+                            c('17', 'BWM_terminal_origCluster_48'),
+                            c('18', 'likely.nonBWM_origCluster_17')
   )
+  length(cluster.assingment)
   
   for(n in 1:length(cluster.assingment)){
     cluster.index = cluster.assingment[[n]][1]; 
@@ -2926,6 +2938,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
     sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
     seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
+    seurat.obj$previous.iteration.clusters[match(cells, colnames(seurat.obj))] = cluster.index
   }
   
   #manual.assign.cluster.with.annotation(cluster.index = '17', id2assign = 'MSxppapp', sub.obj = sub.obj, seurat.obj = seurat.obj)
@@ -2934,7 +2947,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   
   DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
-          na.value = "gray") + 
+          na.value = "gray") + NoLegend()
     ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
     scale_colour_hue(drop = FALSE)
   
