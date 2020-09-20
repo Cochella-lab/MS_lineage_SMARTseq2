@@ -365,7 +365,7 @@ find.reference.mapped.ids.for.terminalCells.scmap = function(sub.obj, nfeatures 
   
 }
 
-seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.obj, nfeatures = 2000,
+seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.obj, nfeatures = 2000, npcs = 30,
                                                                            terminals =  c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 
                                                                                           'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 
                                                                                           'MSxapppa', 
@@ -418,8 +418,8 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.o
     k.filter = 200, # retain the anchor (cell from one dataset to annother) if within k.filter neighbors, the bigger, the more retained  
     max.features = 200, # max nb of features used for anchor filtering
     k.score = 30, 
-    npcs = 30, 
-    dims = 1:30
+    npcs = npcs, 
+    dims = 1:npcs
   )
   
   cat('nb of cells in query and in reference as anchors : ', 
@@ -433,13 +433,13 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.o
     #refdata = as.vector(Idents(seurat.obj)),
     #weight.reduction = seurat.obj[['pca']],
     weight.reduction = sub.obj[['pca']],
-    dims = 1:30,
+    dims = 1:npcs,
     k.weight = 50
   )
   
   sub.obj$predicted.ids.seurat.terminal = predicted.labels$predicted.id
   sub.obj$predicted.ids.seurat.terminal.prob = predicted.labels$prediction.score.max
-    
+  
   return(sub.obj)
   
 }

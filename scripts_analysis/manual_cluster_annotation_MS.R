@@ -2623,6 +2623,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   seurat.obj = readRDS(file = RDSsaved)
   seurat.obj$predicted.ids.scmap = seurat.obj$scmap.pred.id.500
   seurat.obj$predicted.ids.seurat = seurat.obj$seurat.pred.id
+  seurat.obj$previous.iteration.clusters = NA
+  seurat.obj$BWM.cells = NA
   
   if(Refine.annotated.ids){by.group = 'manual.annot.ids';
   }else{by.group = 'seurat_clusters'}
@@ -2762,7 +2764,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   }
   
   sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = n.neighbors, dims = 1:nb.pcs, compute.SNN = TRUE)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 2)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 2.5)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
   
   ##########################################
@@ -2832,9 +2834,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
                   'MSxppp', 'MSxppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
     
     #sub.obj = find.reference.mapped.ids.for.terminalCells.scmap(sub.obj, nfeatures = 2000, terminals = terminals)
-    sub.obj = seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells(sub.obj, nfeatures = 5000, terminals = terminals)
+    sub.obj = seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells(sub.obj, nfeatures = 5000,  npcs = 50, terminals = terminals)
   }
- 
   
   sub.obj$predicted.ids = sub.obj$predicted.ids.seurat.terminal
   sub.obj$predicted.ids.prob = sub.obj$predicted.ids.seurat.terminal.prob
@@ -2843,23 +2844,16 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   Idents(sub.obj) = sub.obj$seurat_clusters_split
   counts.seurat = table(sub.obj$predicted.ids, as.character(sub.obj$seurat_clusters_split))
-  counts.seurat.filter = table(sub.obj$predicted.ids.filtered, as.character(sub.obj$seurat_clusters_split))
-  counts.annot = table(sub.obj$manual.annot.ids, sub.obj$seurat_clusters_split)
-  
-  Idents(sub.obj) = sub.obj$seurat_clusters_split
-  counts.seurat = table(sub.obj$predicted.ids, as.character(sub.obj$seurat_clusters_split))
   counts.seurat.filter = table(sub.obj$predicted.ids.fitered, as.character(sub.obj$seurat_clusters_split))
-  counts.annot = table(sub.obj$manual.annot.ids, sub.obj$seurat_clusters_split)
+  #counts.annot = table(sub.obj$manual.annot.ids, sub.obj$seurat_clusters_split)
   
-  p1 = DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label =TRUE, label.size = 6, repel = TRUE)
-  p2 = DimPlot(sub.obj, group.by = 'predicted.ids', reduction = 'umap', label =TRUE, label.size = 6, repel = TRUE)
-  #p2 = DimPlot(sub.obj, group.by = 'predicted.ids.seurat.terminal', reduction = 'umap', label =TRUE, label.size = 4, repel = TRUE) + NoLegend()
+  
+  p1 = DimPlot(sub.obj, group.by = 'seurat_clusters_split', reduction = 'umap', label =TRUE, label.size = 6, repel = TRUE)
+  p2 = DimPlot(sub.obj, group.by = 'predicted.ids', reduction = 'umap', label =TRUE, label.size = 5, repel = TRUE) + NoLegend()
+  # DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label =TRUE, label.size = 4, repel = TRUE) + NoLegend()
   
   p1 + p2
   
-  #p2 = DimPlot(sub.obj, group.by = 'predicted.ids.seurat.terminal', reduction = 'umap', label =TRUE, label.size = 4, repel = TRUE) + NoLegend()
-  
-  #p1 + p2
   
   legend.txt = NULL
   barplot(counts, main="cluster compositions for predicted labels ",
@@ -2877,28 +2871,25 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   idents.sel = as.character(levels(sub.obj$seurat_clusters_split))
   idents.sel = setdiff(idents.sel, c('0', '2', '5', '4', '7', '8', '3', '12', '13', '14', '11'))
   
-  #idents.sel = c('0', '1', '2', '3', '5', '6', '7', '8', '0', '14', '15', '18' )
+  idents.sel = c('4', '10', '8', '6', '5', '15', '9')
   
   ## chcek the reference-mapped ids for the rest of clusters
-  counts.sel = counts[, !is.na(match(colnames(counts), idents.sel))]
-  counts.sel = counts.sel[apply(as.matrix(counts.sel), 1, sum) >0, ]
-  counts.seurat.sel = counts.seurat[, !is.na(match(colnames(counts.seurat), idents.sel))]
-  counts.seurat.sel = counts.seurat.sel[apply(as.matrix(counts.seurat.sel), 1, sum)>0, ]
-  counts.annot.sel = counts.annot[, !is.na(match(colnames(counts.annot), idents.sel))]
-  counts.annot.sel = counts.annot.sel[apply(as.matrix(counts.annot.sel), 1, sum) >0, ]
+  counts = counts.seurat[, !is.na(match(colnames(counts.seurat), idents.sel))]; 
+  counts.filtered = counts.seurat.filter[, !is.na(match(colnames(counts.seurat), idents.sel))]
+  counts = counts[apply(as.matrix(counts), 1, sum)>0, ]; 
+  counts.filtered = counts.filtered[apply(as.matrix(counts.filtered), 1, sum)>0, ]
   
-  #features.sels = c('unc-120', 'hnd-1', 'hlh-1', 'abts-1', 'ref-2', 'tbx-7', 'unc-39', 'cup-4', 'ins-2', 'F40H3.3', 'hot-1')
+  #counts.sel = counts[, !is.na(match(colnames(counts), idents.sel))]
+  #counts.sel = counts.sel[apply(as.matrix(counts.sel), 1, sum) >0, ]
+  #counts.annot.sel = counts.annot[, !is.na(match(colnames(counts.annot), idents.sel))]
+  #counts.annot.sel = counts.annot.sel[apply(as.matrix(counts.annot.sel), 1, sum) >0, ]
+  
   features.sels = c('unc-120', 'hot-1', 'wago-1', 'pde-6', 'rrc-1', 'maph-1.2', 'kvs-5', 'hlh-1', 'tnt-3', 'spp-15', 'gana-1', 'lin-39', 'rpm-1')
-  #features.sels = c('unc-120', 'clec-264', 'T08H10.1', 'kvs-5', 'pha-4')
   features.terminal = c('gana-1', 'spp-15', 'tnt-3', 'F37H8.5', 'lin-39', 'hot-1', 'wago-1', 'pde-6', 'rrc-1', 'maph-1.2', 'far-5',
                         'clec-264', 'T08H10.1', 'kvs-5', 'B0379.1', 'zig-6', 'frpr-8', 'C14B4.2', 'C06A1.2', 'F48C5.2', 'gst-1')
   
-  features.sels = c('unc-120', 'pha-4', 
-                    'hot-1', 'wago-1', 'pde-6','clec-264', 'T08H10.1',
-                    'gana-1','kvs-5', 'far-5','F37H8.5'
-  )
-  
   VlnPlot(sub.obj, features = features.sels,  group.by = 'seurat_clusters_split', idents = idents.sel)
+  
   
   # check info in JM data for specific lineage
   ids.sel = c('MSxppppx')
@@ -2913,92 +2904,29 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   top.markers[top.markers$cluster == '13',]
   
   FeaturePlot(sub.obj, reduction = 'umap', features = c('hnd-1', 'tbx-7', 'abts-1', 'Y66D12A.13', 'F41D9.2', 'unc-120', 'zig-8')) # MSxpaaa
-  FeaturePlot(sub.obj, reduction = 'umap', features = c('tbx-8', 'F40H3.3', 'ins-2', 'Y42H9B.3', 'unc-120', 'ZK180.5')) # MSxpapa
-  FeaturePlot(sub.obj, reduction = 'umap', features = c('zig-6', 'frpr-8','C14B4.2', 'C06A1.2', 'F48C5.2', 'gst-4', 'maph-1.2', 'irx-1')) # MSxpapa
-  
-  FeaturePlot(sub.obj, reduction = 'umap', features = c('tnt-3', 'gana-1','F37H8.5','kvs-5'))
-  
   
   ##########################################
   # update the manual annotation if good marker genes or mapped ids were found
   ##########################################
-  cluster.index = '0'; id2assign = 'MSxpappa/MSxapppax/MSxppppx'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
+  cluster.assingment = list(c('4', 'MSxappppx'), # orignal_clsuter 33
+                            c('5', 'MSxpppaa'),  c('6', 'MSxpppaa'), 
+                            c('8', 'MSxppppp'), 
+                            c('10', 'MSxappppx/MSxapppp/MSxapppax/MSxapppa'),
+                            c('15', ''),
+                            c('9', ''),
+                            
+                            
+                            
+  )
   
-  cluster.index = '5'; id2assign = 'MSxpappa/MSxapppax/MSxppppx'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  cluster.index = '1'; id2assign = 'MSxpappa/MSxapppax'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  cluster.index = '6'; id2assign = 'MSxappppx/MSxapppax'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  cluster.index = '8'; id2assign = 'MSpappax/MSxapppp/MSxpaaap/terminal.mothers'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  cluster.index = '7'; id2assign = 'MSxpaaap.connection.to.MSxpaaap/MSxpappa.and.MSxapppax/MSxapppp'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  cluster.index = '12'; id2assign = 'MSxpaaap/MSxpaaap/MSxapppax/terminal.mothers'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  cluster.index = '3'; id2assign = 'MSxppppx/MSxappppx/MSxapppa/MSxapppp'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  cluster.index = '13'; id2assign = 'MSxpaaap.alike'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  
-  cluster.index = '2'; id2assign = 'MSxpaaap/MSxppapp/MSxpappp'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  cluster.index = '9'; id2assign = 'MSxpaaap/MSxppapp/MSxpappp'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  cluster.index = '4'; id2assign = 'MSxpaaap'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  cluster.index = '14'; id2assign = 'MSxppapp'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  cluster.index = '10'; id2assign = 'MSxpaaap/MSxppapp/MSxpapap'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  cluster.index = '11'; id2assign = 'MSxpaaap/MSxppapp/MSxpapap'
-  cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-  sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-  seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  
-  
+  for(n in 1:length(cluster.assingment)){
+    cluster.index = cluster.assingment[[n]][1]; 
+    id2assign =  cluster.assingment[[n]][2]; 
+    
+    cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
+    sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
+    seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
+  }
   
   #manual.assign.cluster.with.annotation(cluster.index = '17', id2assign = 'MSxppapp', sub.obj = sub.obj, seurat.obj = seurat.obj)
   DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,
