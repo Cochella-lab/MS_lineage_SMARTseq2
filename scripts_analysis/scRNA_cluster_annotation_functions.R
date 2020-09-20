@@ -636,7 +636,6 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
   # 'MSxappppx', 'MSxapppax', 'MSpappax') 
   ##################################################################################################################################
-  Idents(sub.obj) = sub.obj$seurat_clusters_split
   source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
   terminals = c('MSxppppx', 'MSxpppax', 
                 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 
@@ -652,6 +651,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   sub.obj$predicted.ids.fitered = sub.obj$predicted.ids.seurat.terminal
   sub.obj$predicted.ids.fitered[sub.obj$predicted.ids.prob < 0.4] = NA
   
+  Idents(sub.obj) = sub.obj$seurat_clusters_split
   counts.seurat = table(sub.obj$predicted.ids, as.character(sub.obj$seurat_clusters_split))
   counts.seurat.filter = table(sub.obj$predicted.ids.fitered, as.character(sub.obj$seurat_clusters_split))
   counts.annot = table(sub.obj$manual.annot.ids, sub.obj$seurat_clusters_split)
