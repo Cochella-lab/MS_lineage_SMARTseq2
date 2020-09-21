@@ -3423,7 +3423,8 @@ cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters
                                          ])
 
 
-cluster.sels = c('27', '19', '2', '39', '30', '36', '8', '25')   
+cluster.sels = c('27', '19', '2', '39', '30', '36', '8', '25')
+# cluster.sels = c('27', '19', '2', '39', '36', '8')   
 cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
 sub.obj = subset(seurat.obj, cells = cells.sels)
 sub.obj = subset(seurat.obj, cells = cells.sels)
@@ -3463,6 +3464,26 @@ barplot(counts.seurat, main="cluster compositions by seurat ",
 
 #counts[, match(c('31', '28', '52'), colnames(counts))]
 #counts.seurat[, match(c('31', '28', '52'), colnames(counts.seurat))]
+
+##########################################
+# find new set of variable genes and redo pca and umap
+##########################################
+nfeatures = 3000;
+nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
+n.neighbors = 5;
+min.dist = 0.05; spread = 1;
+
+sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
+#cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(sub.obj)), '\n')
+sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
+sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
+ElbowPlot(sub.obj, ndims = 50)
+sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+                   spread = spread, n.neighbors = n.neighbors, 
+                   min.dist = min.dist)
+
+DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 6)
+
 ##########################################
 # rerun the seurat for label transferring
 ##########################################
@@ -3477,44 +3498,25 @@ if(RErun.seurat.transferring.labels){
   
   #sub.obj = find.reference.mapped.ids.for.terminalCells.scmap(sub.obj, nfeatures = 2000, terminals = terminals)
   sub.obj = seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells(sub.obj, nfeatures = 3000,  npcs = 30, 
-                                                                            k.anchor = 5, k.filter = 50,
+                                                                            k.anchor = 10, k.filter = 50,
                                                                             terminals = terminals)
-  
   sub.obj$predicted.ids = sub.obj$predicted.ids.seurat.terminal
   sub.obj$predicted.ids.prob = sub.obj$predicted.ids.seurat.terminal.prob
   sub.obj$predicted.ids.fitered = sub.obj$predicted.ids.seurat.terminal
   sub.obj$predicted.ids.fitered[sub.obj$predicted.ids.prob < 0.5] = NA
-  p1 = DimPlot(sub.obj, group.by = 'predicted.ids', reduction = 'umap', label = TRUE, label.size = 6, repel = TRUE,  pt.size = 2) + NoLegend()
-  p2 = DimPlot(sub.obj, group.by = 'predicted.ids.fitered', reduction = 'umap', label = TRUE, label.size = 6, repel = TRUE,  pt.size = 2) +
-    NoLegend()
-  p3 = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, repel = TRUE,  pt.size = 2) +
-    NoLegend()
-  
-  p1 + p2 + p3
   
 }
 
-##########################################
-# find new set of variable genes and redo pca and umap
-##########################################
-sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = 3000)
+p1 = DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 6)
+p2 = DimPlot(sub.obj, group.by = 'predicted.ids', reduction = 'umap', label = TRUE, label.size = 6, repel = TRUE,  pt.size = 2) + NoLegend()
+#p2 = DimPlot(sub.obj, group.by = 'predicted.ids.fitered', reduction = 'umap', label = TRUE, label.size = 6, repel = TRUE,  pt.size = 2) +
+#  NoLegend()
+p3 = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, repel = TRUE,  pt.size = 2) +
+  NoLegend()
 
-cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(sub.obj)), '\n')
+p1 + p2 + p3
 
-sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
-sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
-ElbowPlot(sub.obj, ndims = 50)
-
-nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
-n.neighbors = 20;
-min.dist = 0.001; spread = 1;
-sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
-                   spread = spread, n.neighbors = n.neighbors, 
-                   min.dist = min.dist)
-
-# DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 6)
 DimPlot(sub.obj, group.by = 'predicted.ids', reduction = 'umap', label = TRUE, label.size = 4, repel = TRUE) + NoLegend()
-
 DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 4, repel = TRUE) + NoLegend()
 
 p0 = DimPlot(sub.obj, group.by = 'timingEst', reduction = 'umap', label = FALSE, label.size = 5)
