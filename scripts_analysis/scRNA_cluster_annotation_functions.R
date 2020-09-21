@@ -405,7 +405,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   ########################################################
   ########################################################
-  # Section : iteration 14
+  # Section : iteration 16
   # last try of annotate only BWM terminal cells
   # cells were selected from original cluster 36, 39, 2, 19, 27, and also cluster 24, 13, 11, 1, 46, 18, 33, 15, 26, 48 
   # it did not improve the BWM terminal cells and no update in iteration 14 

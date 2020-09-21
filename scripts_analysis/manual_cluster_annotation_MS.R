@@ -3700,13 +3700,13 @@ saveRDS(seurat.obj, file = RDS2save)
 
 ########################################################
 ########################################################
-# Section : iteration 16
+# Section : iteration 14
 # start to integrate BWM terminal and mother cells
 # cells were selected from original cluster 36, 39, 2, 19, 27, and also cluster 24, 13, 11, 1, 46, 18, 33, 15, 26, 48 
 #
 ########################################################
 ########################################################
-nb.iteration = 15
+nb.iteration = 14
 Refine.annotated.ids = FALSE;
 
 RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
@@ -3799,13 +3799,13 @@ cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters
                                            seurat.obj$manual.annot.ids == 'MSx'
                                          ])
 
-#seurat.obj$BWM.cells[!is.na(match(colnames(seurat.obj), cells.sels))] = 'BWM'
-#seurat.bwm = subset(seurat.obj, cells = cells.sels)
-#seurat.nonbwm = subset(seurat.obj, cells = setdiff(colnames(seurat.obj), cells.sels))
-
-#xx = table(seurat.nonbwm$seurat_clusters[which(seurat.nonbwm$manual.annot.ids == 'unknown.MSxpppaa')])
-#xx[which(xx > 0)]
-sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[which(seurat.obj$BWM.cells == 'BWM')])
+# seurat.obj$BWM.cells[!is.na(match(colnames(seurat.obj), cells.sels))] = 'BWM'
+# seurat.bwm = subset(seurat.obj, cells = cells.sels)
+# seurat.nonbwm = subset(seurat.obj, cells = setdiff(colnames(seurat.obj), cells.sels))
+# 
+# xx = table(seurat.nonbwm$seurat_clusters[which(seurat.nonbwm$manual.annot.ids == 'unknown.MSxpppaa')])
+# xx[which(xx > 0)]
+# sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[which(seurat.obj$BWM.cells == 'BWM')])
 
 sub.obj = subset(seurat.obj, cells = cells.sels)
 
@@ -4083,9 +4083,125 @@ DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = T
 saveRDS(seurat.obj, file = RDS2save)
 
 
+########################################################
+########################################################
+# Section : iteration 15
+# start to integrate BWM terminal and mother cells
+# cells were selected from original cluster 36, 39, 2, 19, 27, and also cluster 24, 13, 11, 1, 46, 18, 33, 15, 26, 48 
+#
+########################################################
+########################################################
+nb.iteration = 15
+Refine.annotated.ids = FALSE;
+
+RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
+                  nb.iteration -1, '.rds')
+pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_MSxp_lineage_iteration_", nb.iteration, ".pdf")
+RDS2save =  paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
+                   nb.iteration, '.rds')
+
+seurat.obj = readRDS(file = RDSsaved)
+seurat.obj$predicted.ids.scmap = seurat.obj$scmap.pred.id.500
+seurat.obj$predicted.ids.seurat = seurat.obj$seurat.pred.id
+
+if(Refine.annotated.ids){by.group = 'manual.annot.ids';
+}else{by.group = 'seurat_clusters'}
 
 
+pdf(pdfname, width=18, height = 10)
+par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 
+##########################################
+# select cells of interest
+##########################################
+cluster.index = '24'
+table(seurat.obj$manual.annot.ids[seurat.obj$seurat_clusters == cluster.index], useNA = 'ifany')
+table(seurat.obj$predicted.ids.seurat[seurat.obj$seurat_clusters == cluster.index], useNA = 'ifany')
+
+table(seurat.obj$manual.annot.ids)[grep('MSppaap', names(table(seurat.obj$manual.annot.ids)))]
+
+xx = table(seurat.obj$seurat_clusters[which(seurat.obj$manual.annot.ids == 'MSxppppx/MSxpppax')])
+xx[which(xx > 0)]
+
+cluster.sels = c('4',  '22', '24',  # middle time point for convergence branche
+                 '3', '5', '16', '30', # middle time points for MSxp
+                 '23', '43', '17', '41', '45', '34', '50', # well-separated clusters with clear mapped ids
+                 '44', '28', '52', '31', '53',  # # well-separated clusters without clear mapped ids
+                 '25', '36', '8', '39', '2', '19', '27', # BWM-1 cluster_25 transition to it and possibly cluster_28, 51 transition to BWM_2 
+                 '24', '13', '1', '11', '33', '48', '18', '46', '15', '26' # BWM-2
+)
+
+cluster.sels = c('36', '8', '39', '2', '19', '27', # BWM_terminal_1 without transition 
+                 '13', '1', '11', '33', '48', '18', '46', '15', '26', # BWM_terminal_2
+                 '44', '31', '52', '28', '50', # we
+                 '25', # possible transition clusters
+                 '24' # many cells are not annotated
+)
+
+### BWM terminal cells from cluster 36, 39, 2, 19, 27, 8 and also cluster 24, 13, 11, 1, 46, 18, 33, 15, 26, 48 
+cluster.sels = c('27', '19', '2', '39', '36', '8', '24', '13', '11', '1', '46', '18', '33', '15', '26', '48')   
+cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
+#cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) & is.na(seurat.obj$manual.annot.ids)]
+#cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
+#                                   & is.na(seurat.obj$manual.annot.ids))]
+#cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
+#cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
+
+### try to select all BWM_cells; 
+### cluster '44', '31', '52', '28', '50' were not included here
+cluster.sels = c('36', '8', '39', '2', '19', '27', # BWM_terminal_1 without transition 
+                 '13', '1', '11', '33', '48', '18', '46', '15', '26', # BWM_terminal_2
+                 '25', # possible transition clusters
+                 '24', # also transitions cells and many of them are not annotated
+                 '3', '5', '16', '30', '22', '4' # all middle time points
+)
+cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) |
+                                           
+                                           seurat.obj$manual.annot.ids == 'MSxpppp'|
+                                           seurat.obj$manual.annot.ids == 'MSxpppa'|
+                                           seurat.obj$manual.annot.ids == 'MSxppap'|
+                                           seurat.obj$manual.annot.ids == 'MSxppaa'|
+                                           seurat.obj$manual.annot.ids == 'MSxpapp'|
+                                           seurat.obj$manual.annot.ids == 'MSxpapa'|
+                                           seurat.obj$manual.annot.ids == 'MSxpaap'|
+                                           seurat.obj$manual.annot.ids == 'MSxpaaa'|
+                                           
+                                           seurat.obj$manual.annot.ids == 'MSxappp' |
+                                           seurat.obj$manual.annot.ids == 'MSpappa' |
+                                           
+                                           seurat.obj$manual.annot.ids == 'MSxppp'|
+                                           seurat.obj$manual.annot.ids == 'MSxppa'|
+                                           seurat.obj$manual.annot.ids == 'MSxpap'|
+                                           seurat.obj$manual.annot.ids == 'MSxpaa'|
+                                           seurat.obj$manual.annot.ids == 'MSxapp'|
+                                           
+                                           seurat.obj$manual.annot.ids == 'MSxpp'|
+                                           seurat.obj$manual.annot.ids == 'MSxpa'|
+                                           seurat.obj$manual.annot.ids == 'MSxap'|
+                                           
+                                           seurat.obj$manual.annot.ids == 'MSxp'|
+                                           seurat.obj$manual.annot.ids == 'MSxa'|
+                                           seurat.obj$manual.annot.ids == 'MSx'
+                                         ])
+
+seurat.obj$BWM.cells[!is.na(match(colnames(seurat.obj), cells.sels))] = 'BWM'
+seurat.bwm = subset(seurat.obj, cells = cells.sels)
+seurat.nonbwm = subset(seurat.obj, cells = setdiff(colnames(seurat.obj), cells.sels))
+
+xx = table(seurat.nonbwm$seurat_clusters[which(seurat.nonbwm$manual.annot.ids == 'unknown.MSxpppaa')])
+xx[which(xx > 0)]
+sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[which(seurat.obj$BWM.cells == 'BWM')])
+
+sub.obj = subset(seurat.obj, cells = cells.sels)
+
+sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
+sub.obj$timingEst = as.numeric(as.character(sub.obj$timingEst))
+
+DimPlot(sub.obj, reduction = 'umap', label = TRUE, group.by = by.group)
+barplot(table(sub.obj$seurat_clusters)/table(seurat.obj$seurat_clusters), ylim = c(0, 1), cex.names = 1.0, las=2)
+
+
+saveRDS(seurat.obj, file = RDS2save)
 
 
 
