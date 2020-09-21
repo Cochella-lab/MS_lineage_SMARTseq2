@@ -3700,13 +3700,13 @@ saveRDS(seurat.obj, file = RDS2save)
 
 ########################################################
 ########################################################
-# Section : iteration 14
-# last try of annotate only BWM terminal cells
+# Section : iteration 15
+# start to integrate BWM terminal and mother cells
 # cells were selected from original cluster 36, 39, 2, 19, 27, and also cluster 24, 13, 11, 1, 46, 18, 33, 15, 26, 48 
-# it did not improve the BWM terminal cells and no update in iteration 14 
+#
 ########################################################
 ########################################################
-nb.iteration = 14
+nb.iteration = 15
 Refine.annotated.ids = FALSE;
 
 RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
@@ -3726,7 +3726,18 @@ if(Refine.annotated.ids){by.group = 'manual.annot.ids';
 pdf(pdfname, width=18, height = 10)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 
-#cluster.sels = c('4',  '22', '24', '3', '5', '16', '30') # cluster 4 and 22 have some cells in Msxp lineage
+##########################################
+# select cells of interest
+##########################################
+cluster.index = '24'
+table(seurat.obj$manual.annot.ids[seurat.obj$seurat_clusters == cluster.index], useNA = 'ifany')
+table(seurat.obj$predicted.ids.seurat[seurat.obj$seurat_clusters == cluster.index], useNA = 'ifany')
+
+table(seurat.obj$manual.annot.ids)[grep('MSppaap', names(table(seurat.obj$manual.annot.ids)))]
+
+xx = table(seurat.obj$seurat_clusters[which(seurat.obj$manual.annot.ids == 'MSxppppx/MSxpppax')])
+xx[which(xx > 0)]
+
 cluster.sels = c('4',  '22', '24',  # middle time point for convergence branche
                  '3', '5', '16', '30', # middle time points for MSxp
                  '23', '43', '17', '41', '45', '34', '50', # well-separated clusters with clear mapped ids
@@ -3742,49 +3753,24 @@ cluster.sels = c('36', '8', '39', '2', '19', '27', # BWM_terminal_1 without tran
                  '24' # many cells are not annotated
 )
 
-cluster.index = '52'
-table(seurat.obj$manual.annot.ids[seurat.obj$seurat_clusters == cluster.index], useNA = 'ifany')
-table(seurat.obj$predicted.ids.seurat[seurat.obj$seurat_clusters == cluster.index], useNA = 'ifany')
-
-table(seurat.obj$manual.annot.ids)[grep('MSppaap', names(table(seurat.obj$manual.annot.ids)))]
-
-xx = table(seurat.obj$seurat_clusters[which(seurat.obj$manual.annot.ids == 'MSapaapp')])
-xx[which(xx > 0)]
-
+### BWM terminal cells from cluster 36, 39, 2, 19, 27, 8 and also cluster 24, 13, 11, 1, 46, 18, 33, 15, 26, 48 
+cluster.sels = c('27', '19', '2', '39', '36', '8', '24', '13', '11', '1', '46', '18', '33', '15', '26', '48')   
+cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
 #cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) & is.na(seurat.obj$manual.annot.ids)]
 #cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
 #                                   & is.na(seurat.obj$manual.annot.ids))]
-cluster.sels = c('25', '31', '28', '52', '36', '8', '39', '2', '19', '27')
-cluster.sels = c('25', '36', '8', '39', '2', '19', '27', '13', '1', '11', '33', '48', '18', '46', '15', '26')
 #cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
-cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
+#cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
 
-# BWM_terminal_2
-# cells.sels = colnames(seurat.obj)[seurat.obj$manual.annot.ids == 'MSxpappa/MSxapppax/MSxppppx' | # cluster 0 and cluster 5 in iteration 11
-#                                     seurat.obj$manual.annot.ids == 'MSxppppx/MSxappppx/MSxapppa/MSxapppp' | # cluster 3 
-#                                     seurat.obj$manual.annot.ids == 'MSxpappa/MSxapppax' | # cluster 1
-#                                     seurat.obj$manual.annot.ids == 'MSxappppx/MSxapppax' ] # cluster 6
-# BWM_terminal_1
-# cells.sels = colnames(seurat.obj)[seurat.obj$manual.annot.ids == 'MSxpaaap/MSxppapp/MSxpappp'| # cluster 2 in iteration 11
-#                                     seurat.obj$manual.annot.ids == 'MSxpaaap/MSxppapp/MSxpappp' | # cluster 9
-#                                     seurat.obj$manual.annot.ids == 'MSxpaaap'| # cluster 4
-#                                     seurat.obj$manual.annot.ids == 'MSxppapp' | # cluster 14
-#                                     seurat.obj$manual.annot.ids == 'MSxpaaap/MSxppapp/MSxpapap'] # cluster 10 and 11
-
-##########################################
-# try to select all BWM_cells
-##########################################
+### try to select all BWM_cells; 
+### cluster '44', '31', '52', '28', '50' were not included here
 cluster.sels = c('36', '8', '39', '2', '19', '27', # BWM_terminal_1 without transition 
                  '13', '1', '11', '33', '48', '18', '46', '15', '26', # BWM_terminal_2
                  '25', # possible transition clusters
                  '24', # also transitions cells and many of them are not annotated
-                 '2', '3', '16', '30' # all middle time points
+                 '3', '5', '16', '30', '22', '4' # all middle time points
 )
-
 cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) |
-                                           seurat.obj$manual.annot.ids == 'MSxppppx/MSxpppax'|
-                                           seurat.obj$manual.annot.ids == 'MSxapppa' |
-                                           seurat.obj$manual.annot.ids == 'unknown.MSxapppax.MSxpppaa.MSxpppaa' |
                                            
                                            seurat.obj$manual.annot.ids == 'MSxpppp'|
                                            seurat.obj$manual.annot.ids == 'MSxpppa'|
@@ -3813,10 +3799,16 @@ cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters
                                            seurat.obj$manual.annot.ids == 'MSx'
                                          ])
 
-# BWM terminal cells from cluster 36, 39, 2, 19, 27, 8 and also cluster 24, 13, 11, 1, 46, 18, 33, 15, 26, 48 
-cluster.sels = c('27', '19', '2', '39', '36', '8', '24', '13', '11', '1', '46', '18', '33', '15', '26', '48')   
-cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
-sub.obj = subset(seurat.obj, cells = cells.sels)
+seurat.obj$BWM.cells[!is.na(match(colnames(seurat.obj), cells.sels))] = 'BWM'
+
+seurat.bwm = subset(seurat.obj, cells = cells.sels)
+seurat.nonbwm = subset(seurat.obj, cells = setdiff(colnames(seurat.obj), cells.sels))
+
+xx = table(seurat.nonbwm$seurat_clusters[which(seurat.nonbwm$manual.annot.ids == 'unknown.MSxpppaa')])
+xx[which(xx > 0)]
+
+sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[which(seurat.obj$BWM.cells == 'BWM')])
+
 sub.obj = subset(seurat.obj, cells = cells.sels)
 
 sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
