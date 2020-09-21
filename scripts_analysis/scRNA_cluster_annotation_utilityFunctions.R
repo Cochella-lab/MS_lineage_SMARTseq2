@@ -844,7 +844,7 @@ clustering.splitting.kmean.outlier.detection = function(seurat.obj, sels, redefi
     dbscan::kNNdistplot(mat.dist, k = 4)
     abline(h = 1, lty = 2)
     
-    res.db <- dbscan(mat.dist, eps = 0.5, minPts = 4)
+    res.db <- dbscan(mat.dist, eps = 500, minPts = 5)
     cat('nb of clusters found by dbscan -- ', length(unique(res.db$cluster)), '\n')
     
     subobj$seurat_clusters_split = res.db$cluster
