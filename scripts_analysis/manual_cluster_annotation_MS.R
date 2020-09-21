@@ -3700,7 +3700,7 @@ saveRDS(seurat.obj, file = RDS2save)
 
 ########################################################
 ########################################################
-# Section : iteration 15
+# Section : iteration 16
 # start to integrate BWM terminal and mother cells
 # cells were selected from original cluster 36, 39, 2, 19, 27, and also cluster 24, 13, 11, 1, 46, 18, 33, 15, 26, 48 
 #
@@ -3799,14 +3799,12 @@ cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters
                                            seurat.obj$manual.annot.ids == 'MSx'
                                          ])
 
-seurat.obj$BWM.cells[!is.na(match(colnames(seurat.obj), cells.sels))] = 'BWM'
+#seurat.obj$BWM.cells[!is.na(match(colnames(seurat.obj), cells.sels))] = 'BWM'
+#seurat.bwm = subset(seurat.obj, cells = cells.sels)
+#seurat.nonbwm = subset(seurat.obj, cells = setdiff(colnames(seurat.obj), cells.sels))
 
-seurat.bwm = subset(seurat.obj, cells = cells.sels)
-seurat.nonbwm = subset(seurat.obj, cells = setdiff(colnames(seurat.obj), cells.sels))
-
-xx = table(seurat.nonbwm$seurat_clusters[which(seurat.nonbwm$manual.annot.ids == 'unknown.MSxpppaa')])
-xx[which(xx > 0)]
-
+#xx = table(seurat.nonbwm$seurat_clusters[which(seurat.nonbwm$manual.annot.ids == 'unknown.MSxpppaa')])
+#xx[which(xx > 0)]
 sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[which(seurat.obj$BWM.cells == 'BWM')])
 
 sub.obj = subset(seurat.obj, cells = cells.sels)
@@ -3850,21 +3848,21 @@ barplot(counts.seurat, main="cluster compositions by seurat ",
 # find new set of variable genes and redo pca and umap
 ##########################################
 nfeatures = 5000;
-nb.pcs = 50 # nb of pcs depends on the considered clusters or ids 
-n.neighbors = 5;
-min.dist = 0.05; spread = 1;
-
 sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
 #cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(sub.obj)), '\n')
 sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
 sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE)
 ElbowPlot(sub.obj, ndims = 50)
+nb.pcs = 50 # nb of pcs depends on the considered clusters or ids 
+n.neighbors = 50;
+min.dist = 0.1; spread = 1;
 sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
                    spread = spread, n.neighbors = n.neighbors, 
                    min.dist = min.dist)
 
 DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 6)
 
+DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 4) + NoLegend()
 ##########################################
 # rerun the seurat for label transferring
 ##########################################
