@@ -365,7 +365,10 @@ find.reference.mapped.ids.for.terminalCells.scmap = function(sub.obj, nfeatures 
   
 }
 
-seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.obj, nfeatures = 2000, npcs = 30,
+seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.obj, nfeatures = 3000, npcs = 30,
+                                                                           k.anchor = 5, # k.anchor is neighborhood size for MNN big k.anchor, the bigger, the more anchors found
+                                                                           k.filter = 200, # retain the anchor (cell from one dataset to annother) if within k.filter neighbors, the bigger, the more retained  
+                                                                           max.features = 200, # max nb of features used for anchor filtering
                                                                            terminals =  c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 
                                                                                           'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 
                                                                                           'MSxapppa', 
