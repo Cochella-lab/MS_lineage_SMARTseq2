@@ -7,6 +7,61 @@
 # Date of creation: Fri Aug  7 12:46:05 2020
 ##########################################################################
 ##########################################################################
+test.umap.params.for.BWM.cells = function(sub.obj, 
+                                          pdfname = '/BWM_UMAP_explore_parameters.pdf',
+                                          nfeatures.sampling = c(3000, 5000),
+                                          nb.pcs.sampling = c(5, 10, 30, 50), 
+                                          n.neighbors.sampling = c(5, 10, 30, 50),
+                                          min.dist.sampling = c(0.01, 0.1, 0.3, 0.5), 
+                                          spread.sampling = 1
+)
+{
+  pdfname = paste0(resDir,'/', pdfname);while (!is.null(dev.list()))  dev.off();
+  pdf(pdfname, width=18, height = 12)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  for(nfeatures in nfeatures.sampling)
+  {
+    sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures, verbose = FALSE)
+    sub.obj = ScaleData(sub.obj, features = rownames(sub.obj), verbose = FALSE)
+    sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, npcs = max(50, nb.pcs.sampling))
+    
+    for(nb.pcs in nb.pcs.sampling)
+    {
+      for(n.neighbors in n.neighbors.sampling)
+      {
+        for(min.dist in min.dist.sampling)
+        {
+          for(spread in spread.sampling){
+            cat('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                ', min.dist - ', min.dist, ', spread - ', spread,  '\n')
+            # nfeatures = 5000;
+            # nb.pcs = 50 # nb of pcs depends on the considered clusters or ids 
+            # n.neighbors = 50;
+            # min.dist = 0.05; spread = 1;
+            sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+                               spread = spread, n.neighbors = n.neighbors, 
+                               min.dist = min.dist, verbose = FALSE)
+            
+            #DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 6)
+            pp = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) + 
+              NoLegend() + 
+              ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                             ', min.dist - ', min.dist, ', spread - ', spread))
+            plot(pp)
+          }
+        }
+      }
+        
+    }
+    
+  }
+  
+  
+  dev.off()
+  
+}
+
 
 ########################################################
 ########################################################
