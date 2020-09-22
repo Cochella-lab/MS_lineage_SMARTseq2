@@ -411,7 +411,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # it did not improve the BWM terminal cells and no update in iteration 14 
   ########################################################
   ########################################################
-  nb.iteration = 14
+  nb.iteration = 16
   Refine.annotated.ids = FALSE;
   
   RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
