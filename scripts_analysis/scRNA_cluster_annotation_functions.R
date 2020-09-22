@@ -408,6 +408,10 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # Section : iteration 16
   # collect cells from BWM terminal cells () and mother cells () and also grand-mothers 
   # those cells are the BWM terminal and middle time points, the majority of BWM cells
+  ## !!! HERE we got one of best projection from seurat for the terminal cells and transitions between middle and terminal cells 
+  ## and keep the annotation as the manual.annot.ids
+  # This is probably due to the 8000 variable genes used
+  # the middle cells need to be refined.
   ########################################################
   ########################################################
   nb.iteration = 16
@@ -697,11 +701,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   counts.seurat.filter = table(sub.obj$predicted.ids.fitered, sub.obj$seurat_clusters_split)
   counts.annot = table(sub.obj$manual.annot.ids, sub.obj$seurat_clusters_split)
   
-  sub.obj$manual.annot.ids = sub.obj$predicted.ids
-  p1 = DimPlot(sub.obj, group.by = 'seurat_clusters_split', reduction = 'umap', label =TRUE, label.size = 6, repel = FALSE)
+  #sub.obj$manual.annot.ids = sub.obj$predicted.ids
+  p1 = DimPlot(sub.obj, group.by = 'seurat_clusters_split', reduction = 'umap', label =TRUE, label.size = 6, repel = TRUE)
   p2 = DimPlot(sub.obj, group.by = 'predicted.ids', reduction = 'umap', label =TRUE, label.size = 5, repel = TRUE) + NoLegend()
   p3 = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label =TRUE, label.size = 4, repel = TRUE) + NoLegend()
-  p4 = DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label =TRUE, label.size = 6, repel = FALSE)
+  p4 = DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label =TRUE, label.size = 6, repel = TRUE)
   (p4 + p3)/(p1 + p2)
   
   
@@ -709,7 +713,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   idents.sel = as.character(levels(sub.obj$seurat_clusters_split))
   idents.sel = setdiff(idents.sel, c('0', '2', '5', '4', '7', '8', '3', '12', '13', '14', '11'))
   
-  idents.sel = c('23', '3', '13', '7')
+  idents.sel = c('23', '3', '13', '7', '2')
   
   ## chcek the reference-mapped ids for the rest of clusters
   #counts.sel = counts[, !is.na(match(colnames(counts), idents.sel))]
@@ -748,38 +752,38 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   ##########################################
   # update the manual annotation if good marker genes or mapped ids were found
   ##########################################
-  cluster.assingment = list(c('23', 'MSxappp')
-                            
-                            
-  )
+  #save first the seurat projection result, one of best projection prediciotn
+  seurat.obj$predicted.ids.seurat.keep = NA
+  mm = match(colnames(sub.obj), colnames(seurat.obj))
+  seurat.obj$predicted.ids.seurat.keep[mm] = sub.obj$predicted.ids
+  seurat.obj$manual.annot.ids.1 = seurat.obj$manual.annot.ids
+  seurat.obj$manual.annot.ids = seurat.obj$predicted.ids.seurat.keep
   
   
-  for (ids2assign in c('MSxappp', 'MSxapppp', 'MSxapppa', 'MSxappppx', 'MSxapppax')){
-    
-    cells = colnames(sub.obj)[which(sub.obj$predicted.ids == ids2assign)]
-    sub.obj$manual.annot.ids[match(cells, colnames(sub.obj))] = id2assign
-    seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  }
-  
-  for(n in 1:length(cluster.assingment)){
-    cluster.index = cluster.assingment[[n]][1]; 
-    id2assign =  cluster.assingment[[n]][2]; 
-    cat('cluster ', cluster.index, 'assinged to ', id2assign, '\n')    
-    cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-    sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-    seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-  }
-  
-  #manual.assign.cluster.with.annotation(cluster.index = '17', id2assign = 'MSxppapp', sub.obj = sub.obj, seurat.obj = seurat.obj)
-  DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,
-          pt.size = 2)
-  
-  
+  # cluster.assingment = list(c('23', 'MSxappp')
+  #                           
+  #                             
+  # )
+  # 
+  # for(n in 1:length(cluster.assingment)){
+  #   cluster.index = cluster.assingment[[n]][1]; 
+  #   id2assign =  cluster.assingment[[n]][2]; 
+  #   cat('cluster ', cluster.index, 'assinged to ', id2assign, '\n')    
+  #   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
+  #   sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
+  #   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
+  # }
+  # 
+  # #manual.assign.cluster.with.annotation(cluster.index = '17', id2assign = 'MSxppapp', sub.obj = sub.obj, seurat.obj = seurat.obj)
+  # DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,
+  #         pt.size = 2)
+  # 
+  # 
   DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
-          na.value = "gray") + 
-    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
-    scale_colour_hue(drop = FALSE)
-  
+           na.value = "gray") +
+     ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
+     scale_colour_hue(drop = FALSE)
+
   #FeaturePlot(seurat.obj, reduction = 'umap', features = c('hot-1', 'wago-1', 'pde-6', 'rrc-1', 'maph-1.2'))  
   
   saveRDS(seurat.obj, file = RDS2save)
