@@ -24,7 +24,8 @@ test.umap.params.for.BWM.cells = function(sub.obj,
   {
     sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures, verbose = FALSE)
     sub.obj = ScaleData(sub.obj, features = rownames(sub.obj), verbose = FALSE)
-    sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, npcs = max(50, nb.pcs.sampling))
+    sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, npcs = max(50, nb.pcs.sampling), 
+                      weight.by.var = FALSE)
     
     for(nb.pcs in nb.pcs.sampling)
     {
@@ -44,7 +45,8 @@ test.umap.params.for.BWM.cells = function(sub.obj,
                                min.dist = min.dist, verbose = FALSE)
             
             #DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 6)
-            pp = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) + 
+            pp = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, 
+                         pt.size = 2, repel = TRUE) + 
               NoLegend() + 
               ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
                              ', min.dist - ', min.dist, ', spread - ', spread))
