@@ -247,11 +247,12 @@ quick.analysis.JMurray.scRNA.MS = function()
   pmeda = data.frame(pData(eset))
   
   terminals = c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
-                'MSxappppx', 'MSxapppax', 'MSpappax', 'MSxppppa', 'MSxppppp', 'MSxpppaa', 'MSxpppap',
-                'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa', 
-                'MSxppp', 'MSxppa', 'MSxpap', 'MSxpaa', 'MSxapp',
-                'MSxpp', 'MSxpa', 'MSxap', 
-                'MSxa', 'MSxp')
+                'MSxappppx', 'MSxapppax', 'MSpappax', 'MSxppppa', 'MSxppppp', 'MSxpppaa', 'MSxpppap'
+                #'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa', 
+                #'MSxppp', 'MSxppa', 'MSxpap', 'MSxpaa', 'MSxapp',
+                #'MSxpp', 'MSxpa', 'MSxap', 
+                #'MSxa', 'MSxp', 'MSx'
+                )
   
   check.cell.nb = FALSE
   if(check.cell.nb){
@@ -305,6 +306,15 @@ quick.analysis.JMurray.scRNA.MS = function()
   #DimPlot(eet, group.by = 'seurat_clusters_split', reduction = 'umap', label = TRUE, label.size = 6)
   DimPlot(eet, group.by = 'lineage', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE)
   
+  Idents(eet) = eet$lineage
+  
+  markers <- FindAllMarkers(eet, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
+  top.markers <- markers %>% group_by(cluster) %>% top_n(n = 5, wt = avg_logFC)
+  DoHeatmap(eet, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()
+  
+  # to find new marker genes
+  top.markers <- markers %>% group_by(cluster) %>% top_n(n = 5, wt = avg_logFC)
+  top.markers[top.markers$cluster == 'MSxpappa',]
   
 }
 

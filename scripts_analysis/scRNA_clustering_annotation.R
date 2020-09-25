@@ -105,6 +105,7 @@ if(reEstimate.timing.using.timer.genes.using.cpmNorm){
   
 }
 
+
 par(mfrow = c(1, 3))
 plot(sce$FSC_log2, as.numeric(as.character(sce$timingEst)), type='p', cex = 0.5)
 plot(sce$BSC_log2, as.numeric(as.character(sce$timingEst)), type='p', cex = 0.5)

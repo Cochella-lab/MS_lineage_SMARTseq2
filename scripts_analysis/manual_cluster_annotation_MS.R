@@ -4276,8 +4276,8 @@ xx[which(xx > 0)]
 #cluster.sels = c('25', '36', '8', '39', '2', '19', '27', '13', '1', '11', '33', '48', '18', '46', '15', '26')
 #cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
 #cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
-
-seurat.obj$BWM.cells[seurat.obj$manual.annot.ids == 'likely_nonBWM_origCluster_31'] = NA
+#jj = which(seurat.obj$manual.annot.ids == 'likely_nonBWM_origCluster_31')
+#seurat.obj$BWM.cells[] = NA
 # select BWM terminal and middle time points cells
 ##########################################
 cluster.sels = c('36', '8', '39', '2', '19', '27', # BWM_terminal_1 without transition 
@@ -4393,7 +4393,8 @@ sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap",
                    min.dist = min.dist)
 
 #DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 6)
-DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 4, repel = TRUE) + NoLegend()
+DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,
+        pt.size = 2) + NoLegend()
 
 ##########################################
 # rerun the seurat for label transferring
@@ -4445,8 +4446,8 @@ FindClusters_subclusters = function(sub.obj, resolution = 0.4)
   return(sub.obj$seurat_clusters)
 }
 
-sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:nb.pcs, compute.SNN = TRUE)
-sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.2)
+sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 5, dims = 1:nb.pcs, compute.SNN = TRUE)
+sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.0)
 DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
 
 p0 = DimPlot(sub.obj, group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
@@ -4493,7 +4494,7 @@ if(RErun.seurat.transferring.labels){
   
 }
 
-sub.obj$predicted.ids = sub.obj$predicted.ids.seurat.terminal
+sub.obj$predicted.ids = sub.obj$predicted.ids.seurat.keep
 sub.obj$predicted.ids.prob = sub.obj$predicted.ids.seurat.terminal.prob
 sub.obj$predicted.ids.fitered = sub.obj$predicted.ids.seurat.terminal
 sub.obj$predicted.ids.fitered[sub.obj$predicted.ids.prob < 0.5] = NA
