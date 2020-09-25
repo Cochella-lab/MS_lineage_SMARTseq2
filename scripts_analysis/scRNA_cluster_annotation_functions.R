@@ -382,13 +382,16 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   library(openxlsx)
   
   ee = process.import.Murray.scRNA()
-  murray.ids = unique(ee$lineage)
-  bwms = unique(c('MSx', 'MSxa', 'MSxap', 
-           'MSapaap', 'MSapaapp', 'MSappaaa', 
-           'MSpappa', 'MSpappax', 'MSppaap', 'MSppaapp', 'MSpppaaa',
-           murray.ids[grep('MSxapp|MSxp', murray.ids)]))
   
-  markers.JM = read.xlsx('data/Supplementary_Tables_190611.xlsx', sheet=  4, startRow = 8, colNames = TRUE)
+  murray.ids = unique(ee$lineage)
+  markers.JM = readRDS(file = paste0(RdataDir, 'BWM_markerGenes_JM.rds'))
+  # bwms = unique(c('MSx', 'MSxa', 'MSxap', 
+  #          'MSapaap', 'MSapaapp', 'MSappaaa', 
+  #          'MSpappa', 'MSpappax', 'MSppaap', 'MSppaapp', 'MSpppaaa',
+  #          murray.ids[grep('MSxapp|MSxp', murray.ids)]))
+  
+  #markers.JM = read.xlsx('data/Supplementary_Tables_190611.xlsx', sheet=  4, startRow = 8, colNames = TRUE)
+  
   #markers = markers[!is.na(match(markers$Lineage, bwms)), ]
   #write.csv(markers, file = paste0(tabDir, 'JM_marker_genes_BWM.csv'))
   
@@ -405,16 +408,13 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   ########################################################
   ########################################################
-  # Section : iteration 16
-  # collect cells from BWM terminal cells () and mother cells () and also grand-mothers 
-  # those cells are the BWM terminal and middle time points, the majority of BWM cells
-  ## !!! HERE we got one of best projection from seurat for the terminal cells and transitions between middle and terminal cells 
-  ## and keep the annotation as the manual.annot.ids
-  # This is probably due to the 8000 variable genes used
-  # the middle cells need to be refined.
+  # Section : iteration 17
+  # the second round start 
+  # we start with MSx, MSxa, MSxp, MSxpp, MSxpa, MSxap
+  ## first of all, we need to clean up the seurat.obj 
   ########################################################
   ########################################################
-  nb.iteration = 16
+  nb.iteration = 17
   Refine.annotated.ids = FALSE;
   
   RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
@@ -430,18 +430,36 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   if(Refine.annotated.ids){by.group = 'manual.annot.ids';
   }else{by.group = 'seurat_clusters'}
   
+  bwms.all = c('MSxppppx', 'MSxpppax', # redundant
+               'MSxppppp', 'MSxppppa', 'MSxpppaa', 'MSxpppap',
+                'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 
+                'MSxapppp', 'MSxapppa', 'MSxappppx', 'MSxapppax', 'MSpappax', # all terminal cells
+                'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxppaa', 'MSxpapp', 'MSxpapa', 'MSxpaap', 'MSxpaaa', 'MSxappp', 'MSpappa',  
+                'MSxppp', 'MSxppa', 'MSxpap', 'MSxpaa', 'MSxapp', 
+                'MSxpp', 'MSxpa', 'MSxap',
+                'MSxp', 'MSxa', 
+                'MSx')
+  
+  terminals = c('MSxppppx', 'MSxpppax', # redundant
+                'MSxppppp','MSxppppa', 'MSxpppaa', 'MSxpppap',
+                'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 
+                'MSxpaaap', 'MSxapppp', 'MSxapppa', 
+                'MSxappppx', 'MSxapppax', 'MSpappax'
+  )
+  
   pdf(pdfname, width=18, height = 10)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   ##########################################
   # select subset of cells to annotate
   ##########################################
-  cluster.index = '23'
+  cluster.index = '30'
   table(seurat.obj$manual.annot.ids[seurat.obj$seurat_clusters == cluster.index], useNA = 'ifany')
+  
   table(seurat.obj$predicted.ids.seurat[seurat.obj$seurat_clusters == cluster.index], useNA = 'ifany')
   
   table(seurat.obj$manual.annot.ids)[grep('MSppaap', names(table(seurat.obj$manual.annot.ids)))]
   
-  xx = table(seurat.obj$seurat_clusters[which(seurat.obj$manual.annot.ids == 'MSapaapp')])
+  xx = table(seurat.obj$seurat_clusters[which(seurat.obj$manual.annot.ids.1 == 'MSxa')])
   xx[which(xx > 0)]
   
   #FeaturePlot(seurat.obj, reduction = 'umap', features = c('lin-39', 'clec-264', 'zig-6', 'ceh-34'))
@@ -478,7 +496,6 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   #cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
   #cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
   
-  seurat.obj$BWM.cells[seurat.obj$manual.annot.ids == 'likely_nonBWM_origCluster_31'] = NA
   # select BWM terminal and middle time points cells
   ##########################################
   cluster.sels = c('36', '8', '39', '2', '19', '27', # BWM_terminal_1 without transition 
@@ -517,6 +534,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
                                              # seurat.obj$manual.annot.ids == 'MSxa'|
                                              # seurat.obj$manual.annot.ids == 'MSx'
                                            )])
+  
+  #seurat.obj$BWM.cells[seurat.obj$manual.annot.ids == 'likely_nonBWM_origCluster_31'] = NA
   
   # seurat.obj$BWM.cells[!is.na(match(colnames(seurat.obj), cells.sels))] = 'BWM'
   # seurat.bwm = subset(seurat.obj, cells = cells.sels)
@@ -586,9 +605,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, weight.by.var = FALSE)
   ElbowPlot(sub.obj, ndims = 50)
   
-  nb.pcs = 50 # nb of pcs depends on the considered clusters or ids 
+  nb.pcs = 30 # nb of pcs depends on the considered clusters or ids 
   n.neighbors = 30;
-  min.dist = 0.01; spread = 1
+  min.dist = 0.1; spread = 1
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
                      spread = spread, n.neighbors = n.neighbors, 
                      min.dist = min.dist)
@@ -602,17 +621,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   RErun.seurat.transferring.labels = TRUE
   if(RErun.seurat.transferring.labels){
     source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
-    terminals = c('MSxppppx', 'MSxpppax', 'MSxppppp','MSxppppa', 'MSxpppaa', 'MSxpppap',
-                  'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 
-                  'MSxpaaap', 'MSxapppp', 'MSxapppa', 
-                  'MSxappppx', 'MSxapppax', 'MSpappax', 
-                  'MSxppp', 'MSxppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa',
-                  'MSxpp', 'MSxpa', 'MSxap')
     
     #sub.obj = find.reference.mapped.ids.for.terminalCells.scmap(sub.obj, nfeatures = 2000, terminals = terminals)
     sub.obj = seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells(sub.obj, nfeatures = 3000, npcs = 30, 
                                                                               k.anchor = 5, k.filter = 200,
-                                                                              terminals = terminals)
+                                                                              terminals = bwms.all)
     sub.obj$predicted.ids = sub.obj$predicted.ids.seurat.terminal
     sub.obj$predicted.ids.prob = sub.obj$predicted.ids.seurat.terminal.prob
     sub.obj$predicted.ids.fitered = sub.obj$predicted.ids.seurat.terminal
@@ -684,11 +697,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   RErun.seurat.transferring.labels = FALSE
   if(RErun.seurat.transferring.labels){
     source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
-    terminals = c('MSxppppx', 'MSxpppax', 'MSxppppp','MSxppppa', 'MSxpppaa', 'MSxpppap',
-                  'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 
-                  'MSxpaaap', 'MSxapppp', 'MSxapppa', 
-                  'MSxappppx', 'MSxapppax', 'MSpappax', 
-                  'MSxppp', 'MSxppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
+   
     
     #sub.obj = find.reference.mapped.ids.for.terminalCells.scmap(sub.obj, nfeatures = 2000, terminals = terminals)
     sub.obj = seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells(sub.obj, nfeatures = 5000,  npcs = 50, terminals = terminals)
@@ -737,7 +746,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # check info in JM data for specific lineage
   ids.sel = c('MSxppppx')
   source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
-  find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
+  #find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
+  extrack.markers.from.JM(markers = markers.JM, id = 'MSxpppp', ntop = 10)
   
   top.markers <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
   DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()

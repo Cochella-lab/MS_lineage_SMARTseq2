@@ -247,11 +247,11 @@ quick.analysis.JMurray.scRNA.MS = function()
   pmeda = data.frame(pData(eset))
   
   terminals = c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
-                'MSxappppx', 'MSxapppax', 'MSpappax', 'MSxppppa', 'MSxppppp', 'MSxpppaa', 'MSxpppap'
-                #'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa', 
-                #'MSxppp', 'MSxppa', 'MSxpap', 'MSxpaa', 'MSxapp',
-                #'MSxpp', 'MSxpa', 'MSxap', 
-                #'MSxa', 'MSxp', 'MSx'
+                'MSxappppx', 'MSxapppax', 'MSpappax', 'MSxppppa', 'MSxppppp', 'MSxpppaa', 'MSxpppap',
+                'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa', 
+                'MSxppp', 'MSxppa', 'MSxpap', 'MSxpaa', 'MSxapp',
+                'MSxpp', 'MSxpa', 'MSxap', 
+                'MSxa', 'MSxp', 'MSx'
                 )
   
   check.cell.nb = FALSE
@@ -288,7 +288,7 @@ quick.analysis.JMurray.scRNA.MS = function()
   # eet = subset(ee, cells = cells.sels)
   
   
-  eet <- FindVariableFeatures(eet, selection.method = "vst", nfeatures = 2000)
+  eet <- FindVariableFeatures(eet, selection.method = "vst", nfeatures = 3000)
   #length(intersect(VariableFeatures(sub.obj), timers))
   #VariableFeatures(sub.obj) = setdiff(VariableFeatures(sub.obj), timers)
   cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(eet)), '\n')
@@ -298,7 +298,7 @@ quick.analysis.JMurray.scRNA.MS = function()
   ElbowPlot(eet, ndims = 50)
   
   nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 30; min.dist = 0.1; spread = 1;
+  n.neighbors = 30; min.dist = 0.2; spread = 1;
   eet <- RunUMAP(object = eet, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
                      spread = spread, n.neighbors = n.neighbors, 
                      min.dist = min.dist)
@@ -312,11 +312,20 @@ quick.analysis.JMurray.scRNA.MS = function()
   top.markers <- markers %>% group_by(cluster) %>% top_n(n = 5, wt = avg_logFC)
   DoHeatmap(eet, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()
   
-  # to find new marker genes
-  top.markers <- markers %>% group_by(cluster) %>% top_n(n = 5, wt = avg_logFC)
-  top.markers[top.markers$cluster == 'MSxpappa',]
+  saveRDS(markers, file = paste0(RdataDir, 'BWM_markerGenes_JM.rds'))
+  
+ 
   
 }
+
+extrack.markers.from.JM = function(markers = markers.JM,  id = 'MSxpappa', ntop = 5)
+{
+  # to find new marker genes
+  top.markers <- markers %>% group_by(cluster) %>% top_n(n = ntop, wt = avg_logFC)
+  print(top.markers[top.markers$cluster == id, ])
+  
+}  
+  
 
 find.reference.mapped.ids.for.terminalCells.scmap = function(sub.obj, nfeatures = 2000, 
                                                              terminals = c('MSxppppx', 'MSxpppax', 'MSxppapp', 

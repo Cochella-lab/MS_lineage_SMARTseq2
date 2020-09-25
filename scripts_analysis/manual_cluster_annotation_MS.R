@@ -4207,7 +4207,7 @@ saveRDS(seurat.obj, file = RDS2save)
 
 ########################################################
 ########################################################
-# Section : iteration 17
+# Section : iteration 16
 # collect cells from BWM terminal cells () and mother cells () and also grand-mothers 
 # those cells are the BWM terminal and middle time points, the majority of BWM cells
 ## !!! HERE we got one of best projection from seurat for the terminal cells and transitions between middle and terminal cells 
@@ -4216,7 +4216,7 @@ saveRDS(seurat.obj, file = RDS2save)
 # the middle cells need to be refined.
 ########################################################
 ########################################################
-nb.iteration = 17
+nb.iteration = 16
 Refine.annotated.ids = FALSE;
 
 RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
