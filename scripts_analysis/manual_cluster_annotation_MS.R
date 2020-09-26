@@ -5242,8 +5242,8 @@ seurat.obj$manual.annot.ids[is.na(seurat.obj$BWM.cells)] = NA # keep only BWM ce
 cluster.assingment = list(c('0', 'MSxp'), 
                           #c('1', ''), # don't change cluster 1
                           c('2', 'MSxpa'),
-                          c('3', NA),
-                          c('4', NA),
+                          c('3', 'MSxa'),
+                          c('4', 'MSxa'),
                           c('5', 'MSxap'),
                           c('6', 'MSxap'),
                           c('7', NA),
@@ -5251,7 +5251,7 @@ cluster.assingment = list(c('0', 'MSxp'),
                           c('9', NA),
                           c('10', NA),
                           c('11', NA),
-                          c('12', NA),
+                          c('12', 'MSxa'),
                           c('13', 'MSxa')
                           
 )
@@ -5267,6 +5267,7 @@ for(n in 1:length(cluster.assingment)){
   if(is.na(id2assign)) seurat.obj$BWM.cells[match(cells, colnames(seurat.obj))] = NA
   
 }
+
 
 # #manual.assign.cluster.with.annotation(cluster.index = '17', id2assign = 'MSxppapp', sub.obj = sub.obj, seurat.obj = seurat.obj)
 DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,

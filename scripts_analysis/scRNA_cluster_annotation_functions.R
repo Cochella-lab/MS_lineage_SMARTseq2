@@ -645,7 +645,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
                     'unc-120', 'fbxa-81', # MSxpp
                     'unc-39', 'irx-1', 'egl-43', # MSxpa
                     'ceh-37', 'C45G7.4', 'nhr-67', # MSxap
-                    'cft-1'
+                    'cft-1' # MSxaa
                     )
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
@@ -660,6 +660,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   dev.off()
   
+  FeaturePlot(sub.obj, reduction = 'umap', features = c('cft-1', 'fbxb-70', 'ceh-37'))
   
   #################################################################################################################################
   # update of manually annotated ids using marker genes and potential mapped labels from scmap or seurat
@@ -748,8 +749,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   cluster.assingment = list(c('0', 'MSxp'), 
                             #c('1', ''), # don't change cluster 1
                             c('2', 'MSxpa'),
-                            c('3', NA),
-                            c('4', NA),
+                            c('3', 'MSxa'),
+                            c('4', 'MSxa'),
                             c('5', 'MSxap'),
                             c('6', 'MSxap'),
                             c('7', NA),
@@ -757,7 +758,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
                             c('9', NA),
                             c('10', NA),
                             c('11', NA),
-                            c('12', NA),
+                            c('12', 'MSxa'),
                             c('13', 'MSxa')
     
   )
