@@ -4982,14 +4982,16 @@ cells.sels = unique(colnames(seurat.obj)[seurat.obj$BWM.cells == 'BWM' &
                                               !is.na(match(seurat.obj$manual.annot.ids, ids.sels))                                       
                                            )])
 
-cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) |
-                                           !is.na(match(seurat.obj$manual.annot.ids, ids.sels))                                       
-                                         ])
+#cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) |
+#                                           !is.na(match(seurat.obj$manual.annot.ids, ids.sels))                                       
+#                                         ])
 
-#sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
+sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
 
 #seurat.obj$BWM.cells[seurat.obj$manual.annot.ids == 'likely_nonBWM_origCluster_31'] = NA
-sub.obj = subset(seurat.obj, cells = cells.sels)
+#sub.obj = subset(seurat.obj, cells = cells.sels)
+
+table(sub.obj$seurat_clusters)[table(sub.obj$seurat_clusters)>0]
 
 sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
 sub.obj$timingEst = as.numeric(as.character(sub.obj$timingEst))
