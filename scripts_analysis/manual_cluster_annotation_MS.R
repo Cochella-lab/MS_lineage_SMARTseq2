@@ -4986,10 +4986,10 @@ cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters
                                            !is.na(match(seurat.obj$manual.annot.ids, ids.sels))                                       
                                          ])
 
-sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
+#sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
 
 #seurat.obj$BWM.cells[seurat.obj$manual.annot.ids == 'likely_nonBWM_origCluster_31'] = NA
-#sub.obj = subset(seurat.obj, cells = cells.sels)
+sub.obj = subset(seurat.obj, cells = cells.sels)
 
 sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
 sub.obj$timingEst = as.numeric(as.character(sub.obj$timingEst))

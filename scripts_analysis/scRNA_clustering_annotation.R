@@ -44,6 +44,7 @@ if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 library(Seurat)
 library(ggplot2)
 library(dplyr)
+source.my.script('scRNA_cluster_annotation_functions.R')
 
 ########################################################
 ########################################################

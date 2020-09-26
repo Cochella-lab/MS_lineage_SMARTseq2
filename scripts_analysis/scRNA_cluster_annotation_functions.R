@@ -390,9 +390,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   library(dplyr)
   library(openxlsx)
   
-  ee = process.import.Murray.scRNA()
-  
-  murray.ids = unique(ee$lineage)
+  # ee = process.import.Murray.scRNA()
+  # murray.ids = unique(ee$lineage)
   markers.JM = readRDS(file = paste0(RdataDir, 'BWM_markerGenes_JM.rds'))
   # bwms = unique(c('MSx', 'MSxa', 'MSxap', 
   #          'MSapaap', 'MSapaapp', 'MSappaaa', 
@@ -407,7 +406,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # seurat.obj$manual.annot.ids = NA
   
   
-  nb.iteration = 18
+  nb.iteration = 19
   Refine.annotated.ids = FALSE;
   
   RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
@@ -442,19 +441,20 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
                 'MSxappppx', 'MSxapppax', 'MSpappax'
   )
   
+  
   pdf(pdfname, width=18, height = 10)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   ##########################################
   # select subset of cells to annotate
   ##########################################
-  cluster.index = '14'
+  cluster.index = '22'
   table(seurat.obj$manual.annot.ids[seurat.obj$seurat_clusters == cluster.index], useNA = 'ifany')
   
   table(seurat.obj$predicted.ids.seurat[seurat.obj$seurat_clusters == cluster.index], useNA = 'ifany')
   
   table(seurat.obj$manual.annot.ids)[grep('MSppaap', names(table(seurat.obj$manual.annot.ids)))]
   
-  xx = table(seurat.obj$seurat_clusters[which(seurat.obj$manual.annot.ids == 'MSx')])
+  xx = table(seurat.obj$seurat_clusters[which(seurat.obj$manual.annot.ids == 'MSxapp')])
   xx[which(xx > 0)]
   
   #FeaturePlot(seurat.obj, reduction = 'umap', features = c('lin-39', 'clec-264', 'zig-6', 'ceh-34'))
@@ -487,10 +487,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     (!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) |
      !is.na(match(seurat.obj$manual.annot.ids, ids.sels))                                       
       )])
-  
   cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) |
                                                 !is.na(match(seurat.obj$manual.annot.ids, ids.sels))                                       
                                              ])
+  
+  ids.sels = c('MSxp', 'MSxa', 'MSxpp', 'MSxpa', 'MSxap', 'MSxapp', 'MSxappp', 'MSpappa')
   
   sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
   
