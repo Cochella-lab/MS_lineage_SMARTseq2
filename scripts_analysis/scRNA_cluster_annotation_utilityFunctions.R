@@ -323,11 +323,21 @@ quick.analysis.JMurray.scRNA.MS = function(bwms.all)
   
 }
 
-extrack.markers.from.JM = function(markers = markers.JM,  id = 'MSxpappa', ntop = 5)
+extrack.markers.from.JM = function(markers = markers, eet = eet, group_1 = 'MSxappp', group_2 = 'MSpappa', ntop = 5)
 {
-  # to find new marker genes
-  top.markers <- markers %>% group_by(cluster) %>% top_n(n = ntop, wt = avg_logFC)
-  print(top.markers[top.markers$cluster == id, ])
+  if(is.null(group_2)){
+    # to find new marker genes
+    top.markers <- markers %>% group_by(cluster) %>% top_n(n = ntop, wt = avg_logFC)
+    print(top.markers[top.markers$cluster == group_1, ])
+  }else{
+    Idents(eet) = eet$lineage
+    newmarkers <- FindMarkers(eet, ident.1 =group_1, ident.2 = group_2, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
+    top.markers <- newmarkers %>%  top_n(n = 5, wt = avg_logFC) 
+    print(top.markers)
+  }
+  
+  
+ 
   
 }  
   
