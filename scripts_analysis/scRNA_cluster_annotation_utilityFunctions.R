@@ -323,7 +323,7 @@ quick.analysis.JMurray.scRNA.MS = function(bwms.all)
   
 }
 
-extrack.markers.from.JM = function(markers = markers, eet = eet, group_1 = 'MSxappp', group_2 = 'MSpappa', ntop = 5)
+extrack.markers.from.JM = function(markers = markers, eet = eet, group_1 = 'MSxappp', group_2 = NULL, ntop = 5)
 {
   if(is.null(group_2)){
     # to find new marker genes
