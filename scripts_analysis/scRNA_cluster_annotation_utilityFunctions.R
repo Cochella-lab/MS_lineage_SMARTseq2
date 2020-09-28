@@ -332,7 +332,7 @@ extrack.markers.from.JM = function(markers = markers, eet = eet, group_1 = 'MSxa
   }else{
     Idents(eet) = eet$lineage
     newmarkers <- FindMarkers(eet, ident.1 =group_1, ident.2 = group_2, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
-    top.markers <- newmarkers %>%  top_n(n = 5, wt = avg_logFC) 
+    top.markers <- newmarkers %>%  top_n(n = ntop, wt = avg_logFC) 
     print(top.markers)
   }
   
