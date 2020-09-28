@@ -232,7 +232,7 @@ process.import.Murray.scRNA = function(filter.ref.MS = TRUE)
   
 }
 
-quick.analysis.JMurray.scRNA.MS = function()
+quick.analysis.JMurray.scRNA.MS = function(bwms.all)
 {
   library(VisCello.celegans)
   #cello.data.path = "../VisCello.celegans/inst/app/data/"
@@ -248,13 +248,13 @@ quick.analysis.JMurray.scRNA.MS = function()
   eset = readRDS(file = paste0('data/Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
   pmeda = data.frame(pData(eset))
   
-  terminals = c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
-                'MSxappppx', 'MSxapppax', 'MSpappax', 'MSxppppa', 'MSxppppp', 'MSxpppaa', 'MSxpppap',
-                'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa', 
-                'MSxppp', 'MSxppa', 'MSxpap', 'MSxpaa', 'MSxapp',
-                'MSxpp', 'MSxpa', 'MSxap', 
-                'MSxa', 'MSxp', 'MSx'
-                )
+  # terminals = c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
+  #               'MSxappppx', 'MSxapppax', 'MSpappax', 'MSxppppa', 'MSxppppp', 'MSxpppaa', 'MSxpppap',
+  #               'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa', 
+  #               'MSxppp', 'MSxppa', 'MSxpap', 'MSxpaa', 'MSxapp',
+  #               'MSxpp', 'MSxpa', 'MSxap', 
+  #               'MSxa', 'MSxp', 'MSx'
+  #               )
   
   check.cell.nb = FALSE
   if(check.cell.nb){
@@ -265,7 +265,7 @@ quick.analysis.JMurray.scRNA.MS = function()
     
   }
   #terminals = c('MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
-  kk = which(!is.na(match(pmeda$lineage, terminals)))
+  kk = which(!is.na(match(pmeda$lineage, bwms.all)))
   #jj = grep('MS', pmeda$lineage)
   #kk1 = which(pmeda$lineage == '28_cell_or_earlier'| pmeda$lineage == 'ABaxx'| pmeda$lineage == 'Cx'|
   #              pmeda$lineage == 'Dx'|pmeda$lineage == 'Dxa'|pmeda$lineage == 'Exx')
@@ -276,6 +276,8 @@ quick.analysis.JMurray.scRNA.MS = function()
   
   eet = CreateSeuratObject(counts = eset@assayData$exprs[,kk], assay = 'RNA', meta.data = pmeda[kk, ])
   eet@assays$RNA@data = eset@assayData$norm_exprs[,kk]
+  
+  print(setdiff(bwms.all, unique(eet$lineage)))
   
   par(mfrow=c(2,2))
   hist(eet$n.umi)
@@ -314,7 +316,8 @@ quick.analysis.JMurray.scRNA.MS = function()
   top.markers <- markers %>% group_by(cluster) %>% top_n(n = 5, wt = avg_logFC)
   DoHeatmap(eet, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()
   
-  saveRDS(markers, file = paste0(RdataDir, 'BWM_markerGenes_JM.rds'))
+  save(eet, markers, file = paste0(RdataDir, 'Seurat.object_JM_BWM_data_markers.Rdata'))
+  #saveRDS(markers, file = paste0(RdataDir, 'BWM_markerGenes_JM.rds'))
   
  
   
