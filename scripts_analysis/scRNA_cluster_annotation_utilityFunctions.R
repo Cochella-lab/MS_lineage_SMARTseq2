@@ -455,6 +455,7 @@ find.reference.mapped.ids.for.terminalCells.scmap = function(sub.obj, nfeatures 
 }
 
 seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.obj, nfeatures = 3000, npcs = 30,
+                                                                           reduction = 'cca',
                                                                            k.anchor = 5, # k.anchor is neighborhood size for MNN big k.anchor, the bigger, the more anchors found
                                                                            k.filter = 200, # retain the anchor (cell from one dataset to annother) if within k.filter neighbors, the bigger, the more retained  
                                                                            max.features = 200, # max nb of features used for anchor filtering
@@ -505,7 +506,7 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.o
     #features = features.to.use,
     reference.assay = 'RNA',
     query.assay = 'RNA',
-    reduction = 'cca',
+    reduction = reduction,
     k.anchor = k.anchor, # k.anchor is neighborhood size for MNN big k.anchor, the bigger, the more anchors found
     k.filter = k.filter, # retain the anchor (cell from one dataset to annother) if within k.filter neighbors, the bigger, the more retained  
     max.features = max.features, # max nb of features used for anchor filtering
@@ -536,6 +537,94 @@ seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells = function(sub.o
   
 }
 
+reference.based.cell.projection.rf.svm = function(sub.obj, nfeatures = 3000, scale.cell = TRUE,
+                                                  cost = 1, param.tuning = FALSE, ntree = 50,
+                                                  terminals =  c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 
+                                                                 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 
+                                                                 'MSxapppa', 'MSxappppx', 'MSxapppax', 'MSpappax',
+                                                                 'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 
+                                                                 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa'))
+{
+  library(Seurat)
+  library(scater)
+  library(scran)
+  
+  # cost = 1; param.tuning = FALSE; ntree = 100;
+  ## import J.M data with selected ids
+  library(VisCello.celegans)
+  eset = readRDS(file = paste0('data/Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
+  pmeda = data.frame(pData(eset))
+  
+  kk = which(!is.na(match(pmeda$lineage, terminals)))
+  cat('nb of cell in the reference -- ', length(kk), '\n')
+  cat('nb of cell states in the reference -- ', length(unique(pmeda$lineage[kk])), '\n')
+  
+  eet = CreateSeuratObject(counts = eset@assayData$exprs[,kk], assay = 'RNA', meta.data = pmeda[kk, ])
+  eet@assays$RNA@data = eset@assayData$norm_exprs[,kk]
+  
+  Idents(eet) = eet$lineage
+  cat('-- nb of cells for ids --\n')
+  print(table(eet$lineage))
+  
+  ## select the genes to use
+  eet <- FindVariableFeatures(object = eet, nfeatures = nfeatures)
+  features.sels = intersect(VariableFeatures(eet), rownames(sub.obj))
+  cat('nb of variable genes used in the reference -- ', nfeatures, '\n')
+  cat('nb of variable genes shared by reference and our data -- ', length(features.sels), '\n')
+  
+  sce = Seurat::as.SingleCellExperiment(eet)
+  counts(sce) = as.matrix(counts(sce))
+  logcounts(sce) = as.matrix(logcounts(sce))
+  #rowData(sce)$feature_symbol <- rownames(sce)
+  
+  sce2 = Seurat::as.SingleCellExperiment(sub.obj)
+  counts(sce2) = as.matrix(counts(sce2))
+  logcounts(sce2) = as.matrix(logcounts(sce2))
+  #rowData(sce2)$feature_symbol <- rownames(sce2)
+  
+  index.train = match(features.sels, rownames(sce))
+  index.test = match(features.sels, rownames(sce2))
+  
+  train = sce[index.train, ]
+  test = sce2[index.test, ]
+  y <- as.factor(train$lineage)
+  
+  train = logcounts(train)
+  test = logcounts(test)
+  if(scale.cell){
+    train = scale(train, center = TRUE, scale = TRUE)
+    test = scale(test, center = TRUE, scale = TRUE)
+  }
+  
+  train = t(train)
+  test = t(test)
+  
+  train <- as.data.frame(train)
+  test <- as.data.frame(test)
+  rownames(train) <- NULL
+  rownames(test) <- NULL
+  
+  ## run rf prediction
+  rf.res = run.classifier.rf(train, y, test, ntree = ntree, param.tuning = param.tuning)
+  #rf.res = data.frame(rf.res, stringsAsFactors = FALSE)
+  cat('RF nb of cells with probability > 0.5 :', length(which(rf.res$prob>0.5)), '\n')
+  cat('RF nb of cells with probability > 0.7 :', length(which(rf.res$prob>0.7)), '\n')
+  
+  ## run svm prediction
+  svm.res = run.classifier.svm(train, y, test, cost = cost, param.tuning = param.tuning)
+  #svm.res = data.frame(svm.res, index.test, stringsAsFactors = FALSE)
+  
+  cat('SVM nb of cells with probability > 0.5 :', length(which(svm.res$prob>0.5)), '\n')
+  cat('SVM nb of cells with probability > 0.7 :', length(which(svm.res$prob>0.7)), '\n')
+  
+  sub.obj$pred.ids.svm = svm.res$label
+  sub.obj$pred.ids.svm.prob = svm.res$prob
+  sub.obj$pred.ids.rf = rf.res$label
+  sub.obj$pred.ids.rf.prob = rf.res$prob
+  
+  return(sub.obj)
+  
+}
 
 
 scmap.transfer.labels.from.Tintor.scRNA = function(seurat.obj)
@@ -733,59 +822,6 @@ test.scmap.similarity = function(ee_ref, sce)
     #readline() 
     #break()
   }
-}
-
-
-
-reference.based.cell.projection.rf.svm = function()
-{
-  # prepare train and test tables
-  #ee <- selectFeatures(ee, suppress_plot = FALSE, n_features = 500)
-  #table(rowData(ee)$scmap_features)
-  features.sel = rownames(ee)[rowData(ee)$scmap_features]
-  features.sel = features.sel[!is.na(match(features.sel, rownames(sce)))]
-  ee.sel = ee[match(features.sel, rownames(ee)),]
-  sce.sel = sce[match(features.sel, rownames(sce))]
-  
-  train = logcounts(ee.sel)
-  study = logcounts(sce.sel)
-  train = t(train)
-  train <- as.data.frame(train)
-  y <- as.factor(ee.sel$lineage)
-  study = t(study)
-  study <- as.data.frame(study)
-  rownames(train) <- NULL
-  rownames(study) <- NULL
-  
-  if(method == 'rf'){
-    rf.res = run.classifier.rf(train, study)
-    
-    pred.prob.threshod = 0.5
-    
-    predicted.id = rf.res$label
-    predicted.id[which(rf.res$prob < pred.prob.threshod)] = NA
-    seurat.obj$predicted.id = predicted.id
-    
-    DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
-            na.value = "grey10") + 
-      ggtitle(paste0("projection with RF (threshold = ", pred.prob.threshod, ")")) +
-      scale_colour_hue(drop = FALSE) + 
-      NoLegend()
-  }
-  
-  if(method == 'svm'){
-    svm.res = run.classifier.svm(train, study)
-    predicted.id = svm.res$label
-    predicted.id[which(svm.res$prob < 0.5)] = NA
-    seurat.obj$predicted.id = predicted.id
-    
-    DimPlot(seurat.obj, group.by = "predicted.id", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5,
-            na.value = "grey10") + 
-      ggtitle("projection with SVM ") +
-      scale_colour_hue(drop = FALSE) + 
-      NoLegend()
-  }
-  
 }
 
 ########################################################
@@ -1225,7 +1261,7 @@ run.classifier.rf = function(train, y, test, ntree = 200, param.tuning = FALSE)
   #Prediction <- stats::predict(m1, test, type = "prob")
   #Prediction <- predict(train_rf, test, type = "response")$predictions
   rf.res = data.frame(label = apply(Prediction, 1, function(x) colnames(Prediction)[which.max(x)]),
-                      prob = apply(Prediction, 1, function(x) x[which.max(x)]))
+                      prob = apply(Prediction, 1, function(x) x[which.max(x)]), stringsAsFactors = FALSE)
   #hist(rf.res$prob)
   #kappa2(data.frame(rf.res$label, y.test), weight = c("unweighted"), sort.levels = FALSE)
   return(rf.res)
