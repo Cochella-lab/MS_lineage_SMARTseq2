@@ -9,6 +9,7 @@
 ##########################################################################
 test.umap.params.for.BWM.cells = function(sub.obj, 
                                           pdfname = '/BWM_UMAP_explore_parameters.pdf',
+                                          group.by = 'manual.annot.ids', with_legend = FALSE,
                                           nfeatures.sampling = c(3000, 5000),
                                           nb.pcs.sampling = c(5, 10, 30, 50), 
                                           n.neighbors.sampling = c(5, 10, 30, 50),
@@ -44,12 +45,19 @@ test.umap.params.for.BWM.cells = function(sub.obj,
                                spread = spread, n.neighbors = n.neighbors, 
                                min.dist = min.dist, verbose = FALSE)
             
-            #DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 6)
-            pp = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, 
-                         pt.size = 2, repel = TRUE) + 
-              NoLegend() + 
-              ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
-                             ', min.dist - ', min.dist, ', spread - ', spread))
+            if(with_legend){
+              pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
+                           pt.size = 2, repel = TRUE) + 
+                ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                               ', min.dist - ', min.dist, ', spread - ', spread))
+            }else{
+              pp = DimPlot(sub.obj, group.by = group.by, reduction = 'umap', label = TRUE, label.size = 6, 
+                           pt.size = 2, repel = TRUE) + 
+                NoLegend() + 
+                ggtitle(paste0('nfeatures - ', nfeatures,  ', nb.pcs - ', nb.pcs, ', n.neighbors - ', n.neighbors, 
+                               ', min.dist - ', min.dist, ', spread - ', spread))
+            }
+            
             plot(pp)
           }
         }
