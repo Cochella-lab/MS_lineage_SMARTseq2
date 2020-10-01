@@ -323,7 +323,7 @@ quick.analysis.JMurray.scRNA.MS = function(bwms.all)
   
 }
 
-extrack.markers.from.JM = function(markers = markers, eet = eet, group_1 = 'MSxappp', group_2 = NULL, ntop = 5)
+extrack.markers.from.JM = function(markers = markers, eet = eet, group_1 = 'MSxappp', group_2 = NULL, ntop = 5, test.use = 'wilcox')
 {
   if(is.null(group_2)){
     # to find new marker genes
@@ -331,7 +331,8 @@ extrack.markers.from.JM = function(markers = markers, eet = eet, group_1 = 'MSxa
     print(top.markers[top.markers$cluster == group_1, ])
   }else{
     Idents(eet) = eet$lineage
-    newmarkers <- FindMarkers(eet, ident.1 =group_1, ident.2 = group_2, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
+    newmarkers <- FindMarkers(eet, ident.1 =group_1, ident.2 = group_2, only.pos = TRUE, min.pct = 0.25, 
+                              logfc.threshold = 0.5, test.use = test.use)
     top.markers <- newmarkers %>%  top_n(n = ntop, wt = avg_logFC) 
     print(top.markers)
   }
