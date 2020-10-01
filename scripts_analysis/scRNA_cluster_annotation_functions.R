@@ -600,10 +600,21 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   nb.pcs = 30 # nb of pcs depends on the considered clusters or ids 
   n.neighbors = 10;
-  min.dist = 0.01; spread = 0.5
-  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+  min.dist = 0.01; spread = 1
+  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
                      spread = spread, n.neighbors = n.neighbors,
                      min.dist = min.dist)
+  
+  # idntt = c('MSxpappp'); cells_to_show <- list(c(WhichCells(sub.obj, idents = idntt)))
+  # DimPlot(sub.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE,
+  #         cells.highlight = cells_to_show, cols.highlight = 'red', sizes.highlight = 1,
+  #         pt.size = 2, label.size = 5) + NoLegend() + ggtitle(idntt)
+  # 
+  # idntt = c('MSxpapap'); cells_to_show <- list(c(WhichCells(sub.obj, idents = idntt)))
+  # DimPlot(sub.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE,
+  #         cells.highlight = cells_to_show, cols.highlight = 'red', sizes.highlight = 1.5,
+  #         pt.size = 2, label.size = 5) + NoLegend() + ggtitle(idntt)
+  
   DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE)
   
   DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) + NoLegend()
@@ -699,7 +710,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     return(sub.obj$seurat_clusters)
   }
   
-  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 5, dims = 1:20, compute.SNN = TRUE)
+ 
+  
+  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 5, dims = 1:40, compute.SNN = TRUE)
   sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 2.0)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
 
@@ -734,10 +747,10 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     plot(p1)
   }
   
-  idntt = c('MSxpppap'); cells_to_show <- list(c(WhichCells(sub.obj, idents = idntt)))
-  p2 =  DimPlot(sub.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE,
+  idntt = c('MSxpapap'); cells_to_show <- list(c(WhichCells(sub.obj, idents = idntt)))
+  DimPlot(sub.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE,
                 cells.highlight = cells_to_show, cols.highlight = 'red', sizes.highlight = 1,
-                pt.size = 2, label.size = 5) + NoLegend() + ggtitle('seurat.pred.ids')
+                pt.size = 2, label.size = 5) + NoLegend() + ggtitle(idntt)
   
   # check info in JM data for specific lineage
   #' source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
@@ -805,11 +818,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   features.sels = c('maph-1.3', 'maph-1.2', 'ZC449.5', 'shc-2')
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
-  # MSxpaaap
+  # MSxppapp
   source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
-  extrack.markers.from.JM(markers = markers, eet = eet, group_1 = 'MSxpaaap', group_2 = 'MSxppppp', ntop = 10)
+  extrack.markers.from.JM(markers = markers, eet = eet, group_1 = 'MSxppapp', group_2 = 'MSxpaaap', ntop = 10)
   
-  features.sels = c('maph-1.3', 'maph-1.2', 'ZC449.5', 'shc-2')
+  features.sels = c('K09G1.1', 'tbx-2', 'D1086.12')
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
   

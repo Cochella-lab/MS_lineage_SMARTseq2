@@ -996,6 +996,25 @@ clustering.splitting.kmean.outlier.detection = function(seurat.obj, sels, redefi
   
 }
 
+Find_subClusters_dbscan = function(sub.obj, dims = 1:20, eps = 500, minPts = 5)
+{
+  library('dbscan')
+  library('lsa')
+  subobj.pca = sub.obj@reductions$pca@cell.embeddings[, dims]
+  #mat.dist = dist(lsa::cosine(t(subobj.pca)))
+  
+  dbscan::kNNdistplot(subobj.pca, k = 100)
+  abline(h = 0.2, lty = 2)
+  res.db <- dbscan(subobj.pca, eps = 0.3, minPts = 1000)
+  sub.obj$seurat_clusters_split = res.db$cluster
+  DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
+  #cat('nb of clusters found by dbscan -- ', length(unique(res.db$cluster)), '\n')
+  #subobj$seurat_clusters_split = res.db$cluster
+  
+  return(res.db$cluster)
+  
+}
+
 
 ########################################################
 ########################################################
