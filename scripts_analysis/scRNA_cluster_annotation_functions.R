@@ -825,6 +825,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   features.sels = c('K09G1.1', 'tbx-2', 'D1086.12')
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
+  # MSxpppp and MSxpppa
+ features.sels = c( 'sul-2', 'camt-1', 'irx-1', 'ctg-1',  # MSxpppa 
+                    'tbx-2', 'D1086.12' #MSxpppp
+ )
+  FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
   manual.discovery.new.features = FALSE
   if(manual.discovery.new.features){
@@ -883,13 +888,16 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   
   cluster.assingment = list(#c('0', 'MSxp'),
-                             c('0', 'MSxappppx'),
-                             c('1', 'MSxapppax'),
-                             c('2', 'MSxapppp'),
-                             c('3', 'MSxapppa'),
-                             c('4', 'MSxapppp'),
-                             c('5', 'MSxapppax')
-                              #c('6', 'MSxpapa')
+                             c('0', 'MSxppppa'),
+                             c('7', 'MSxppppa'),
+                             c('4', 'MSxpppaa'),
+                             c('5', 'MSxpppaa'),
+                             c('1', 'MSxppppp'),
+                             c('8', 'MSxpppap'), 
+                             c('2', 'MSxpppp'),
+                             c('3', 'MSxpppa'),
+                             c('6', 'mixture_MSxpppp_MSxpppa_daughters'),
+                             c('9', 'unknown_MSxpppaa_MSxppppa_later')
   )
 
   for(n in 1:length(cluster.assingment)){
