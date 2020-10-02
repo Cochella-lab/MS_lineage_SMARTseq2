@@ -373,10 +373,10 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   ########################################################
   ########################################################
-  # Section : iteration 30 (terminal cells) 
+  # Section : iteration 31 (terminal cells) 
   ## we will always check the mother, current generation and daughter cells together
   ## After using the seurat prediction for middle time points, we focus on  
-  
+  ## all terminal cells and assocaited mother cells except convergence branch 
   ########################################################
   ########################################################
   library(ggplot2)
@@ -404,7 +404,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # predicted.ids.seurat.keep -- saved the seurat prediction for middle and terminal cells
   # pred.ids.seurat.keep.bwm.all -- saved the seurat prediction for all bwm cells (early, middle and temrinal cells)
   ##########################################
-  nb.iteration = 30
+  nb.iteration = 31
   Refine.annotated.ids = TRUE;
   
   RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
@@ -416,6 +416,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   seurat.obj = readRDS(file = RDSsaved)
   seurat.obj$predicted.ids.scmap = seurat.obj$scmap.pred.id.500
   seurat.obj$predicted.ids.seurat = seurat.obj$seurat.pred.id
+  
+  saveRDS(seurat.obj, file = RDS2save)
   
   if(Refine.annotated.ids){by.group = 'manual.annot.ids';
   }else{by.group = 'seurat_clusters'}
