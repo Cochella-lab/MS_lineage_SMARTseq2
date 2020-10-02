@@ -373,7 +373,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   ########################################################
   ########################################################
-  # Section : iteration 31 (terminal cells) 
+  # Section : iteration 32 (terminal cells) 
   ## we will always check the mother, current generation and daughter cells together
   ## After using the seurat prediction for middle time points, we focus on  
   ## all terminal cells and assocaited mother cells except convergence branch 
@@ -404,7 +404,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # predicted.ids.seurat.keep -- saved the seurat prediction for middle and terminal cells
   # pred.ids.seurat.keep.bwm.all -- saved the seurat prediction for all bwm cells (early, middle and temrinal cells)
   ##########################################
-  nb.iteration = 31
+  nb.iteration = 32
   Refine.annotated.ids = TRUE;
   
   RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
@@ -412,12 +412,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_MSxp_lineage_iteration_", nb.iteration, ".pdf")
   RDS2save =  paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
                       nb.iteration, '.rds')
-  
   seurat.obj = readRDS(file = RDSsaved)
-  seurat.obj$predicted.ids.scmap = seurat.obj$scmap.pred.id.500
-  seurat.obj$predicted.ids.seurat = seurat.obj$seurat.pred.id
   
-  saveRDS(seurat.obj, file = RDS2save)
+  #seurat.obj$predicted.ids.scmap = seurat.obj$scmap.pred.id.500
+  #seurat.obj$predicted.ids.seurat = seurat.obj$seurat.pred.id
+  #saveRDS(seurat.obj, file = RDS2save)
   
   if(Refine.annotated.ids){by.group = 'manual.annot.ids';
   }else{by.group = 'seurat_clusters'}
@@ -529,6 +528,10 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   #              'MSxppppp', 'MSxppppa', 'MSxpppaa', 'MSxpppap',  
   #              'MSxpppa', 'MSxpppp')
   # ids.sels = c('mixture_MSxppapp_MSxpappp', 'mixture_terminals', 'MSxpappa')
+  # ids.sels = c('likely_MSxpapap', 'mixture_MSxppapp_MSxpappp', 'likely_MSxpaaap', 'MSxpaaap', 'MSxppapp', 
+  #              'MSxpapa', 'MSxppap', 'MSxpapp', 'mixture_MSxpppa_MSxpppp_MSxpapa_MSxpapp_MSxppap', 'likely_MSxpappa', 'likely_MSxppppx',
+  #              'MSxppppp', 'MSxpppaa', 'MSxppppa', 'MSxpppap', 
+  #              'MSxpppp', 'MSxpppa')
   ids.sels = c('likely_MSxpapap', 'mixture_MSxppapp_MSxpappp', 'likely_MSxpaaap', 'MSxpaaap', 'MSxppapp', 
                'MSxpapa', 'MSxppap', 'MSxpapp', 'mixture_MSxpppa_MSxpppp_MSxpapa_MSxpapp_MSxppap', 'likely_MSxpappa', 'likely_MSxppppx',
                'MSxppppp', 'MSxpppaa', 'MSxppppa', 'MSxpppap', 
@@ -545,6 +548,8 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
   sub.obj$timingEst = as.numeric(as.character(sub.obj$timingEst))
+  sub.obj$pred.ids = sub.obj$predicted.ids.seurat.keep
+  
   DimPlot(sub.obj, reduction = 'umap', label = TRUE, group.by = by.group) + NoLegend()
   
   barplot(table(sub.obj$seurat_clusters)/table(seurat.obj$seurat_clusters), ylim = c(0, 1), cex.names = 1.0, las=2)
