@@ -931,31 +931,31 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'likely_MSxpapap')] = 'MSxpapap'
   # sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxppapp_MSxpappp')] = 'MSxppapp'
   
-  sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'likely_MSxpappp')] = 'MSxpappp'
-  sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'likely_MSxppapp')] = 'MSxppapp'
-  
+  sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'likely_MSxpappp')] = 'MSxppapp/MSxpappp'
+  sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'likely_MSxppapp')] = 'MSxppapp/MSxpappp'
+  sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids.5 != 'MSxppapp')] = 'MSxppapp/MSxpappp'
   
   seurat.obj$manual.annot.ids[match(colnames(sub.obj), colnames(seurat.obj))] = sub.obj$manual.annot.ids
   #mm = match(colnames(sub.obj), colnames(seurat.obj))
   #seurat.obj$manual.annot.ids[mm] = sub.obj$manual.annot.ids
   
-  sub.obj$ids.backup = sub.obj$manual.annot.ids
-  
-  cluster.assingment = list(#c('0', 'MSxp'),
-                            c('5', 'MSxpapap'),
-                            c('')
-                             
-  )
-  for(n in 1:length(cluster.assingment)){
-    cluster.index = cluster.assingment[[n]][1];
-    id2assign =  cluster.assingment[[n]][2];
-    cat('cluster ', cluster.index, 'assinged to ', id2assign, '\n')
-    cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
-    sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
-    seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
-    if(is.na(id2assign)) seurat.obj$BWM.cells[match(cells, colnames(seurat.obj))] = NA
-
-  }
+  # sub.obj$ids.backup = sub.obj$manual.annot.ids
+  # 
+  # cluster.assingment = list(#c('0', 'MSxp'),
+  #                           c('5', 'MSxpapap'),
+  #                           c('')
+  #                            
+  # )
+  # for(n in 1:length(cluster.assingment)){
+  #   cluster.index = cluster.assingment[[n]][1];
+  #   id2assign =  cluster.assingment[[n]][2];
+  #   cat('cluster ', cluster.index, 'assinged to ', id2assign, '\n')
+  #   cells = colnames(sub.obj)[which(sub.obj$seurat_clusters_split == cluster.index)]
+  #   sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
+  #   seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
+  #   if(is.na(id2assign)) seurat.obj$BWM.cells[match(cells, colnames(seurat.obj))] = NA
+  # 
+  # }
   
   #jj1 = which(sub.obj$ids.backup == 'MSxppap')
   #sub.obj$manual.annot.ids[jj1] = 'MSxppap'
@@ -969,7 +969,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
      scale_colour_hue(drop = FALSE) + NoLegend()
   
   #FeaturePlot(seurat.obj, reduction = 'umap', features = c('hot-1', 'wago-1', 'pde-6', 'rrc-1', 'maph-1.2'))  
+  
   saveRDS(seurat.obj, file = RDS2save)
+  
+  
+  
   
   
 }
