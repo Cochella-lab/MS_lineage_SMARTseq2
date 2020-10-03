@@ -10029,4 +10029,3 @@ saveRDS(seurat.obj, file = RDS2save)
 
     #FeaturePlot(seurat.obj, reduction = 'umap', features = c('hot-1', 'wago-1', 'pde-6', 'rrc-1', 'maph-1.2'))
     saveRDS(seurat.obj, file = RDS2save)
-    
