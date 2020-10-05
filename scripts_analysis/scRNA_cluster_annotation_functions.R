@@ -1015,9 +1015,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   seurat.obj$manual.annot.ids[which(seurat.obj$manual.annot.ids == 'MSxpp.early')] = 'MSxpp'
   
-  
   saveRDS(seurat.obj, file = RDS2save)
-  
   
 }
 
