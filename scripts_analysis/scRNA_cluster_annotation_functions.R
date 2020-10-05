@@ -540,8 +540,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # ids.sels = c('MSxppppp', 'MSxpppaa', 'MSxppppa', 'MSxpppap', 'MSxpppp', 'MSxpppa',
   #              'likely_MSxpappa', 'likely_MSxppppx', 'mixture_MSxpppa_MSxpppp_MSxpapa_MSxpapp_MSxppap')
                
-  ids.sels = c('likely_MSxppppx', 'mixture_MSxpppa_MSxpppp_MSxpapa_MSxpapp_MSxppap', 'mixture_terminal_mothers',
-               'MSxpppp', 'MSxpppa', 'MSxpapa', 'MSxpapp', 'MSxppap')
+  ids.sels = c('likely_MSxppppx', 'mixture_MSxpppa_MSxpppp_MSxpapa_MSxpapp_MSxppap', 'mixture_terminal_mothers')
+             #'MSxpppp', 'MSxpppa') 
+             #'MSxpppa', 'MSxpapa', 'MSxpapp', 'MSxppap')
   
   ids.left = setdiff(ids.current, ids.sels)
   print(ids.left)
@@ -549,13 +550,10 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.sels))])
   sub.obj = subset(seurat.obj, cells = cells.sels)
-  
-  xx = table(sub.obj$seurat_clusters)
-  xx[which(xx > 0)]
-  
   sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
   sub.obj$timingEst = as.numeric(as.character(sub.obj$timingEst))
   sub.obj$pred.ids = sub.obj$predicted.ids.seurat.keep
+  
   
   DimPlot(sub.obj, reduction = 'umap', label = TRUE, group.by = by.group) + NoLegend()
   
@@ -615,7 +613,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, weight.by.var = FALSE)
   ElbowPlot(sub.obj, ndims = 50)
   
-  nb.pcs = 30 # nb of pcs depends on the considered clusters or ids 
+  nb.pcs = 20 # nb of pcs depends on the considered clusters or ids 
   n.neighbors = 10;
   min.dist = 0.01; spread = 1
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
@@ -623,6 +621,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
                      min.dist = min.dist, verbose = TRUE)
   
   DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) + NoLegend()
+  
+  
+  xx = table(sub.obj$predicted.ids.seurat.keep)
+  xx[xx>10]
+  jj2 = which(!is.na(match(sub.obj$predicted.ids.seurat.keep, c('MSxppppx', 'MSxpppax'))) == TRUE)
   
   p1 = DimPlot(sub.obj, group.by = 'predicted.ids.seurat.keep', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE)
   p2 = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) + 
