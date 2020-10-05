@@ -500,7 +500,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   seurat.obj$BWM.cells[which(seurat.obj$manual.annot.ids == 'unknown_MSxpppaa_MSxppppa_later')] = NA
   
   ids.current = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
-  ids.sels = ids.current[which(nchar(ids.current)>5)]
+  ids.sels = ids.current[which(nchar(ids.current)>6)]
   
   #ids.sels = c('MSx', 'MSxp', 'MSxa', 'MSxpp', 'MSxpa', 'MSxap')
   # ids.sels = c('MSxapp', 'MSxappp', 'MSpappa', 
@@ -728,8 +728,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   if(RErun.seurat.transferring.labels){
     source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
     
-    #ids.refs = c(terminals, 'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'Msxpaaa')
-    ids.refs = terminals
+    ids.refs = c(terminals, 
+                 'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
+    #ids.refs = terminals
     #sub.obj = find.reference.mapped.ids.for.terminalCells.scmap(sub.obj, nfeatures = 2000, terminals = terminals)
     sub.obj = seurat.transfer.labels.from.Murray.scRNA.to.scRNA.terminalCells(sub.obj, nfeatures = 3000, npcs = 30, 
                                                                               reduction = 'pcaproject',
@@ -742,7 +743,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     abline(v = 0.5, col = 'red', lwd=2.0)
     
     source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
-    sub.obj = reference.based.cell.projection.rf.svm(sub.obj, nfeatures = 3000, cost = 0.1, ntree = 50, scale.cell = TRUE,
+    sub.obj = reference.based.cell.projection.rf.svm(sub.obj, nfeatures = 3000, cost = 0.5, ntree = 50, scale.cell = TRUE,
                                                                               terminals = ids.refs)
     
     sub.obj$predicted.ids.fitered = sub.obj$predicted.ids.seurat.terminal
@@ -765,16 +766,22 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     (p2 + p3) / (p4 + p5)
     
     p2 + p3
+    p1 + p2
+    p1 + p3
     
     DimPlot(sub.obj, group.by = 'predicted.ids', reduction = 'umap', label = TRUE, label.size = 4, repel = TRUE) + NoLegend()
     DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 4, repel = TRUE) + NoLegend()
     #DimPlot(sub.obj, group.by = 'predicted.ids.scmap', reduction = 'umap', label = TRUE, label.size = 4, repel = TRUE)
     
     # save the seurat prediction for all BWM cells
+    seurat.obj$pred.ids.terminals.mothers.seurat = NA
+    seurat.obj$pred.ids.terminals.mothers.svm = NA
     #sub.obj$predicted.ids.seurat.keep.bwm.all = NA
-    sub.obj$pred.ids.seurat.keep.bwm.all = sub.obj$predicted.ids.seurat.terminal
-    seurat.obj$pred.ids.seurat.keep.bwm.all = NA
-    seurat.obj$pred.ids.seurat.keep.bwm.all[match(colnames(sub.obj), colnames(seurat.obj))] = sub.obj$pred.ids.seurat.keep.bwm.all
+    #sub.obj$pred.ids.terminals.mothers.seurat = sub.obj$predicted.ids.seurat.terminal
+    #seurat.obj$pred.ids.seurat.terminals.mothers = NA
+    mm = match(colnames(sub.obj), colnames(seurat.obj))
+    seurat.obj$pred.ids.terminals.mothers.seurat[mm] = sub.obj$predicted.ids.seurat.terminal
+    seurat.obj$pred.ids.terminals.mothers.svm[mm] = sub.obj$pred.ids.svm
     
   }
   
