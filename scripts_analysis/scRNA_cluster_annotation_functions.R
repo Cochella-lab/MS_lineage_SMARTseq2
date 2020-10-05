@@ -373,7 +373,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   ########################################################
   ########################################################
-  # Section : iteration 34 (terminal cells) 
+  # Section : iteration 35 (terminal cells) 
   ## we will always check the mother, current generation and daughter cells together
   ## After using the seurat prediction for middle time points, we focus on  
   ## all terminal cells and assocaited mother cells except convergence branch 
@@ -401,10 +401,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # manual.annot.ids.1 -- inital manual annotation for early and middle time points before using terminal cells annotation from seruat
   # manual.annot.ids.2 -- saved the manual annotation for non-BWM cells 
   # manual.annot.ids.3 -- saved the manual annotation before using seurat prediction for cells in middle time points
+  # manual.annot.ids.6 -- saved manual annotation after iteration 34
   # predicted.ids.seurat.keep -- saved the seurat prediction for middle and terminal cells
   # pred.ids.seurat.keep.bwm.all -- saved the seurat prediction for all bwm cells (early, middle and temrinal cells)
   ##########################################
-  nb.iteration = 34
+  nb.iteration = 35
   Refine.annotated.ids = TRUE;
   
   RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
@@ -494,7 +495,13 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   # cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) |
   #                                               !is.na(match(seurat.obj$manual.annot.ids, ids.sels))                                       
   #                                            ])
+  #seurat.obj$manual.annot.ids.6 = seurat.obj$manual.annot.ids
+  
+  seurat.obj$BWM.cells[which(seurat.obj$manual.annot.ids == 'unknown_MSxpppaa_MSxppppa_later')] = NA
+  
   ids.current = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
+  ids.sels = ids.current[which(nchar(ids.current)>5)]
+  
   #ids.sels = c('MSx', 'MSxp', 'MSxa', 'MSxpp', 'MSxpa', 'MSxap')
   # ids.sels = c('MSxapp', 'MSxappp', 'MSpappa', 
   #              'MSxppp', 'MSxppa', 'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxppaa', 
@@ -543,8 +550,11 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   #'            #''MSxpppa') 
   #'            #'MSxpppa', 'MSxpapa', 'MSxpapp', 'MSxppap')
   # ids.sels = c('mixture_terminal_MSxpppp_MSxpppa', 'MSxppppp', 'MSxppppa', 'MSxpppaa', 'MSxpppap', 'MSxpappa')
-  # ids.sels = c('MSxppapp/MSxpappp', 'MSxppapp')
-  ids.sels = c('MSxpa.early', 'MSxpa')
+  #ids.sels = c('MSxppapp/MSxpappp', 'MSxppapp')
+  #ids.sels = c('MSxpa.early', 'MSxpa')
+  #ids.sels = c('mixture_MSxpaaap.MSxppapp.MSxpappp.MSxpapap')
+               #'MSxppapp/MSxpappp', 'MSxpapap', 'MSxpaaap', 'MSxppapp',
+               #'MSxpapa')
   
   ids.left = setdiff(ids.current, ids.sels)
   print(ids.left)
@@ -554,6 +564,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   sub.obj = subset(seurat.obj, cells = cells.sels)
   sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
   sub.obj$timingEst = as.numeric(as.character(sub.obj$timingEst))
+  
   sub.obj$pred.ids = sub.obj$predicted.ids.seurat.keep
   xx = table(sub.obj$predicted.ids.seurat.keep)
   xx[xx>10]
@@ -601,9 +612,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     require(tictoc)
     tic()
     test.umap.params.for.BWM.cells(sub.obj, 
-                                   pdfname = 'UMAP_param_TEST_BWM_terminalCells_dissect_cells_inBetween_MSxpppp_MSxpppa.pdf',
+                                   pdfname = 'UMAP_param_TEST_BWM_terminalCells_dissect_cells_inBetween_BWM_2_test1.pdf',
                                    group.by = 'pred.ids.filtered', with_legend = TRUE,
-                                   nfeatures.sampling = c(1000, 3000, 5000), nb.pcs.sampling = c(5, 10, 20, 30),
+                                   nfeatures.sampling = c(500, 1000, 3000), nb.pcs.sampling = c(5, 10, 20, 30),
                                    n.neighbors.sampling = c(5, 10, 30), 
                                    min.dist.sampling = c(0.01, 0.1)
                                    )
@@ -611,7 +622,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     
   }
   
-  nfeatures = 3000;
+  nfeatures = 500;
   sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
   #cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(sub.obj)), '\n')
   sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
@@ -620,13 +631,15 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   nb.pcs = 5 # nb of pcs depends on the considered clusters or ids 
   n.neighbors = 10;
-  min.dist = 0.05; spread = 1
+  min.dist = 0.01; spread = 1
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
                      spread = spread, n.neighbors = n.neighbors,
                      min.dist = min.dist, verbose = TRUE)
   
-  DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) 
-  #+ NoLegend()
+  DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) + 
+    NoLegend()
+  
+  VlnPlot(sub.obj, features = c('timingEst'), ncol = 1, group.by = 'manual.annot.ids') + NoLegend()
   
   xx = table(sub.obj$predicted.ids.seurat.keep)
   xx[xx>10]
@@ -635,7 +648,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   #jj2 = which(!is.na(match(sub.obj$predicted.ids.seurat.keep, c('MSxppppx', 'MSxpppax'))) == TRUE)
   
   p1 = DimPlot(sub.obj, group.by = 'pred.ids.filtered', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE)
-  p2 = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) + 
+  p2 = DimPlot(sub.obj, group.by = 'pred.ids.seurat.keep.bwm.all', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) + 
     NoLegend()
   p2 + p1
   
@@ -664,20 +677,25 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
                pt.size = 2, label.size = 5) + NoLegend() + ggtitle(idntt)
   p3 + p4
   
-  
+  # MSxpa
   FeaturePlot(sub.obj, reduction = 'umap', features = c('unc-39', 'R11A5.3', 'egl-43'))
+  
+  FeaturePlot(sub.obj, reduction = 'umap', features = c('zig-8','ham-1', 'F19C6.4',  'shc-2', 'F07C6.4', 
+                                                         'unc-120', 'abts-1' # MSxpaaa
+                                                        ))
   
   # MSxpappa
   #source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
-  extrack.markers.from.JM(markers = markers, eet = eet, group_1 = 'MSxpappa', group_2 = 'MSxppppp', ntop = 10)
+  extrack.markers.from.JM(markers = markers, eet = eet, group_1 = 'MSxpappp', group_2 = 'MSxppapp', ntop = 20)
   features.sels = c('stn-2', 'Y9C2UA.1', 'hsp-12.1', 'unc-62', 
                     'ceh-34', 'zig-6',
                     'fbxb-88', 'fbxc-24', 'E01G4.5',  'igcm-4' 
                     )
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
+  extrack.markers.from.JM(markers = markers, eet = eet, group_1 = 'MSxpappp', group_2 = 'MSxppapp', ntop = 20)
   features.sels = c('maph-1.3', 'shc-2', 'twk-31', 'mec-2',   # MSxppapp
-                    'D1086.12', 'tbx-2', 'K09G1.1', 'zig-6', 'stn-2', 'T25G12.11') # MSxpappp   
+                    'D1086.12', 'tbx-2', 'K09G1.1', 'zig-6', 'stn-2', 'T25G12.11', 'unc-5') # MSxpappp   
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
   # MSxpapap (almost sure)
@@ -778,7 +796,6 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.0)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
   
-  
   p1  = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, repel = TRUE,  pt.size = 2) +
      ggtitle('manual.annot.ids') + NoLegend()
   p2 = DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2,
@@ -791,9 +808,9 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   p4 = VlnPlot(sub.obj, features = c('timingEst'), ncol = 1,
                group.by = 'seurat_clusters_split') + NoLegend()
   
-  
   VlnPlot(sub.obj, features = c('timingEst'), ncol = 1,
           group.by = 'manual.annot.ids') + NoLegend()
+  
   p1 + p4
   p2 + p4
   plot(p3)
@@ -984,7 +1001,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
     sub.obj$manual.annot.ids[which(sub.obj$seurat_clusters_split == cluster.index)] = id2assign
     seurat.obj$manual.annot.ids[match(cells, colnames(seurat.obj))] = id2assign
     if(is.na(id2assign)) seurat.obj$BWM.cells[match(cells, colnames(seurat.obj))] = NA
-
+  
   }
   
   #jj1 = which(sub.obj$ids.backup == 'MSxppap')
