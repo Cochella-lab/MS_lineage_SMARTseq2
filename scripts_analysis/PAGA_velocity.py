@@ -8,8 +8,12 @@ import numpy as np
 from matplotlib import rcParams
 import matplotlib.pyplot as plt
 import scanpy as sc
-
 #%matplotlib inline 
+
+sc.settings.verbosity = 3  # verbosity: errors (0), warnings (1), info (2), hints (3)
+sc.logging.print_versions()
+results_file = './write/paul15.h5ad'
+sc.settings.set_figure_params(dpi=80, frameon=False, figsize=(3, 3), facecolor='white')  # low dpi (dots per inch) yields small inline figures
 
 sc.settings.verbosity = 3  # verbosity: errors (0), warnings (1), info (2), hints (3)
 sc.settings.set_figure_params(dpi=80, color_map='viridis')  # low dpi (dots per inch) yields small inline figures
