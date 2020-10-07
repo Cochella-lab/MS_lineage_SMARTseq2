@@ -337,5 +337,34 @@ ms$manual.annot.ids = NA
 ms = manual.annotation.for.BWM.clusters(seurat.obj = ms)
 
 
+##########################################
+# read annotated seurat.obj and save loom file 
+##########################################
+# install scater https://bioconductor.org/packages/release/bioc/html/scater.html
+library(scater)
+# install loomR from GitHub using the remotes package remotes::install_github(repo =
+# 'mojaveazure/loomR', ref = 'develop')
+library(loomR)
+library(Seurat)
+library(patchwork)
+
+nb.iteration = 36
+RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
+                  nb.iteration -1, '.rds')
+seurat.obj = readRDS(file = RDSsaved)
+
+## select manually annotated bwm cells
+ids.bwm = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
+cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.bwm))])
+sub.obj = subset(seurat.obj, cells = cells.sels)
+manual.annot.ids = sub.obj$manual.annot.ids
+
+sub.obj@meta.data[, grep('pred|ids|scmap|previous.iteration.clusters|BWM.cells', colnames(sub.obj@meta.data))] = NULL
+sub.obj$manual.ids = manual.annot.ids
+
+sub.loom <- as.loom(sub.obj, filename = "seuratObj_BWM_manual_cellIds_iteration_36.loom", verbose = FALSE)
+sub.loom
+sub.loom$close_all()
+
 
 
