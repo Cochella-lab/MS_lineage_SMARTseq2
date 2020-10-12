@@ -16,7 +16,6 @@ if(install.magic){
   # at the same time the magic-impute was installed in default python 
   # /usr/local/bin/python
   
-  
 }
 
 ##########################################

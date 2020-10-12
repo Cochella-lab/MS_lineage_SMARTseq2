@@ -83,7 +83,7 @@ sc.pl.paga(adata, threshold=0.8, layout='fa')
 sc.pl.paga(adata,
     threshold=0.9,           
     solid_edges='connectivities',
-    #dashed_edges='connectivities', 
+    #dashed_edges='connectivities', c
     layout='fa',
     node_size_scale=3,
     node_size_power=1,
@@ -127,6 +127,36 @@ sc.pl.paga_compare(
   edge_width_scale = 0.5,
   save = False
 )
+
+"""
+Run scVI for imputation before gene dynamics 
+original code from https://www.scvi-tools.org/en/stable/tutorials/basic_tutorial.html
+working directory is :
+    /Users/jiwang/workspace/imp/scRNAseq_MS_lineage_dev/results_jiwang/results/all_batches_202008/scVI
+"""
+import sys
+IN_COLAB = "google.colab" in sys.modules
+
+def allow_notebook_for_test():
+    print("Testing the basic tutorial notebook")
+
+show_plot = True
+test_mode = False
+save_path = "./"
+
+if not test_mode:
+    save_path = "../../data"
+
+if IN_COLAB:
+    !pip install --quiet scvi[notebooks]
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import pandas as pd
+import scanpy as sc
+import scvi
+
 
 
 ##################################
