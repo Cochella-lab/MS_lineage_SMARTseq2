@@ -8,7 +8,7 @@
 ##########################################################################
 ##########################################################################
 test.umap.params.for.BWM.cells = function(sub.obj, 
-                                          pdfname = '/BWM_UMAP_explore_parameters.pdf',
+                                          pdfname = 'BWM_UMAP_explore_parameters.pdf',
                                           group.by = 'manual.annot.ids', with_legend = FALSE,
                                           nfeatures.sampling = c(3000, 5000),
                                           nb.pcs.sampling = c(5, 10, 30, 50), 

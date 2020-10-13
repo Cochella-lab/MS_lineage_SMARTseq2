@@ -338,7 +338,7 @@ ms = manual.annotation.for.BWM.clusters(seurat.obj = ms)
 
 
 ##########################################
-# read annotated seurat.obj and save loom file 
+# read annotated seurat.obj and save loom file for PAGA analysis
 ##########################################
 # install scater https://bioconductor.org/packages/release/bioc/html/scater.html
 library(scater)
@@ -350,7 +350,7 @@ library(patchwork)
 
 nb.iteration = 36
 RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
-                  nb.iteration -1, '.rds')
+                  nb.iteration, '.rds')
 seurat.obj = readRDS(file = RDSsaved)
 
 ## select manually annotated bwm cells
@@ -358,6 +358,7 @@ ids.bwm = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)],
 cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.bwm))])
 sub.obj = subset(seurat.obj, cells = cells.sels)
 
+#saveRDS(sub.obj, file = paste0(RdataDir, 'manual_annotated_BWM_3.5k.cells.rds'))
 source.my.script('scRNA_cluster_annotation_functions.R')
 # compare.bwm.with.JMdata(sub.obj)
 
@@ -368,6 +369,56 @@ sub.obj$manual.ids = manual.annot.ids
 sub.loom <- as.loom(sub.obj, filename = "seuratObj_BWM_manual_cellIds_iteration_36.loom", verbose = FALSE)
 sub.loom
 sub.loom$close_all()
+
+
+########################################################
+########################################################
+# Section : regulator prediction using sc_TF_MARA.R
+# ideally, at the end we will have a package easily to be install in Github
+# inputs will be either mRNA or pre-mRNA matrix
+# the data will be processed either cluster-wise (id-wise) or cell-wise
+# imputation will be done for cell-wise analysis
+# dynamic genes will be identified using gam package
+# MARA is used for inferring TF actvities 
+########################################################
+########################################################
+resDir = paste0("results/", version.analysis, '/annoted_BWM')
+tabDir = paste0(resDir, "/tables/")
+
+if(!dir.exists("results/")){dir.create("results/")}
+if(!dir.exists(resDir)){dir.create(resDir)}
+if(!dir.exists(tabDir)){dir.create(tabDir)}
+
+sub.obj = readRDS(file = paste0(RdataDir, 'manual_annotated_BWM_3.5k.cells.rds'))
+sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxppppp.MSxppppa.MSxpppap.MSxpppaa.MSxpappa')] =
+  'mixture_terminal_1'
+sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxpaaap.MSxppapp.MSxpappp.MSxpapap')] = 
+  'mixture_terminal_2'
+
+source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
+require(tictoc)
+tic()
+test.umap.params.for.BWM.cells(sub.obj, 
+                               pdfname = 'UMAP_param_TEST_BWM_all.pdf',
+                               group.by = 'manual.annot.ids', with_legend = FALSE,
+                               nfeatures.sampling = c(3000, 5000, 8000), nb.pcs.sampling = c(10, 20, 30, 50),
+                               n.neighbors.sampling = c(5, 10, 30, 50), 
+                               min.dist.sampling = c(0.01, 0.1)
+)
+toc()
+
+##########################################
+# run the sctf.MARA
+##########################################
+source.my.script('sctf_MARA.R')
+
+
+
+
+
+
+
+
 
 
 
