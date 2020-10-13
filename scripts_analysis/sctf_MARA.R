@@ -7,6 +7,63 @@
 # Date of creation: Wed Oct  7 17:31:46 2020
 ##########################################################################
 ##########################################################################
+library("pheatmap")
+library("RColorBrewer")
+library(grid)
+
+
+predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manual.annot.ids', Y_name = 'RNA')
+{
+  # mode = 'cluster.wise';
+  ids = sub.obj$manual.annot.ids
+  Y.data = sub.obj@assays$RNA@data
+  ids.uniq = unique(ids)
+  
+  if(mode == 'cluster.wise'){
+    cat('-- averging the gene expression in clusters -- \n')
+    
+    Y.mat = matrix(NA, nrow = nrow(Y.data), ncol = length(ids.uniq))
+    colnames(Y.mat) = ids.uniq
+    rownames(Y.mat) = rownames(Y.data)
+    
+    for(n in 1:length(ids.uniq)) 
+    {
+      jj = which(ids == ids.uniq[n])
+      if(length(jj) == 1) Y.mat[, n] = Y.data[,jj]
+      if(length(jj) > 1) Y.mat[, n] = apply(Y.data[,jj], 1, mean)
+    }
+    
+    cal_z_score <- function(x){ (x - mean(x)) / sd(x)}
+    Y.norm <- t(apply(Y.mat, 1, cal_z_score))
+    #cols = c(colorRampPalette((brewer.pal(n = 7, name="RdYlBu")))(100))
+    
+    
+    pheatmap(Y.norm, cluster_rows=TRUE, 
+             show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
+             scale = 'none',
+             cluster_cols=FALSE, 
+             main = paste0("gene dynamics"), 
+             na_col = "white",
+             #color = cols, 
+             #annotation_col = my_sample_col,
+             #gaps_row = c(1:nrow(map)-1),
+             fontsize_col = 10,
+             height = 8,
+             width = 30
+    )
+    
+  }else{
+    Y.mat = Y.data
+  }
+  
+}
+
+########################################################
+########################################################
+# Section : package installation
+# 
+########################################################
+########################################################
 install.magic = FALSE
 if(install.magic){
   install.packages("Rmagic")

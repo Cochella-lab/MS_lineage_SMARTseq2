@@ -408,10 +408,11 @@ test.umap.params.for.BWM.cells(sub.obj,
 toc()
 
 ##########################################
-# run the sctf.MARA
+# run the sctf_MARA
 ##########################################
 source.my.script('sctf_MARA.R')
 
+res = predict.TF.MARA.for.scdata(sub.obj, mode = 'cluster.wise', id = 'manual.annot.ids')
 
 
 
