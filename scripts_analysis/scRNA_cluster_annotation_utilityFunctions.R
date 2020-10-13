@@ -256,13 +256,19 @@ quick.analysis.JMurray.scRNA.MS = function(bwms.all)
   eset = readRDS(file = paste0('data/Parker_et_al_dataSet_afterFiltering_89701cell.rds'))
   pmeda = data.frame(pData(eset))
   
-  # terminals = c('MSxppppx', 'MSxpppax', 'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 'MSxapppp', 'MSxapppa', 
-  #               'MSxappppx', 'MSxapppax', 'MSpappax', 'MSxppppa', 'MSxppppp', 'MSxpppaa', 'MSxpppap',
-  #               'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa', 
-  #               'MSxppp', 'MSxppa', 'MSxpap', 'MSxpaa', 'MSxapp',
-  #               'MSxpp', 'MSxpa', 'MSxap', 
-  #               'MSxa', 'MSxp', 'MSx'
-  #               )
+  bwms.all = c('MSxppppx', 'MSxpppax', # redundant
+               'MSxppppp', 'MSxppppa', 'MSxpppaa', 'MSxpppap',
+               'MSxppapp', 'MSxpappp', 'MSxpappa', 'MSxpapap', 'MSxpaaap', 
+               'MSxapppp', 'MSxapppa', 'MSxappppx', 'MSxapppax', 'MSpappax', # all terminal cells
+               'MSxpppp', 'MSxpppa', 'MSxppap', # 'MSxppaa', 
+               'MSxpapp', 'MSxpapa',  
+               'MSapaap', 'MSppaap', #'MSxpaap', 
+               'MSxpaaa', 'MSxappp', 'MSpappa', 
+               'MSxppp', 'MSxppa', 'MSxpap', 'MSxpaa', 'MSxapp'
+               #'MSxpp', 'MSxpa', 'MSxap',
+               #'MSxp', 'MSxa',
+               #'MSx'
+               )
   
   check.cell.nb = FALSE
   if(check.cell.nb){
@@ -273,12 +279,8 @@ quick.analysis.JMurray.scRNA.MS = function(bwms.all)
     
   }
   #terminals = c('MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa')
-  kk = which(!is.na(match(pmeda$lineage, bwms.all)))
-  #jj = grep('MS', pmeda$lineage)
-  #kk1 = which(pmeda$lineage == '28_cell_or_earlier'| pmeda$lineage == 'ABaxx'| pmeda$lineage == 'Cx'|
-  #              pmeda$lineage == 'Dx'|pmeda$lineage == 'Dxa'|pmeda$lineage == 'Exx')
   
-  #kk = unique(c(kk, kk1))
+  kk = which(!is.na(match(pmeda$lineage, bwms.all)))
   cat('nb of cell in reference -- ', length(kk), '\n')
   cat('nb of cell states in reference -- ', length(unique(pmeda$lineage[kk])), '\n')
   
@@ -293,12 +295,6 @@ quick.analysis.JMurray.scRNA.MS = function(bwms.all)
   hist(eet$n.umi/eet$nFeature_RNA, breaks = 10)
   xx = (eet@assays$RNA@counts[,10]); xx = xx[which(xx>0)]
   hist(xx, breaks = 20)
-  # Idents(ee) = 
-  # cells.sels = colnames(ee)[!is.na(match(ee$lineage, terminals))]
-  # #eet = ee[, is.na(jj)]
-  # xx = ee[, c(1:10)]
-  # eet = subset(ee, cells = cells.sels)
-  
   
   eet <- FindVariableFeatures(eet, selection.method = "vst", nfeatures = 3000)
   #length(intersect(VariableFeatures(sub.obj), timers))
@@ -306,11 +302,11 @@ quick.analysis.JMurray.scRNA.MS = function(bwms.all)
   cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(eet)), '\n')
   
   eet = ScaleData(eet, features = rownames(eet))
-  eet <- RunPCA(object = eet, features = VariableFeatures(eet), verbose = FALSE)
+  eet <- RunPCA(object = eet, features = VariableFeatures(eet), verbose = FALSE, weight.by.var = FALSE )
   ElbowPlot(eet, ndims = 50)
   
   nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 30; min.dist = 0.2; spread = 1;
+  n.neighbors = 30; min.dist = 0.1; spread = 1;
   eet <- RunUMAP(object = eet, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
                      spread = spread, n.neighbors = n.neighbors, 
                      min.dist = min.dist)
@@ -318,8 +314,24 @@ quick.analysis.JMurray.scRNA.MS = function(bwms.all)
   #DimPlot(eet, group.by = 'seurat_clusters_split', reduction = 'umap', label = TRUE, label.size = 6)
   DimPlot(eet, group.by = 'lineage', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE)
   
-  Idents(eet) = eet$lineage
   
+  ids.current = names(table(sub.obj$manual.annot.ids))
+  ids.sels = setdiff(ids.current, c('MSxpp', 'MSxpa', 'MSxap', 'MSxp', 'MSxa'))
+  cells.sels = unique(colnames(sub.obj)[!is.na(match(sub.obj$manual.annot.ids, ids.sels))])
+  ssub = subset(sub.obj, cells = cells.sels)
+  
+  VariableFeatures(ssub) = VariableFeatures(eet)
+  cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(ssub)), '\n')
+  ssub = ScaleData(ssub, features = rownames(ssub))
+  ssub <- RunPCA(object = ssub, features = VariableFeatures(ssub), verbose = FALSE, weight.by.var = TRUE)
+  ssub <- RunUMAP(object = ssub, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, 
+                 spread = spread, n.neighbors = n.neighbors, 
+                 min.dist = min.dist)
+  DimPlot(ssub, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) +
+    NoLegend()
+  
+  
+  Idents(eet) = eet$lineage
   markers <- FindAllMarkers(eet, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
   top.markers <- markers %>% group_by(cluster) %>% top_n(n = 5, wt = avg_logFC)
   DoHeatmap(eet, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()
@@ -327,9 +339,10 @@ quick.analysis.JMurray.scRNA.MS = function(bwms.all)
   save(eet, markers, file = paste0(RdataDir, 'Seurat.object_JM_BWM_data_markers.Rdata'))
   #saveRDS(markers, file = paste0(RdataDir, 'BWM_markerGenes_JM.rds'))
   
- 
-  
 }
+
+
+
 
 extrack.markers.from.JM = function(markers = markers, eet = eet, group_1 = 'MSxappp', group_2 = NULL, ntop = 5, test.use = 'wilcox')
 {

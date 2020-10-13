@@ -357,8 +357,11 @@ seurat.obj = readRDS(file = RDSsaved)
 ids.bwm = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
 cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.bwm))])
 sub.obj = subset(seurat.obj, cells = cells.sels)
-manual.annot.ids = sub.obj$manual.annot.ids
 
+source.my.script('scRNA_cluster_annotation_functions.R')
+# compare.bwm.with.JMdata(sub.obj)
+
+manual.annot.ids = sub.obj$manual.annot.ids
 sub.obj@meta.data[, grep('pred|ids|scmap|previous.iteration.clusters|BWM.cells', colnames(sub.obj@meta.data))] = NULL
 sub.obj$manual.ids = manual.annot.ids
 
