@@ -11,13 +11,13 @@ library("pheatmap")
 library("RColorBrewer")
 library(grid)
 
-
 predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manual.annot.ids', Y_name = 'RNA')
 {
   # mode = 'cluster.wise';
   ids = sub.obj$manual.annot.ids
   Y.data = sub.obj@assays$RNA@data
   ids.uniq = unique(ids)
+  ids.uniq = ids.uniq[order(nchar(ids.uniq))]
   
   if(mode == 'cluster.wise'){
     cat('-- averging the gene expression in clusters -- \n')
@@ -26,17 +26,26 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
     colnames(Y.mat) = ids.uniq
     rownames(Y.mat) = rownames(Y.data)
     
-    for(n in 1:length(ids.uniq)) 
+    for(n in 1:length(ids.uniq))
     {
       jj = which(ids == ids.uniq[n])
       if(length(jj) == 1) Y.mat[, n] = Y.data[,jj]
       if(length(jj) > 1) Y.mat[, n] = apply(Y.data[,jj], 1, mean)
     }
     
+    ss = apply(Y.mat, 1, mean)
+    fano = apply(Y.mat, 1, var)/ss
+    plot(ss, fano, cex = 0.6);
+    abline(h = c(0.5,  0.7, 1.0), col = 'blue', lwd=1.2)
+    length(which(fano > 1.0))
+    length(which(fano > 0.7))
+    length(which(fano > 0.5))
+    #length(which(fano > 0.3))
+    
+    Y.data = Y.data[which(fano > 1.0), ]
     cal_z_score <- function(x){ (x - mean(x)) / sd(x)}
     Y.norm <- t(apply(Y.mat, 1, cal_z_score))
     #cols = c(colorRampPalette((brewer.pal(n = 7, name="RdYlBu")))(100))
-    
     
     pheatmap(Y.norm, cluster_rows=TRUE, 
              show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
@@ -57,6 +66,109 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
   }
   
 }
+
+
+########################################################
+########################################################
+# Section : utility functions for sctf_MARA
+# 
+########################################################
+########################################################
+##########################################
+# process worm gene tss to have unique tss for each gene. 
+# to do this, we just pick the tss furthest from the gene start so that the promoter can cover as much as regulatory elements
+# in addition, save the gene length, transcript length for the scRNA-seq length normalization
+##########################################
+process.worm.gene.tss = function()
+{
+    
+  rm(list=ls())
+  setwd('/Volumes/groups/cochella/jiwang/annotations')
+  
+  tss = read.table('ce11_tss.bed', header = FALSE, sep = '\t')
+  load('BioMart_WBcel235.Rdata')
+  annot = annot[which(annot$Gene.type == 'protein_coding'), ]
+  
+  # filter non-protein-coding genes
+  mm = match(tss$V4, annot$Gene.stable.ID)
+  tss = tss[which(!is.na(mm)), ]
+  
+  gg.uniq = unique(tss$V4)
+  keep = rep(NA, length(gg.uniq))
+  names(keep) = gg.uniq
+  gg.counts = table(tss$V4)
+  
+  gg.with.singleTss = names(gg.counts)[which(gg.counts == 1)]
+  #gg.with.multiTss = names(gg.counts)[which(gg.counts > 1)]
+  keep[match(gg.with.singleTss, names(keep))] = match(gg.with.singleTss, tss$V4) 
+  
+  nn = which(is.na(keep))
+  for(n in nn)
+  {
+     kk = which(tss$V4 == names(keep)[n])
+     if(length(kk) == 1){
+        cat('Error \n')
+     }else{
+       cat(n, '--', as.character(names(keep)[n]), '\n')
+       #jj = which(annot$)
+       if(unique(tss$V6[kk]) == '+'){
+         keep[n] = kk[which(tss$V2[kk] == max(tss$V2[kk]))][1]
+       }else{
+         keep[n] = kk[which(tss$V2[kk] == min(tss$V2[kk]))][1]
+       }
+     }
+  }
+  
+  tss = tss[keep, ]
+  #write.table(tss, file = 'ce11_tss_curated_singleTss_perGene_proteinCoding.bed', sep = '\t', col.names = FALSE, row.names = FALSE,
+  #            quote = FALSE)
+  
+  
+  ## save the gene length and transcript length (averge of isoform lengths)
+  aa = data.frame(annot$Gene.stable.ID, annot$Gene.Start..bp., annot$Gene.End..bp., annot$Transcript.length..including.UTRs.and.CDS., 
+                  annot$Gene.name, annot$Gene.type, stringsAsFactors = FALSE)
+  
+  aa$gene.length = abs(aa$annot.Gene.End..bp. - aa$annot.Gene.Start..bp.)
+  
+  gg.uniq = unique(aa$annot.Gene.stable.ID)
+  keep = aa[match(gg.uniq, aa$annot.Gene.stable.ID), ]
+  colnames(keep) = c('wormbase.id', 'gene.start', 'gene.end', 'transcript.length', 'gene.name', 'gene.type', 'gene.length')
+  
+  for(n in 1:nrow(keep))
+  {
+    # n = 1
+    jj = which(aa$annot.Gene.stable.ID == keep$wormbase.id[n])
+    if(length(jj) > 1){
+      cat(n, '--', as.character(keep$wormbase.id[n]), '\n')
+      keep$transcript.length[n] = as.integer(median(aa$annot.Transcript.length..including.UTRs.and.CDS.[jj]))
+    }
+  }
+  #saveRDS(keep, file = 'ce11_proteinCoding_genes_geneLength_transcriptLength.rds')
+}
+
+##########################################
+# after running FIMO, make motif occurrency matrix  
+##########################################
+make.motif.oc.matrix.from.fimo.output = function()
+{
+  library(data.table)
+  fimo.out = '../data/motifs_tfs/fimo.tsv'
+  fimo = fread(fimo.out, header = TRUE)
+  motif.oc = table(fimo$motif_id, fimo$sequence_name, useNA = 'ifany')
+  motif.oc = t(motif.oc)
+  
+  ##########################################
+  # import gene annotatio nand convert ensgene 
+  ##########################################
+  load(file = '../data/Hashimsholy_et_al/annotMapping_ensID_Wormbase_GeneName.Rdata')
+  mm = match(rownames(motif.oc), geneMapping$Wormbase)
+  rownames(motif.oc) = geneMapping$Gene.name[mm]
+  #kk = match(rownames(motif.oc, ))
+  
+}
+
+
+
 
 ########################################################
 ########################################################
