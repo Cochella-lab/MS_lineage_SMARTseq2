@@ -26,7 +26,7 @@ tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
 source.path <- sub(basename(path), "", path)
 
 user <- "results_jiwang/"
-setwd(paste0("../", user))
+setwd(paste0("~/workspace/imp/scRNAseq_MS_lineage_dev/", user))
 #setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user))
 
 version.DATA = 'all_batches'

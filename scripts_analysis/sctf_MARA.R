@@ -7,17 +7,35 @@
 # Date of creation: Wed Oct  7 17:31:46 2020
 ##########################################################################
 ##########################################################################
-library("pheatmap")
-library("RColorBrewer")
-library(grid)
-
 predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manual.annot.ids', Y_name = 'RNA')
 {
+  library("pheatmap")
+  library("RColorBrewer")
+  library(grid)
+  library(Seurat)
+  library(scater)
+  library(SingleCellExperiment)
+  library(scran)
+  
+  ll = readRDS(file = '../data/motifs_tfs/ce11_proteinCoding_genes_geneLength_transcriptLength.rds')
+  
   # mode = 'cluster.wise';
   ids = sub.obj$manual.annot.ids
   Y.data = sub.obj@assays$RNA@data
   ids.uniq = unique(ids)
   ids.uniq = ids.uniq[order(nchar(ids.uniq))]
+  
+  # convert to SingleCellExperiment, recalculate scaling factor and normalized to fpkm
+  sce = as.SingleCellExperiment(sub.obj)
+  
+  mm = match(rownames(sce), ll$gene.name)
+  sce = sce[which(!is.na(mm)), ] # keep genes with correponding lengths
+  ll = ll[mm[which(!is.na(mm))], ]
+  
+  sce <- logNormCounts(sce, log = FALSE, size_factors = NULL)
+  fpkm(sce) <- log2(calculateFPKM(sce, lengths = ll$transcript.length) + 1)
+  
+  Y.data = fpkm(sce)
   
   if(mode == 'cluster.wise'){
     cat('-- averging the gene expression in clusters -- \n')
@@ -46,7 +64,6 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
     cal_z_score <- function(x){ (x - mean(x)) / sd(x)}
     Y.norm <- t(apply(Y.mat, 1, cal_z_score))
     #cols = c(colorRampPalette((brewer.pal(n = 7, name="RdYlBu")))(100))
-    
     pheatmap(Y.norm, cluster_rows=TRUE, 
              show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
              scale = 'none',
@@ -60,7 +77,9 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
              height = 8,
              width = 30
     )
+      
     
+      
   }else{
     Y.mat = Y.data
   }
@@ -158,16 +177,49 @@ make.motif.oc.matrix.from.fimo.output = function()
   motif.oc = t(motif.oc)
   
   ##########################################
-  # import gene annotatio nand convert ensgene 
+  # import gene annotation and convert ensgene 
   ##########################################
   load(file = '../data/Hashimsholy_et_al/annotMapping_ensID_Wormbase_GeneName.Rdata')
   mm = match(rownames(motif.oc), geneMapping$Wormbase)
   rownames(motif.oc) = geneMapping$Gene.name[mm]
   #kk = match(rownames(motif.oc, ))
+    
+  ## modify the motif names with associated TFs
+  motif.tf = read.table('../data/motifs_tfs/motifs_tfs_mapping.txt', header = FALSE, sep = ' ')
+  motif.tf = motif.tf[, c(2:3)]
+  colnames(motif.tf) = c('motifs', 'tfs')
+  
+  # manually modify the motif names
+  motif.tf = data.frame(motif.tf, stringsAsFactors = FALSE)
+  motif.tf$motifs.new = motif.tf$motifs
+  
+  xx = motif.tf
+  #xx$motifs.new = gsub('1.02', '', xx$motifs.new)
+  #xx$motifs.new = gsub('1.02', '', xx$motifs.new)
+  xx$motifs.new = paste0(xx$motifs.new, '_', xx$tfs)
+  xx$motifs.new = gsub('-', '', xx$motifs.new)
+  xx$motifs.new = gsub(':', '.', xx$motifs.new)
+  xx$motifs.new = gsub('/', '.', xx$motifs.new)
+  xx$motifs.new = gsub("\\(","", xx$motifs.new)
+  xx$motifs.new = gsub("\\)","", xx$motifs.new)
+  xx$motifs.new = gsub("_Homo_sapiens_DBD*","", xx$motifs.new)
+  xx$motifs.new = gsub("_Caenorhabditis_briggsae_DBD*","", xx$motifs.new)
+  xx$motifs.new = gsub("_Drosophila_melanogaster_DBD*","", xx$motifs.new)
+  xx$motifs.new = gsub("_Mus_musculus_DBD*","", xx$motifs.new)
+  xx$motifs.new = gsub("_Brugia_pahangi_DBD*","", xx$motifs.new)
+  xx$motifs.new = gsub("_Wuchereria_bancrofti_DBD*","", xx$motifs.new)
+  xx$motifs.new = gsub("_PBM_CONSTRUCTS_DBD*","", xx$motifs.new)
+  xx$motifs.new = gsub("_Tetraodon_nigroviridis_DBD*","", xx$motifs.new)
+  
+  motif.tf = xx
+  
+  saveRDS(motif.tf, file = '../data/motifs_tfs/motif_tf_mapping.rds')
+  
+  mm = match(colnames(motif.oc), motif.tf$motifs)
+  colnames(motif.oc) = motif.tf$motifs.new[mm]
+  save(motif.oc, file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
   
 }
-
-
 
 
 ########################################################
