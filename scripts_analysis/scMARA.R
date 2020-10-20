@@ -24,7 +24,6 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
   
   # mode = 'cluster.wise';
   ids = sub.obj$manual.annot.ids
-  Y.data = sub.obj@assays$RNA@data
   ids.uniq = unique(ids)
   ids.uniq = ids.uniq[order(nchar(ids.uniq))]
   
@@ -36,39 +35,65 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
   ll = ll[mm[which(!is.na(mm))], ]
   
   sce <- logNormCounts(sce, log = FALSE, size_factors = NULL)
-  fpkm(sce) <- log2(calculateFPKM(sce, lengths = ll$transcript.length) + 1)
-  
-  Y.data = fpkm(sce)
-  
+  Y.fpkm <- log2(calculateFPKM(sce, lengths = ll$transcript.length) + 1)
   
   if(mode == 'cluster.wise'){
     cat('-- averging the gene expression in clusters -- \n')
     
-    Y.mat = matrix(NA, nrow = nrow(Y.data), ncol = length(ids.uniq))
+    Y.mat = matrix(NA, nrow = nrow(Y.fpkm), ncol = length(ids.uniq))
     colnames(Y.mat) = ids.uniq
-    rownames(Y.mat) = rownames(Y.data)
-    
+    rownames(Y.mat) = rownames(Y.fpkm)
     for(n in 1:length(ids.uniq))
     {
       jj = which(ids == ids.uniq[n])
-      if(length(jj) == 1) Y.mat[, n] = Y.data[,jj]
-      if(length(jj) > 1) Y.mat[, n] = apply(Y.data[,jj], 1, mean)
+      if(length(jj) == 1) Y.mat[, n] = Y.fpkm[,jj]
+      if(length(jj) > 1) Y.mat[, n] = apply(Y.fpkm[,jj], 1, mean)
     }
     
-    ss = apply(Y.mat, 1, mean)
-    fano = apply(Y.mat, 1, var)/ss
-    plot(ss, fano, cex = 0.6);
-    abline(h = c(0.5,  0.7, 1.0), col = 'blue', lwd=1.2)
-    length(which(fano > 1.5))
-    length(which(fano > 1.0))
-    length(which(fano > 0.7))
-    length(which(fano > 0.5))
-    #length(which(fano > 0.3))
+    ##########################################
+    # select dynamic genes for reponse Y
+    # 1) with fano 
+    # 2) ratio betwen daughter and mother, a lot of pairs to take care
+    # 3) by lineage e.g. MSx, MSxa, MSxap, MSxapp, MSxappp, MSxapppp, MSxappppx (e.g. with gam)
+    ##########################################
+    select.dyn.genes.with.fano = FALSE
+    if(select.dyn.genes.with.fano){
+      ss = apply(Y.mat, 1, mean)
+      fano = apply(Y.mat, 1, var)/ss
+      plot(ss, fano, cex = 0.6);
+      abline(h = c(0.5,  0.7, 1.0), col = 'blue', lwd=1.2)
+      length(which(fano > 1.5))
+      length(which(fano > 1.0))
+      length(which(fano > 0.7))
+      length(which(fano > 0.5))
+      #length(which(fano > 0.3))
+      
+      Y.sel = Y.mat[which(fano > 1.5), ]
+    }
     
-    Y.mat = Y.mat[which(fano > 1.5), ]
-    
+    select.dyn.genes.with.pair.ratios = FALSE
+    if(select.dyn.genes.with.pair.ratios){
+      
+      Y.mat = as.data.frame(Y.mat)
+      
+      Y.sel = cbind(Y.mat$MSxa - Y.mat$MSx,
+                    Y.mat$MSxp - Y.mat$MSx
+                    #Y.mat$MSxap - Y.mat$MSxa, 
+                    #Y.mat$MSxapp - Y.mat$MSxap, 
+                    #Y.mat$MSxappp - Y.mat$MSxapp
+                    )
+      rownames(Y.sel) = rownames(Y.mat)
+      colnames(Y.sel) = c('MSxa', 'MSxp')
+      
+      hist(Y.sel, breaks = 100);abline(v = c(-1, 1))
+      cutoff = 1;
+      sels = apply(Y.sel, 1, function(x) sum(abs(x)> cutoff)>1)
+      cat(sum(sels), ' gene were selected \n')
+      Y.sel = Y.sel[sels, ]
+       
+    }
     cal_z_score <- function(x){ (x - mean(x)) / sd(x)}
-    Y.norm <- t(apply(Y.mat, 1, cal_z_score))
+    Y.norm <- t(apply(Y.sel, 1, cal_z_score))
     #cols = c(colorRampPalette((brewer.pal(n = 7, name="RdYlBu")))(100))
     pheatmap(Y.norm, cluster_rows=TRUE, 
              show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
@@ -88,60 +113,54 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
     # prepare matrix A and reponse Y and run elastic-net
     ##########################################
     require(glmnet)
-    Y.sel = as.matrix(Y.mat)
+    y = as.matrix(Y.sel)
+    #y = y[]
     mm = match(rownames(Y.sel), rownames(motif.oc))
-    Y.sel = Y.sel[!is.na(mm), ]
+    y = y[!is.na(mm), ]
     x = as.matrix(motif.oc[mm[!is.na(mm)], ])
     x[which(is.na(x) == TRUE)] = 0
-
+    
     cat('nb of motifs which were not found among all considered genes ', length(which(apply(x, 2, sum) == 0)), '\n')
     cat('nb of genes without motifs ', length(which(apply(x, 1, sum) == 0)), '\n')
     
     #y = Y.sel[, c(1, 2)] 
-    y = Y.sel[, c(1:10)]
+    #y = Y.sel[, c(1:10)]
     
-    alpha = 0
-    binary = 1;
-    binary.matrix = binary== 0
-    intercept=TRUE
+    alpha = 0.5
+    #binary = 1;  binary.matrix = binary== 0
+    intercept=FALSE
     ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
-    standardize=TRUE 
-    standardize.response=TRUE
+    standardize=TRUE
+    standardize.response=FALSE
     
     #if(binary.matrix){x = x >0; standardize=FALSE}
     ### use Cross-validation to select tuning paprameter
-    cv.fit=cv.glmnet(x, y, family='mgaussian', grouped=TRUE, 
-                     alpha=alpha, nlambda=20, standardize=standardize, 
-                     standardize.response=standardize.response, intercept=intercept)
+    cv.fit=cv.glmnet(x, y, family='mgaussian', grouped=FALSE, 
+                     alpha=alpha, nlambda=100, standardize=standardize, 
+                     standardize.response=standardize.response, intercept=intercept, relax = TRUE)
     plot(cv.fit)
     #cv.fit$lambda
     
-    optimal = which(cv.fit$lambda==cv.fit$lambda.min)
-    #optimal = which(cv.fit$lambda==cv.fit$lambda.1se)
-    
-    fit=glmnet(x,y,alpha=alpha, lambda=cv.fit$lambda,family='mgaussian', type.multinomial=c("grouped"),
+    #optimal = which(cv.fit$lambda==cv.fit$lambda.min)
+    s.optimal = cv.fit$lambda.1se
+    fit=glmnet(x,y,alpha=alpha, lambda=cv.fit$lambda,family='mgaussian', 
                standardize=standardize, standardize.response=standardize.response, intercept=intercept)
     #plot(fit, xvar = "lambda", label = TRUE, type.coef = "coef")
     ## collect result from the elastic-net
     #colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
     #colnames(x)[which(fit$beta[[2]][,optimal]!=0)]
-    keep = matrix(NA, nrow = ncol(x), ncol = ncol(y))
-    rownames(keep) = rownames(fit$beta[[1]])
+    keep = as.data.frame(coef.glmnet(fit, s = s.optimal))
+    keep = keep[-1, ] # remove intecept
     colnames(keep) = names(fit$beta)
-    for(n in 1:ncol(keep))
-    {
-      keep[,n] = fit$beta[[n]][, optimal]
-    }
     ss = apply(keep, 1, function(x) all(x==0))
     keep = keep[!ss, ] 
     
     #keep[which(abs(keep)<0.05)] = 0
-    keep = data.frame(keep, stringsAsFactors = FALSE)
-    
+    #keep = data.frame(keep, stringsAsFactors = FALSE)
     head(rownames(keep)[order(-abs(keep$MSxp))], 10)
     
   }else{
-    Y.mat = Y.data
+    Y.mat = Y.fpkm
   }
   
 }
