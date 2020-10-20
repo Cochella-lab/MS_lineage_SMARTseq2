@@ -1044,17 +1044,17 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
      ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
      scale_colour_hue(drop = FALSE) + NoLegend()
   
-  jj2 = which(seurat.obj$manual.annot.ids == 'mixture_BWM_terminal_2')
-  seurat.obj$manual.annot.ids[jj2] = 'mixture_MSxpaaap.MSxppapp.MSxpappp.MSxpapap'
-  
-  jj3 = which(seurat.obj$manual.annot.ids == 'mixture_terminal_MSxpppp_MSxpppa')
-  seurat.obj$manual.annot.ids[jj3] = 'mixture_MSxppppp.MSxppppa.MSxpppap.MSxpppaa.MSxpappa'
-  
-  jj4 = which(seurat.obj$manual.annot.ids == 'MSxpa.early')
-  seurat.obj$manual.annot.ids[jj4] = 'MSxpa'
-  
-  seurat.obj$manual.annot.ids[which(seurat.obj$manual.annot.ids == 'MSxpp.early')] = 'MSxpp'
-  
+  # jj2 = which(seurat.obj$manual.annot.ids == 'mixture_BWM_terminal_2')
+  # seurat.obj$manual.annot.ids[jj2] = 'mixture_MSxpaaap.MSxppapp.MSxpappp.MSxpapap'
+  # 
+  # jj3 = which(seurat.obj$manual.annot.ids == 'mixture_terminal_MSxpppp_MSxpppa')
+  # seurat.obj$manual.annot.ids[jj3] = 'mixture_MSxppppp.MSxppppa.MSxpppap.MSxpppaa.MSxpappa'
+  # 
+  # jj4 = which(seurat.obj$manual.annot.ids == 'MSxpa.early')
+  # seurat.obj$manual.annot.ids[jj4] = 'MSxpa'
+  # 
+  # seurat.obj$manual.annot.ids[which(seurat.obj$manual.annot.ids == 'MSxpp.early')] = 'MSxpp'
+  # 
   saveRDS(seurat.obj, file = RDS2save)
   
 }

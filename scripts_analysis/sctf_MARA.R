@@ -40,6 +40,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
   
   Y.data = fpkm(sce)
   
+  
   if(mode == 'cluster.wise'){
     cat('-- averging the gene expression in clusters -- \n')
     

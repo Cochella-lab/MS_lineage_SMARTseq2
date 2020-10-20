@@ -390,7 +390,17 @@ if(!dir.exists("results/")){dir.create("results/")}
 if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
 
-sub.obj = readRDS(file = paste0(RdataDir, 'manual_annotated_BWM_3.5k.cells.rds'))
+nb.iteration = 37
+RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
+                  nb.iteration, '.rds')
+seurat.obj = readRDS(file = RDSsaved)
+
+## select manually annotated bwm cells
+ids.bwm = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
+cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.bwm))])
+sub.obj = subset(seurat.obj, cells = cells.sels)
+
+#sub.obj = readRDS(file = paste0(RdataDir, 'manual_annotated_BWM_3.5k.cells.rds'))
 sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxppppp.MSxppppa.MSxpppap.MSxpppaa.MSxpappa')] =
   'mixture_terminal_1'
 sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxpaaap.MSxppapp.MSxpappp.MSxpapap')] = 
