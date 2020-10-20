@@ -18,6 +18,9 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
   library(scran)
   
   ll = readRDS(file = '../data/motifs_tfs/ce11_proteinCoding_genes_geneLength_transcriptLength.rds')
+  motif.oc = readRDS(file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
+  motif.tf = readRDS(file = '../data/motifs_tfs/motif_tf_mapping.rds')
+  tfs = readxl::read_xlsx('../data/motifs_tfs/Table-S2-wTF-3.0-Fuxman-Bass-Mol-Sys-Biol-2016.xlsx', sheet = 1)
   
   # mode = 'cluster.wise';
   ids = sub.obj$manual.annot.ids
@@ -55,12 +58,14 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
     fano = apply(Y.mat, 1, var)/ss
     plot(ss, fano, cex = 0.6);
     abline(h = c(0.5,  0.7, 1.0), col = 'blue', lwd=1.2)
+    length(which(fano > 1.5))
     length(which(fano > 1.0))
     length(which(fano > 0.7))
     length(which(fano > 0.5))
     #length(which(fano > 0.3))
     
-    Y.data = Y.data[which(fano > 1.0), ]
+    Y.mat = Y.mat[which(fano > 1.5), ]
+    
     cal_z_score <- function(x){ (x - mean(x)) / sd(x)}
     Y.norm <- t(apply(Y.mat, 1, cal_z_score))
     #cols = c(colorRampPalette((brewer.pal(n = 7, name="RdYlBu")))(100))
@@ -77,9 +82,63 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
              height = 8,
              width = 30
     )
-      
     
-      
+    ##########################################
+    # prepare matrix A and reponse Y and run elastic-net
+    ##########################################
+    require(glmnet)
+    Y.sel = as.matrix(Y.mat)
+    mm = match(rownames(Y.sel), rownames(motif.oc))
+    Y.sel = Y.sel[!is.na(mm), ]
+    x = as.matrix(motif.oc[mm[!is.na(mm)], ])
+    x[which(is.na(x) == TRUE)] = 0
+
+    cat('nb of motifs which were not found among all considered genes ', length(which(apply(x, 2, sum) == 0)), '\n')
+    cat('nb of genes without motifs ', length(which(apply(x, 1, sum) == 0)), '\n')
+    
+    #y = Y.sel[, c(1, 2)] 
+    y = Y.sel[, c(1:10)]
+    
+    alpha = 0
+    binary = 1;
+    binary.matrix = binary== 0
+    intercept=TRUE
+    ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
+    standardize=TRUE 
+    standardize.response=TRUE
+    
+    #if(binary.matrix){x = x >0; standardize=FALSE}
+    ### use Cross-validation to select tuning paprameter
+    cv.fit=cv.glmnet(x, y, family='mgaussian', grouped=TRUE, 
+                     alpha=alpha, nlambda=20, standardize=standardize, 
+                     standardize.response=standardize.response, intercept=intercept)
+    plot(cv.fit)
+    #cv.fit$lambda
+    
+    optimal = which(cv.fit$lambda==cv.fit$lambda.min)
+    #optimal = which(cv.fit$lambda==cv.fit$lambda.1se)
+    
+    fit=glmnet(x,y,alpha=alpha, lambda=cv.fit$lambda,family='mgaussian', type.multinomial=c("grouped"),
+               standardize=standardize, standardize.response=standardize.response, intercept=intercept)
+    #plot(fit, xvar = "lambda", label = TRUE, type.coef = "coef")
+    ## collect result from the elastic-net
+    #colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
+    #colnames(x)[which(fit$beta[[2]][,optimal]!=0)]
+    keep = matrix(NA, nrow = ncol(x), ncol = ncol(y))
+    rownames(keep) = rownames(fit$beta[[1]])
+    colnames(keep) = names(fit$beta)
+    for(n in 1:ncol(keep))
+    {
+      keep[,n] = fit$beta[[n]][, optimal]
+    }
+    ss = apply(keep, 1, function(x) all(x==0))
+    keep = keep[!ss, ] 
+    
+    #keep[which(abs(keep)<0.05)] = 0
+    keep = data.frame(keep, stringsAsFactors = FALSE)
+    
+    head(rownames(keep)[order(-abs(keep$MSxp))], 10)
+    
   }else{
     Y.mat = Y.data
   }
@@ -192,24 +251,27 @@ make.motif.oc.matrix.from.fimo.output = function()
   # manually modify the motif names
   motif.tf = data.frame(motif.tf, stringsAsFactors = FALSE)
   motif.tf$motifs.new = motif.tf$motifs
+  motif.tf$tfs.new = motif.tf$tfs
   
   xx = motif.tf
   #xx$motifs.new = gsub('1.02', '', xx$motifs.new)
   #xx$motifs.new = gsub('1.02', '', xx$motifs.new)
-  xx$motifs.new = paste0(xx$motifs.new, '_', xx$tfs)
-  xx$motifs.new = gsub('-', '', xx$motifs.new)
-  xx$motifs.new = gsub(':', '.', xx$motifs.new)
-  xx$motifs.new = gsub('/', '.', xx$motifs.new)
-  xx$motifs.new = gsub("\\(","", xx$motifs.new)
-  xx$motifs.new = gsub("\\)","", xx$motifs.new)
-  xx$motifs.new = gsub("_Homo_sapiens_DBD*","", xx$motifs.new)
-  xx$motifs.new = gsub("_Caenorhabditis_briggsae_DBD*","", xx$motifs.new)
-  xx$motifs.new = gsub("_Drosophila_melanogaster_DBD*","", xx$motifs.new)
-  xx$motifs.new = gsub("_Mus_musculus_DBD*","", xx$motifs.new)
-  xx$motifs.new = gsub("_Brugia_pahangi_DBD*","", xx$motifs.new)
-  xx$motifs.new = gsub("_Wuchereria_bancrofti_DBD*","", xx$motifs.new)
-  xx$motifs.new = gsub("_PBM_CONSTRUCTS_DBD*","", xx$motifs.new)
-  xx$motifs.new = gsub("_Tetraodon_nigroviridis_DBD*","", xx$motifs.new)
+  #xx$tfs.new = paste0(xx$tfs.new, '_', xx$tfs)
+  #xx$tfs.new = gsub('-', '', xx$tfs.new)
+  xx$tfs.new = gsub(':', '.', xx$tfs.new)
+  xx$tfs.new = gsub('/', '.', xx$tfs.new)
+  xx$tfs.new = gsub("\\(","", xx$tfs.new)
+  xx$tfs.new = gsub("\\)","", xx$tfs.new)
+  xx$tfs.new = gsub("_Homo_sapiens_DBD*.*","", xx$tfs.new)
+  xx$tfs.new = gsub("_Caenorhabditis_briggsae_DBD*.*","", xx$tfs.new)
+  xx$tfs.new = gsub("_Drosophila_melanogaster_DBD*.*","", xx$tfs.new)
+  xx$tfs.new = gsub("_Mus_musculus_DBD*.*","", xx$tfs.new)
+  xx$tfs.new = gsub("_Brugia_pahangi_DBD*.*","", xx$tfs.new)
+  xx$tfs.new = gsub("_Wuchereria_bancrofti_DBD*.*","", xx$tfs.new)
+  xx$tfs.new = gsub("_PBM_CONSTRUCTS_DBD*.*","", xx$tfs.new)
+  xx$tfs.new = gsub("_Tetraodon_nigroviridis_DBD*.*","", xx$tfs.new)
+  
+  xx$motifs.new = paste0(xx$motifs.new, '_', xx$tfs.new)
   
   motif.tf = xx
   
@@ -217,7 +279,8 @@ make.motif.oc.matrix.from.fimo.output = function()
   
   mm = match(colnames(motif.oc), motif.tf$motifs)
   colnames(motif.oc) = motif.tf$motifs.new[mm]
-  save(motif.oc, file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
+  
+  saveRDS(motif.oc, file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
   
 }
 
