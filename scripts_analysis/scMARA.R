@@ -50,6 +50,29 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
       if(length(jj) > 1) Y.mat[, n] = apply(Y.fpkm[,jj], 1, mean)
     }
     
+    # subset Y.mat for TFs
+    jj = match(tfs$`Public name`, rownames(Y.mat))
+    jj = jj[!is.na(jj)]
+    tf.mat = Y.mat[jj, ]
+    cutoff.tf = 1;
+    ss = apply(tf.mat, 1, function(x) !all(x<cutoff.tf))
+    tf.mat = tf.mat[ss, ]
+    
+    pheatmap(tf.mat, cluster_rows=TRUE, 
+             show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
+             scale = 'row',
+             cluster_cols=FALSE, 
+             main = paste0("dynamic TFs"), 
+             na_col = "white",
+             #color = cols, 
+             #annotation_col = my_sample_col,
+             #gaps_row = c(1:nrow(map)-1),
+             fontsize_col = 10,
+             height = 8,
+             width = 30
+    )
+    write.csv(tf.mat, file = paste0(tabDir, 'detected_TFs_in_BWM.csv'), row.names = TRUE)
+    
     ##########################################
     # select dynamic genes for reponse Y
     # 1) with fano 
@@ -99,7 +122,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
              show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
              scale = 'none',
              cluster_cols=FALSE, 
-             main = paste0("gene dynamics"), 
+             main = paste0("dynamic genes"), 
              na_col = "white",
              #color = cols, 
              #annotation_col = my_sample_col,
