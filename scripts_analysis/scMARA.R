@@ -202,7 +202,6 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
 ##########################################
 process.worm.gene.tss = function()
 {
-    
   rm(list=ls())
   setwd('/Volumes/groups/cochella/jiwang/annotations')
   
@@ -327,7 +326,64 @@ make.motif.oc.matrix.from.fimo.output = function()
   
 }
 
-
+cluster.pwm.based.similarity = function()
+{
+  library(tidyverse)  # data manipulation
+  library(cluster)    # clustering algorithms
+  library(factoextra) # clustering visualization
+  require(graphics)
+  
+  pwm.corr = read.table(file = '../data/motifs_tfs/pwm_similarity_correction_PCC.txt', header = TRUE, 
+                        row.names = 1)
+  motif.tf$motifs.new = paste0(motif.tf$tfs.new, '_', motif.tf$motifs)
+  
+  newName = motif.tf$motifs.new[match(rownames(pwm.corr), motif.tf$motifs)]
+  rownames(pwm.corr) = newName
+  colnames(pwm.corr) = newName
+  
+  comparisons <- 1 - pwm.corr
+  dd <- as.dist(comparisons)
+  
+  # Hierarchical clustering using Complete Linkage
+  hc <- hclust(dd, method = "ward.D2" )
+  
+  # Plot the obtained dendrogram
+  #plot(hc, cex = 0.6, hang = -1)
+  #sub_grp <- cutree(hc, h = 0.1)
+  pdfname = paste0(resDir, "/pwm_celegans_similarity_clustering.pdf")
+  pdf(pdfname, width=20, height = 30)
+  par(cex =0.5, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  hc.cutoff = 0.1
+  #plot(hc, cex = 0.5, hang = -1)
+  plot(as.dendrogram(hc), cex=0.5, horiz=TRUE)
+  abline(v = c(0.05, 0.1, 0.15, 0.2, 0.25, 0.3), col = 'red')
+  #rect.hclust(hc, h = hc.cutoff, border="darkred")
+  #groups <- 
+  length(unique(cutree(hc, h = 0.1)))
+  length(unique(cutree(hc, h = 0.15)))
+  length(unique(cutree(hc, h = 0.2)))
+  length(unique(cutree(hc, h = 0.25)))
+  
+  dev.off()
+  
+  change.pwm.logo.names = FALSE
+  if(change.pwm.logo.names){
+    setwd('../data/motifs_tfs/pwm_logo')
+    logo.file = list.files(path = '.', pattern = '*.pdf', full.names = FALSE)
+    for(n in 1:nrow(motif.tf))
+    {
+      # n = 1 
+      cmd = paste0('mv ', logo.file[grep(motif.tf$motifs[n], logo.file)], ' ',  motif.tf$motifs.new[n], '.pdf')
+      system(cmd)
+    }
+    
+  }
+  
+  #fviz_nbclust(diss = comparisons, FUN = hcut, method = "wss")
+  #fviz_nbclust(df, FUN = hcut, method = "silhouette")
+  
+}
 ########################################################
 ########################################################
 # Section : package installation
