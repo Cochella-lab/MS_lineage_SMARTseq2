@@ -192,6 +192,11 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
 ########################################################
 ########################################################
 # Section : utility functions for sctf_MARA
+# part-1 : worm gene annotation convertion
+# part-2 : motif occurrency matrix preparation from fimo output
+# part-3 : motif-tf mapping table
+# patt-4 : pwm clustering based on sequence similarity (here the binding site overlapping is not considered as before) 
+# and modify motif-tf mapping 
 # 
 ########################################################
 ########################################################
@@ -272,6 +277,8 @@ process.worm.gene.tss = function()
 make.motif.oc.matrix.from.fimo.output = function()
 {
   library(data.table)
+  motif.tf = readRDS( '../data/motifs_tfs/motif_tf_mapping.rds')
+  
   fimo.out = '../data/motifs_tfs/fimo.tsv'
   fimo = fread(fimo.out, header = TRUE)
   motif.oc = table(fimo$motif_id, fimo$sequence_name, useNA = 'ifany')
@@ -284,8 +291,17 @@ make.motif.oc.matrix.from.fimo.output = function()
   mm = match(rownames(motif.oc), geneMapping$Wormbase)
   rownames(motif.oc) = geneMapping$Gene.name[mm]
   #kk = match(rownames(motif.oc, ))
-    
-  ## modify the motif names with associated TFs
+  
+  mm = match(colnames(motif.oc), motif.tf$motifs)
+  colnames(motif.oc) = motif.tf$motifs.new[mm]
+  
+  saveRDS(motif.oc, file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
+  
+}
+
+## modify the motif names with associated TFs
+process.motif.tf.mapping = function()
+{
   motif.tf = read.table('../data/motifs_tfs/motifs_tfs_mapping.txt', header = FALSE, sep = ' ')
   motif.tf = motif.tf[, c(2:3)]
   colnames(motif.tf) = c('motifs', 'tfs')
@@ -318,11 +334,6 @@ make.motif.oc.matrix.from.fimo.output = function()
   motif.tf = xx
   
   saveRDS(motif.tf, file = '../data/motifs_tfs/motif_tf_mapping.rds')
-  
-  mm = match(colnames(motif.oc), motif.tf$motifs)
-  colnames(motif.oc) = motif.tf$motifs.new[mm]
-  
-  saveRDS(motif.oc, file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
   
 }
 
@@ -379,15 +390,24 @@ cluster.pwm.based.similarity = function()
     }
     
   }
-  
   #fviz_nbclust(diss = comparisons, FUN = hcut, method = "wss")
   #fviz_nbclust(df, FUN = hcut, method = "silhouette")
   
   ##########################################
-  # 
+  # merge motifs using height = 0.1 and change motif names
   ##########################################
+  groups <- cutree(hc, h = 0.1)
+  motif.tf = data.frame(motif.tf, group = groups, stringsAsFactors = FALSE)
+  motif.tf$names = NA
+  for(nn in unique(motif.tf$group))
+  {
+    # nn = 5
+    kk = which(motif.tf$group == nn)
+    motif.tf$names[kk] = paste0(paste0(unique(motif.tf$tfs.new[kk]), collapse = '_'), '.M', nn)
+    
+  }
   
-  
+  saveRDS(motif.tf, file = '../data/motifs_tfs/motif_tf_mapping.rds') # motif-to-tf mapping for non-redundant motifs (to some extent)
   
 }
 ########################################################
