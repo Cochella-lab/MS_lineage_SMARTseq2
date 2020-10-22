@@ -421,7 +421,7 @@ toc()
 ##########################################
 # run the sctf_MARA
 ##########################################
-source.my.script('sctf_MARA.R')
+source.my.script('scMARA.R')
 
 res = predict.TF.MARA.for.scdata(sub.obj, mode = 'cluster.wise', id = 'manual.annot.ids')
 

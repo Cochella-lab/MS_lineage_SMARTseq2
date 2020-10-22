@@ -322,6 +322,7 @@ make.motif.oc.matrix.from.fimo.output = function()
     }
   }
   
+  motif.oc = xx;
   saveRDS(motif.oc, file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
   
 }
