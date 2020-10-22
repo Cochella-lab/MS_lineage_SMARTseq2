@@ -357,7 +357,7 @@ cluster.pwm.based.similarity = function()
   hc.cutoff = 0.1
   #plot(hc, cex = 0.5, hang = -1)
   plot(as.dendrogram(hc), cex=0.5, horiz=TRUE)
-  abline(v = c(0.05, 0.1, 0.15, 0.2, 0.25, 0.3), col = 'red')
+  abline(v = c(0.1, 0.15, 0.2), col = 'red')
   #rect.hclust(hc, h = hc.cutoff, border="darkred")
   #groups <- 
   length(unique(cutree(hc, h = 0.1)))
@@ -382,6 +382,12 @@ cluster.pwm.based.similarity = function()
   
   #fviz_nbclust(diss = comparisons, FUN = hcut, method = "wss")
   #fviz_nbclust(df, FUN = hcut, method = "silhouette")
+  
+  ##########################################
+  # 
+  ##########################################
+  
+  
   
 }
 ########################################################
