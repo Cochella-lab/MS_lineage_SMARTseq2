@@ -188,7 +188,6 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
   
 }
 
-
 ########################################################
 ########################################################
 # Section : utility functions for sctf_MARA
@@ -292,8 +291,36 @@ make.motif.oc.matrix.from.fimo.output = function()
   rownames(motif.oc) = geneMapping$Gene.name[mm]
   #kk = match(rownames(motif.oc, ))
   
-  mm = match(colnames(motif.oc), motif.tf$motifs)
-  colnames(motif.oc) = motif.tf$motifs.new[mm]
+  ss1 = apply(motif.oc, 1, sum)
+  cat(length(which(ss1 == 0)), 'genes without scanned motifs \n')
+  ss2 = apply(motif.oc, 2, sum)
+  
+  ## merge occurrence for motifs in the same cluster
+  #mm = match(colnames(motif.oc), motif.tf$motifs)
+  #colnames(motif.oc) = motif.tf$motifs.new[mm]
+  names = unique(motif.tf$names[match(colnames(motif.oc), motif.tf$motifs)])
+  xx = matrix(0, ncol = length(names), nrow = nrow(motif.oc))
+  rownames(xx) = rownames(motif.oc)
+  colnames(xx) = names
+  
+  for(n in 1:ncol(xx))
+  {
+    # n = 2
+    cat(n, '\n')
+    mtf = motif.tf$motifs[which(motif.tf$names == colnames(xx)[n])]
+    kk = match(mtf, colnames(motif.oc))
+    kk = kk[!is.na(kk)]
+    
+    if(length(kk) == 0){
+      cat('Error : no motif found \n')
+    }else{
+      if(length(kk) == 1){
+        xx[,n] = motif.oc[, kk]
+      }else{
+        xx[,n] = ceiling(apply(motif.oc[,kk], 1, median))
+      }
+    }
+  }
   
   saveRDS(motif.oc, file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
   
