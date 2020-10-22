@@ -50,28 +50,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
       if(length(jj) > 1) Y.mat[, n] = apply(Y.fpkm[,jj], 1, mean)
     }
     
-    # subset Y.mat for TFs
-    jj = match(tfs$`Public name`, rownames(Y.mat))
-    jj = jj[!is.na(jj)]
-    tf.mat = Y.mat[jj, ]
-    cutoff.tf = 1;
-    ss = apply(tf.mat, 1, function(x) !all(x<cutoff.tf))
-    tf.mat = tf.mat[ss, ]
-    
-    pheatmap(tf.mat, cluster_rows=TRUE, 
-             show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
-             scale = 'row',
-             cluster_cols=FALSE, 
-             main = paste0("dynamic TFs"), 
-             na_col = "white",
-             #color = cols, 
-             #annotation_col = my_sample_col,
-             #gaps_row = c(1:nrow(map)-1),
-             fontsize_col = 10,
-             height = 8,
-             width = 30
-    )
-    write.csv(tf.mat, file = paste0(tabDir, 'detected_TFs_in_BWM.csv'), row.names = TRUE)
+    # process.detected.tf.expression.profiles(Y.mat)
     
     ##########################################
     # select dynamic genes for reponse Y
@@ -115,21 +94,10 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
       Y.sel = Y.sel[sels, ]
        
     }
-    cal_z_score <- function(x){ (x - mean(x)) / sd(x)}
-    Y.norm <- t(apply(Y.sel, 1, cal_z_score))
-    #cols = c(colorRampPalette((brewer.pal(n = 7, name="RdYlBu")))(100))
-    pheatmap(Y.norm, cluster_rows=TRUE, 
-             show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
-             scale = 'none',
-             cluster_cols=FALSE, 
-             main = paste0("dynamic genes"), 
-             na_col = "white",
-             #color = cols, 
-             #annotation_col = my_sample_col,
-             #gaps_row = c(1:nrow(map)-1),
-             fontsize_col = 10,
-             height = 8,
-             width = 30
+    
+    pheatmap(Y.norm, cluster_rows=TRUE, show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
+             scale = 'row', cluster_cols=FALSE, main = paste0("dynamic genes"), 
+             na_col = "white", fontsize_col = 10
     )
     
     ##########################################
@@ -149,9 +117,9 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
     #y = Y.sel[, c(1, 2)] 
     #y = Y.sel[, c(1:10)]
     
-    alpha = 0.5
+    alpha = 0
     #binary = 1;  binary.matrix = binary== 0
-    intercept=FALSE
+    intercept=TRUE
     ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
     standardize=TRUE
     standardize.response=FALSE
@@ -165,7 +133,8 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
     #cv.fit$lambda
     
     #optimal = which(cv.fit$lambda==cv.fit$lambda.min)
-    s.optimal = cv.fit$lambda.1se
+    #s.optimal = cv.fit$lambda.1se
+    s.optimal = cv.fit$lambda.min
     fit=glmnet(x,y,alpha=alpha, lambda=cv.fit$lambda,family='mgaussian', 
                standardize=standardize, standardize.response=standardize.response, intercept=intercept)
     #plot(fit, xvar = "lambda", label = TRUE, type.coef = "coef")
@@ -182,6 +151,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
     #keep = data.frame(keep, stringsAsFactors = FALSE)
     head(rownames(keep)[order(-abs(keep$MSxp))], 10)
     
+    
   }else{
     Y.mat = Y.fpkm
   }
@@ -194,8 +164,9 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
 # part-1 : worm gene annotation convertion
 # part-2 : motif occurrency matrix preparation from fimo output
 # part-3 : motif-tf mapping table
-# patt-4 : pwm clustering based on sequence similarity (here the binding site overlapping is not considered as before) 
+# part-4 : pwm clustering based on sequence similarity (here the binding site overlapping is not considered as before) 
 # and modify motif-tf mapping 
+# part-5: prepare the detecte tf expression profiles
 # 
 ########################################################
 ########################################################
@@ -438,6 +409,45 @@ cluster.pwm.based.similarity = function()
   saveRDS(motif.tf, file = '../data/motifs_tfs/motif_tf_mapping.rds') # motif-to-tf mapping for non-redundant motifs (to some extent)
   
 }
+
+process.detected.tf.expression.profiles(Y.mat)
+{
+  # subset Y.mat for TFs
+  jj = match(tfs$`Public name`, rownames(Y.mat))
+  jj = jj[!is.na(jj)]
+  tf.mat = Y.mat[jj, ]
+  cutoff.tf = 1;
+  ss = apply(tf.mat, 1, function(x) !all(x<cutoff.tf))
+  tf.mat = tf.mat[ss, ]
+  
+  save.tf.profiles.across.lineage = FALSE
+  if(save.tf.profiles.across.lineage){
+    pdfname = paste0(resDir, "/TFs_standardized_fpkm_in_BWM.pdf")
+    pdf(pdfname, width=12, height = 50)
+    par(cex =0.3, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    pheatmap(tf.mat, cluster_rows=TRUE, 
+             show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
+             scale = 'row',
+             cluster_cols=FALSE, 
+             main = paste0("standardized fpkm of TFs "), 
+             na_col = "white",
+             #color = cols, 
+             #annotation_col = my_sample_col,
+             #gaps_row = c(1:nrow(map)-1),
+             fontsize_col = 10
+    )
+    dev.off()
+    
+    
+    write.csv(tf.mat, file = paste0(tabDir, 'detected_TFs_in_BWM.csv'), row.names = TRUE)
+  }
+  
+  saveRDS(tf.mat, file = paste0(RdataDir, 'TFs_expression_profiles_BWM.rds')) 
+  
+}
+
+
 ########################################################
 ########################################################
 # Section : package installation
