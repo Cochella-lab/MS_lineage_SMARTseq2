@@ -16,11 +16,15 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
   library(scater)
   library(SingleCellExperiment)
   library(scran)
+  source.my.script('scMARA_utility_functions.R')
   
   ll = readRDS(file = '../data/motifs_tfs/ce11_proteinCoding_genes_geneLength_transcriptLength.rds')
   motif.oc = readRDS(file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
+  # modify this drosophila motif's name, because it is not for nhr-67 
+  colnames(motif.oc)[which(colnames(motif.oc) == 'nhr-67.M141')] = 'M1471_1.02_M141' 
   motif.tf = readRDS(file = '../data/motifs_tfs/motif_tf_mapping.rds')
   tfs = readxl::read_xlsx('../data/motifs_tfs/Table-S2-wTF-3.0-Fuxman-Bass-Mol-Sys-Biol-2016.xlsx', sheet = 1)
+  tf.mat = readRDS(file = paste0(RdataDir, 'TFs_expression_profiles_BWM.rds')) 
   
   # mode = 'cluster.wise';
   ids = sub.obj$manual.annot.ids
@@ -37,6 +41,8 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
   sce <- logNormCounts(sce, log = FALSE, size_factors = NULL)
   Y.fpkm <- log2(calculateFPKM(sce, lengths = ll$transcript.length) + 1)
   
+  remove(sce)
+  
   if(mode == 'cluster.wise'){
     cat('-- averging the gene expression in clusters -- \n')
     
@@ -45,12 +51,14 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
     rownames(Y.mat) = rownames(Y.fpkm)
     for(n in 1:length(ids.uniq))
     {
+      cat(ids.uniq[n], '\n')
       jj = which(ids == ids.uniq[n])
       if(length(jj) == 1) Y.mat[, n] = Y.fpkm[,jj]
       if(length(jj) > 1) Y.mat[, n] = apply(Y.fpkm[,jj], 1, mean)
     }
     
     # process.detected.tf.expression.profiles(Y.mat)
+    remove(Y.fpkm)
     
     ##########################################
     # select dynamic genes for reponse Y
@@ -78,12 +86,6 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
       
       Y.mat = as.data.frame(Y.mat)
       
-      Y.sel = cbind(Y.mat$MSxa - Y.mat$MSx,
-                    Y.mat$MSxp - Y.mat$MSx
-                    #Y.mat$MSxap - Y.mat$MSxa, 
-                    #Y.mat$MSxapp - Y.mat$MSxap, 
-                    #Y.mat$MSxappp - Y.mat$MSxapp
-                    )
       rownames(Y.sel) = rownames(Y.mat)
       colnames(Y.sel) = c('MSxa', 'MSxp')
       
@@ -95,357 +97,55 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
        
     }
     
+    select.dyn.genes.with.FindAllMarker.MST = FALSE
+    if(select.dyn.genes.with.FindAllMarker.MST){
+      run.FindAllMarkers = FALSE # it takes ~ 30 minutes
+      if(run.FindAllMarkers){
+        Idents(sub.obj) = sub.obj$manual.annot.ids
+        markers.new <- FindAllMarkers(sub.obj, only.pos = FALSE, min.pct = 0.1, logfc.threshold = 0.25)
+        saveRDS(markers.new, file = paste0(RdataDir,  'AllMarkers_MST_manual.annotation.rds'))
+      }else{
+        markers = readRDS(file = paste0(RdataDir,  'AllMarkers_MST_manual.annotation.rds'))
+      }
+      
+      #top.markers <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+      #DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()
+      
+    }
+    
     pheatmap(Y.norm, cluster_rows=TRUE, show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
              scale = 'row', cluster_cols=FALSE, main = paste0("dynamic genes"), 
              na_col = "white", fontsize_col = 10
     )
     
     ##########################################
-    # prepare matrix A and reponse Y and run elastic-net
+    # prepare matrix A and reponse Y and run penalized.lm
     ##########################################
     require(glmnet)
+    lineage = c('MSxpaaa')
+    
+    gene.sel = markers$gene[which(!is.na(match(markers$cluster, lineage)) & markers$p_val_adj<0.001 & markers$avg_logFC>0.5)]
+    gene.sel = gene.sel[which(!is.na(match(gene.sel, rownames(Y.mat))))]
+    index.sel = match(gene.sel, rownames(Y.mat))
+    Y.sel = Y.mat[index.sel, match(lineage, colnames(Y.mat))]
     y = as.matrix(Y.sel)
-    #y = y[]
-    mm = match(rownames(Y.sel), rownames(motif.oc))
+    
+    #mm = match(rownames(Y.sel), rownames(motif.oc))
+    mm = match(gene.sel, rownames(motif.oc))
     y = y[!is.na(mm), ]
     x = as.matrix(motif.oc[mm[!is.na(mm)], ])
     x[which(is.na(x) == TRUE)] = 0
     
-    cat('nb of motifs which were not found among all considered genes ', length(which(apply(x, 2, sum) == 0)), '\n')
-    cat('nb of genes without motifs ', length(which(apply(x, 1, sum) == 0)), '\n')
+    source.my.script('scMARA_utility_functions.R')
+    run.penelized.lm(x, y, alpha = 0, Test = TRUE)
     
-    #y = Y.sel[, c(1, 2)] 
-    #y = Y.sel[, c(1:10)]
-    
-    alpha = 0
-    #binary = 1;  binary.matrix = binary== 0
-    intercept=TRUE
-    ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
-    standardize=TRUE
-    standardize.response=FALSE
-    
-    #if(binary.matrix){x = x >0; standardize=FALSE}
-    ### use Cross-validation to select tuning paprameter
-    cv.fit=cv.glmnet(x, y, family='mgaussian', grouped=FALSE, 
-                     alpha=alpha, nlambda=100, standardize=standardize, 
-                     standardize.response=standardize.response, intercept=intercept, relax = TRUE)
-    plot(cv.fit)
-    #cv.fit$lambda
-    
-    #optimal = which(cv.fit$lambda==cv.fit$lambda.min)
-    #s.optimal = cv.fit$lambda.1se
-    s.optimal = cv.fit$lambda.min
-    fit=glmnet(x,y,alpha=alpha, lambda=cv.fit$lambda,family='mgaussian', 
-               standardize=standardize, standardize.response=standardize.response, intercept=intercept)
-    #plot(fit, xvar = "lambda", label = TRUE, type.coef = "coef")
-    ## collect result from the elastic-net
-    #colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
-    #colnames(x)[which(fit$beta[[2]][,optimal]!=0)]
-    keep = as.data.frame(coef.glmnet(fit, s = s.optimal))
-    keep = keep[-1, ] # remove intecept
-    colnames(keep) = names(fit$beta)
-    ss = apply(keep, 1, function(x) all(x==0))
-    keep = keep[!ss, ] 
-    
-    #keep[which(abs(keep)<0.05)] = 0
-    #keep = data.frame(keep, stringsAsFactors = FALSE)
-    head(rownames(keep)[order(-abs(keep$MSxp))], 10)
-    
-    
+        
   }else{
     Y.mat = Y.fpkm
   }
   
 }
 
-########################################################
-########################################################
-# Section : utility functions for sctf_MARA
-# part-1 : worm gene annotation convertion
-# part-2 : motif occurrency matrix preparation from fimo output
-# part-3 : motif-tf mapping table
-# part-4 : pwm clustering based on sequence similarity (here the binding site overlapping is not considered as before) 
-# and modify motif-tf mapping 
-# part-5: prepare the detecte tf expression profiles
-# 
-########################################################
-########################################################
-##########################################
-# process worm gene tss to have unique tss for each gene. 
-# to do this, we just pick the tss furthest from the gene start so that the promoter can cover as much as regulatory elements
-# in addition, save the gene length, transcript length for the scRNA-seq length normalization
-##########################################
-process.worm.gene.tss = function()
-{
-  rm(list=ls())
-  setwd('/Volumes/groups/cochella/jiwang/annotations')
-  
-  tss = read.table('ce11_tss.bed', header = FALSE, sep = '\t')
-  load('BioMart_WBcel235.Rdata')
-  annot = annot[which(annot$Gene.type == 'protein_coding'), ]
-  
-  # filter non-protein-coding genes
-  mm = match(tss$V4, annot$Gene.stable.ID)
-  tss = tss[which(!is.na(mm)), ]
-  
-  gg.uniq = unique(tss$V4)
-  keep = rep(NA, length(gg.uniq))
-  names(keep) = gg.uniq
-  gg.counts = table(tss$V4)
-  
-  gg.with.singleTss = names(gg.counts)[which(gg.counts == 1)]
-  #gg.with.multiTss = names(gg.counts)[which(gg.counts > 1)]
-  keep[match(gg.with.singleTss, names(keep))] = match(gg.with.singleTss, tss$V4) 
-  
-  nn = which(is.na(keep))
-  for(n in nn)
-  {
-     kk = which(tss$V4 == names(keep)[n])
-     if(length(kk) == 1){
-        cat('Error \n')
-     }else{
-       cat(n, '--', as.character(names(keep)[n]), '\n')
-       #jj = which(annot$)
-       if(unique(tss$V6[kk]) == '+'){
-         keep[n] = kk[which(tss$V2[kk] == max(tss$V2[kk]))][1]
-       }else{
-         keep[n] = kk[which(tss$V2[kk] == min(tss$V2[kk]))][1]
-       }
-     }
-  }
-  
-  tss = tss[keep, ]
-  #write.table(tss, file = 'ce11_tss_curated_singleTss_perGene_proteinCoding.bed', sep = '\t', col.names = FALSE, row.names = FALSE,
-  #            quote = FALSE)
-  
-  
-  ## save the gene length and transcript length (averge of isoform lengths)
-  aa = data.frame(annot$Gene.stable.ID, annot$Gene.Start..bp., annot$Gene.End..bp., annot$Transcript.length..including.UTRs.and.CDS., 
-                  annot$Gene.name, annot$Gene.type, stringsAsFactors = FALSE)
-  
-  aa$gene.length = abs(aa$annot.Gene.End..bp. - aa$annot.Gene.Start..bp.)
-  
-  gg.uniq = unique(aa$annot.Gene.stable.ID)
-  keep = aa[match(gg.uniq, aa$annot.Gene.stable.ID), ]
-  colnames(keep) = c('wormbase.id', 'gene.start', 'gene.end', 'transcript.length', 'gene.name', 'gene.type', 'gene.length')
-  
-  for(n in 1:nrow(keep))
-  {
-    # n = 1
-    jj = which(aa$annot.Gene.stable.ID == keep$wormbase.id[n])
-    if(length(jj) > 1){
-      cat(n, '--', as.character(keep$wormbase.id[n]), '\n')
-      keep$transcript.length[n] = as.integer(median(aa$annot.Transcript.length..including.UTRs.and.CDS.[jj]))
-    }
-  }
-  #saveRDS(keep, file = 'ce11_proteinCoding_genes_geneLength_transcriptLength.rds')
-}
-
-##########################################
-# after running FIMO, make motif occurrency matrix  
-##########################################
-make.motif.oc.matrix.from.fimo.output = function()
-{
-  library(data.table)
-  motif.tf = readRDS( '../data/motifs_tfs/motif_tf_mapping.rds')
-  
-  fimo.out = '../data/motifs_tfs/fimo.tsv'
-  fimo = fread(fimo.out, header = TRUE)
-  motif.oc = table(fimo$motif_id, fimo$sequence_name, useNA = 'ifany')
-  motif.oc = t(motif.oc)
-  
-  ##########################################
-  # import gene annotation and convert ensgene 
-  ##########################################
-  load(file = '../data/Hashimsholy_et_al/annotMapping_ensID_Wormbase_GeneName.Rdata')
-  mm = match(rownames(motif.oc), geneMapping$Wormbase)
-  rownames(motif.oc) = geneMapping$Gene.name[mm]
-  #kk = match(rownames(motif.oc, ))
-  
-  ss1 = apply(motif.oc, 1, sum)
-  cat(length(which(ss1 == 0)), 'genes without scanned motifs \n')
-  ss2 = apply(motif.oc, 2, sum)
-  
-  ## merge occurrence for motifs in the same cluster
-  #mm = match(colnames(motif.oc), motif.tf$motifs)
-  #colnames(motif.oc) = motif.tf$motifs.new[mm]
-  names = unique(motif.tf$names[match(colnames(motif.oc), motif.tf$motifs)])
-  xx = matrix(0, ncol = length(names), nrow = nrow(motif.oc))
-  rownames(xx) = rownames(motif.oc)
-  colnames(xx) = names
-  
-  for(n in 1:ncol(xx))
-  {
-    # n = 2
-    cat(n, '\n')
-    mtf = motif.tf$motifs[which(motif.tf$names == colnames(xx)[n])]
-    kk = match(mtf, colnames(motif.oc))
-    kk = kk[!is.na(kk)]
-    
-    if(length(kk) == 0){
-      cat('Error : no motif found \n')
-    }else{
-      if(length(kk) == 1){
-        xx[,n] = motif.oc[, kk]
-      }else{
-        xx[,n] = ceiling(apply(motif.oc[,kk], 1, median))
-      }
-    }
-  }
-  
-  motif.oc = xx;
-  saveRDS(motif.oc, file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
-  
-}
-
-## modify the motif names with associated TFs
-process.motif.tf.mapping = function()
-{
-  motif.tf = read.table('../data/motifs_tfs/motifs_tfs_mapping.txt', header = FALSE, sep = ' ')
-  motif.tf = motif.tf[, c(2:3)]
-  colnames(motif.tf) = c('motifs', 'tfs')
-  
-  # manually modify the motif names
-  motif.tf = data.frame(motif.tf, stringsAsFactors = FALSE)
-  motif.tf$motifs.new = motif.tf$motifs
-  motif.tf$tfs.new = motif.tf$tfs
-  
-  xx = motif.tf
-  #xx$motifs.new = gsub('1.02', '', xx$motifs.new)
-  #xx$motifs.new = gsub('1.02', '', xx$motifs.new)
-  #xx$tfs.new = paste0(xx$tfs.new, '_', xx$tfs)
-  #xx$tfs.new = gsub('-', '', xx$tfs.new)
-  xx$tfs.new = gsub(':', '.', xx$tfs.new)
-  xx$tfs.new = gsub('/', '.', xx$tfs.new)
-  xx$tfs.new = gsub("\\(","", xx$tfs.new)
-  xx$tfs.new = gsub("\\)","", xx$tfs.new)
-  xx$tfs.new = gsub("_Homo_sapiens_DBD*.*","", xx$tfs.new)
-  xx$tfs.new = gsub("_Caenorhabditis_briggsae_DBD*.*","", xx$tfs.new)
-  xx$tfs.new = gsub("_Drosophila_melanogaster_DBD*.*","", xx$tfs.new)
-  xx$tfs.new = gsub("_Mus_musculus_DBD*.*","", xx$tfs.new)
-  xx$tfs.new = gsub("_Brugia_pahangi_DBD*.*","", xx$tfs.new)
-  xx$tfs.new = gsub("_Wuchereria_bancrofti_DBD*.*","", xx$tfs.new)
-  xx$tfs.new = gsub("_PBM_CONSTRUCTS_DBD*.*","", xx$tfs.new)
-  xx$tfs.new = gsub("_Tetraodon_nigroviridis_DBD*.*","", xx$tfs.new)
-  
-  xx$motifs.new = paste0(xx$motifs.new, '_', xx$tfs.new)
-  
-  motif.tf = xx
-  
-  saveRDS(motif.tf, file = '../data/motifs_tfs/motif_tf_mapping.rds')
-  
-}
-
-cluster.pwm.based.similarity = function()
-{
-  library(tidyverse)  # data manipulation
-  library(cluster)    # clustering algorithms
-  library(factoextra) # clustering visualization
-  require(graphics)
-  
-  pwm.corr = read.table(file = '../data/motifs_tfs/pwm_similarity_correction_PCC.txt', header = TRUE, 
-                        row.names = 1)
-  motif.tf$motifs.new = paste0(motif.tf$tfs.new, '_', motif.tf$motifs)
-  
-  newName = motif.tf$motifs.new[match(rownames(pwm.corr), motif.tf$motifs)]
-  rownames(pwm.corr) = newName
-  colnames(pwm.corr) = newName
-  
-  comparisons <- 1 - pwm.corr
-  dd <- as.dist(comparisons)
-  
-  # Hierarchical clustering using Complete Linkage
-  hc <- hclust(dd, method = "ward.D2" )
-  
-  # Plot the obtained dendrogram
-  #plot(hc, cex = 0.6, hang = -1)
-  #sub_grp <- cutree(hc, h = 0.1)
-  pdfname = paste0(resDir, "/pwm_celegans_similarity_clustering.pdf")
-  pdf(pdfname, width=20, height = 30)
-  par(cex =0.5, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  
-  hc.cutoff = 0.1
-  #plot(hc, cex = 0.5, hang = -1)
-  plot(as.dendrogram(hc), cex=0.5, horiz=TRUE)
-  abline(v = c(0.1, 0.15, 0.2), col = 'red')
-  #rect.hclust(hc, h = hc.cutoff, border="darkred")
-  #groups <- 
-  length(unique(cutree(hc, h = 0.1)))
-  length(unique(cutree(hc, h = 0.15)))
-  length(unique(cutree(hc, h = 0.2)))
-  length(unique(cutree(hc, h = 0.25)))
-  
-  dev.off()
-  
-  change.pwm.logo.names = FALSE
-  if(change.pwm.logo.names){
-    setwd('../data/motifs_tfs/pwm_logo')
-    logo.file = list.files(path = '.', pattern = '*.pdf', full.names = FALSE)
-    for(n in 1:nrow(motif.tf))
-    {
-      # n = 1 
-      cmd = paste0('mv ', logo.file[grep(motif.tf$motifs[n], logo.file)], ' ',  motif.tf$motifs.new[n], '.pdf')
-      system(cmd)
-    }
-    
-  }
-  #fviz_nbclust(diss = comparisons, FUN = hcut, method = "wss")
-  #fviz_nbclust(df, FUN = hcut, method = "silhouette")
-  
-  ##########################################
-  # merge motifs using height = 0.1 and change motif names
-  ##########################################
-  groups <- cutree(hc, h = 0.1)
-  motif.tf = data.frame(motif.tf, group = groups, stringsAsFactors = FALSE)
-  motif.tf$names = NA
-  for(nn in unique(motif.tf$group))
-  {
-    # nn = 5
-    kk = which(motif.tf$group == nn)
-    motif.tf$names[kk] = paste0(paste0(unique(motif.tf$tfs.new[kk]), collapse = '_'), '.M', nn)
-    
-  }
-  
-  saveRDS(motif.tf, file = '../data/motifs_tfs/motif_tf_mapping.rds') # motif-to-tf mapping for non-redundant motifs (to some extent)
-  
-}
-
-process.detected.tf.expression.profiles(Y.mat)
-{
-  # subset Y.mat for TFs
-  jj = match(tfs$`Public name`, rownames(Y.mat))
-  jj = jj[!is.na(jj)]
-  tf.mat = Y.mat[jj, ]
-  cutoff.tf = 1;
-  ss = apply(tf.mat, 1, function(x) !all(x<cutoff.tf))
-  tf.mat = tf.mat[ss, ]
-  
-  save.tf.profiles.across.lineage = FALSE
-  if(save.tf.profiles.across.lineage){
-    pdfname = paste0(resDir, "/TFs_standardized_fpkm_in_BWM.pdf")
-    pdf(pdfname, width=12, height = 50)
-    par(cex =0.3, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-    
-    pheatmap(tf.mat, cluster_rows=TRUE, 
-             show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
-             scale = 'row',
-             cluster_cols=FALSE, 
-             main = paste0("standardized fpkm of TFs "), 
-             na_col = "white",
-             #color = cols, 
-             #annotation_col = my_sample_col,
-             #gaps_row = c(1:nrow(map)-1),
-             fontsize_col = 10
-    )
-    dev.off()
-    
-    
-    write.csv(tf.mat, file = paste0(tabDir, 'detected_TFs_in_BWM.csv'), row.names = TRUE)
-  }
-  
-  saveRDS(tf.mat, file = paste0(RdataDir, 'TFs_expression_profiles_BWM.rds')) 
-  
-}
 
 
 ########################################################

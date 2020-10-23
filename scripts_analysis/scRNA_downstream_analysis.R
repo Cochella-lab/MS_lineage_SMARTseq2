@@ -400,6 +400,8 @@ ids.bwm = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)],
 cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.bwm))])
 sub.obj = subset(seurat.obj, cells = cells.sels)
 
+rm(seurat.obj) # remove big object to clear memory
+
 #sub.obj = readRDS(file = paste0(RdataDir, 'manual_annotated_BWM_3.5k.cells.rds'))
 sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxppppp.MSxppppa.MSxpppap.MSxpppaa.MSxpappa')] =
   'mixture_terminal_1'

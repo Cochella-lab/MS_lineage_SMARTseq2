@@ -973,10 +973,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
   
   manual.discovery.new.features = FALSE
   if(manual.discovery.new.features){
-    Idents(sub.obj) = sub.obj$seurat_clusters_split
-    markers.new <- FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.1, logfc.threshold = 0.1)
-    top.markers <- markers.new %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
-    DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()
+    
   
   }
   
