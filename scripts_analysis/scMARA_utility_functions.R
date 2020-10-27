@@ -20,16 +20,16 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
   ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
   if(is.null(ncol(y))){
     family = 'gaussian'
-    cat('single response \n')
+    cat('responses nb : 1  \n')
   }else{
     family = 'mgaussian'
-    cat(ncol(y), 'response \n')
+    cat('responses nb :',  ncol(y), '\n')
   }
   
   cat('-- start the penalized linear regression -- \n')
   ### use Cross-validation to select tuning paprameter
   cv.fit=cv.glmnet(x, y, family=family, grouped=FALSE, 
-                   alpha=alpha, nlambda=50, standardize=standardize, 
+                   alpha=alpha, nlambda=100, standardize=standardize, 
                    standardize.response=standardize.response, intercept=intercept, relax = FALSE)
   plot(cv.fit)
   #s.optimal = cv.fit$lambda.1se
@@ -42,14 +42,26 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
   ## collect result from the elastic-net
   #colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
   #colnames(x)[which(fit$beta[[2]][,optimal]!=0)]
+  
+  # extract fitting results for either multiple response or single response; 
+  # in particular, we decided to use only ridge penalized linear regression here
   if(family == 'mgaussian'){
     keep = as.data.frame(coef.glmnet(fit, s = s.optimal))
     keep = keep[-1, ] # remove intecept
     colnames(keep) = names(fit$beta)
-    ss = apply(keep, 1, function(x) !all(x==0))
-    keep = keep[ss, ]
-    head(rownames(keep)[order(-abs(keep$MSxp))], 10)
-    head(rownames(keep)[order(-abs(keep$MSxa))], 10)
+    keep = apply(keep, 2, scale)
+    rownames(keep) = rownames(fit$beta[[2]])
+    #ss = apply(keep, 1, function(x) !all(x==0))
+    #keep = keep[ss, ]
+    #head(rownames(keep)[order(-abs(keep$MSxp))], 10)
+    #head(rownames(keep)[order(-abs(keep$MSxa))], 10)
+    res = keep
+    if(Test){
+      ss = apply(keep, 1, function(x) length(which(abs(x)>2.0)))
+      keep = keep[which(ss>0), ]
+      print(keep)
+    }
+    
   }else{
     keep = coef.glmnet(fit, s = s.optimal)
     motif.names = keep@Dimnames[[1]]
@@ -57,23 +69,24 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
     keep = keep[-1]
     names(keep) = motif.names
     
-    if(alpha > 0.0) {
-      keep = keep[which(keep != 0)]
-      print(names(keep))
-    }else{
-      keep = scale(keep)
-      o1 = order(-abs(keep))
-      keep = keep[o1]
-      motif.names = motif.names[o1]
-      res = data.frame(motif = motif.names, scores = keep, stringsAsFactors = FALSE)
-      if(Test) print(res[which(res$scores > 1.5), ])
-    }
+    keep = scale(keep)
+    o1 = order(-abs(keep))
+    keep = keep[o1]
+    motif.names = motif.names[o1]
+    res = data.frame(motif = motif.names, scores = keep, stringsAsFactors = FALSE)
+    if(Test) print(res[which(abs(res$scores) > 2.0), ])
     
+    # if(alpha > 0.0) {
+    #   keep = keep[which(keep != 0)]
+    #   print(names(keep))
+    # }else{
+     
   }
   
   #for(n in 1:ncol(keep)) keep[,n] = scale(keep[,n], center = TRUE, scale = TRUE)
   #keep[which(abs(keep)<0.05)] = 0
   #keep = data.frame(keep, stringsAsFactors = FALSE)
+  return(res)
   
 }
 
@@ -165,20 +178,47 @@ display.gene.expression.MS.lineage = function(tf.mat)
   library("treeio")
   library("ggtree")
   
-  nwk <- system.file("extdata", "sample.nwk", package="treeio")
-  tree <- read.tree(nwk)
+  bwm_tree = readRDS(file = paste0(RdataDir, 'BWM_tree_for_visualization.rds'))
   
-  ggplot(tree, aes(x, y)) + geom_tree() + theme_tree()
-  ggtree(tree, color="firebrick", size=2, linetype="dotted")
-  ggtree(tree, ladderize=TRUE)
-  ggtree(tree, branch.length="none")
+  source.my.script('make_lineage_ggtree_Viscello.R')
+  ids.names = colnames(tf.mat)
+  ids.names[which(ids.names == "MSxppapp/MSxpappp")] = 'MSxpappp'
   
+  pdfname = paste0(resDir, "/BWM_lineage_expressed_TFs_profiles.pdf")
+  pdf(pdfname, width=10, height = 8)
+  par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
-  beast_file <- system.file("examples/MCC_FluA_H3.tree", 
-                            package="ggtree")
-  beast_tree <- read.beast(beast_file)
-  ggtree(beast_tree, mrsd="2013-01-01") + theme_tree2()
+  options(warn=-1)
+  for(n in 1:nrow(tf.mat))
+  #for(n in 1:10)
+  {
+    cat(n, ' -- ', rownames(tf.mat)[n], '\n')
+    tf.expr = tf.mat[n, ]
+    #names(tf.expr)[which(names(tf.expr) == "MSxppapp/MSxpappp")] = 'MSxpappp'
+    bwm_tree$value = tf.expr[match(bwm_tree$lineage, ids.names)]
+    out.tree = make_lineage_ggtree(bwm_tree, root = 'MS', color.annot = "value") + 
+      ggtitle(rownames(tf.mat)[n])
+    
+    plot(out.tree)
+    
+  }
+  options(warn=0)
+  dev.off()
   
+  #nwk <- system.file("extdata", "sample.nwk", package="treeio")
+  #tree <- read.tree(nwk)
+  # ggplot(tree, aes(x, y)) + geom_tree() + theme_tree()
+  # ggtree(tree, color="firebrick", size=2, linetype="dotted")
+  # ggtree(tree, ladderize=TRUE)
+  # ggtree(tree, branch.length="none")
+  # 
+  # 
+  # beast_file <- system.file("examples/MCC_FluA_H3.tree", 
+  #                           package="ggtree")
+  # beast_tree <- read.beast(beast_file)
+  # ggtree(beast_tree, mrsd="2013-01-01") + theme_tree2()
+  
+  #ggtree(tree_tbl, )
   
 }
 

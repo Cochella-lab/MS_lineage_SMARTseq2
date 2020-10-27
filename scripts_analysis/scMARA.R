@@ -122,10 +122,24 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
     # prepare matrix A and reponse Y and run penalized.lm
     ##########################################
     require(glmnet)
-    lineage = c('MSxpaaa')
+    lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+    lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
     
     gene.sel = markers$gene[which(!is.na(match(markers$cluster, lineage)) & markers$p_val_adj<0.001 & markers$avg_logFC>0.5)]
     gene.sel = gene.sel[which(!is.na(match(gene.sel, rownames(Y.mat))))]
+    
+    gene.sel_1 = gene.sel
+    gene.sel_2 = gene.sel
+    gene.shared = intersect(gene.sel_1, gene.sel_2)
+    
+    gene.sel_1 = setdiff(gene.sel_1, gene.shared)
+    gene.sel_2 = setdiff(gene.sel_2, gene.shared)
+    
+    lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+    gene.sel = gene.sel_1
+    
+    lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+    gene.sel = gene.sel_2
     index.sel = match(gene.sel, rownames(Y.mat))
     Y.sel = Y.mat[index.sel, match(lineage, colnames(Y.mat))]
     y = as.matrix(Y.sel)
@@ -137,7 +151,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
     x[which(is.na(x) == TRUE)] = 0
     
     source.my.script('scMARA_utility_functions.R')
-    run.penelized.lm(x, y, alpha = 0, Test = TRUE)
+    res = run.penelized.lm(x, y, alpha = 0, Test = TRUE)
     
         
   }else{
