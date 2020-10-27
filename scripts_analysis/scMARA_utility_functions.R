@@ -178,7 +178,7 @@ display.gene.expression.MS.lineage = function(tf.mat)
   library("treeio")
   library("ggtree")
   
-  bwm_tree = readRDS(file = paste0(RdataDir, 'BWM_tree_for_visualization.rds'))
+  bwm_tree = readRDS(file = paste0(dataDir, 'BWM_tree_for_visualization.rds'))
   
   source.my.script('make_lineage_ggtree_Viscello.R')
   ids.names = colnames(tf.mat)
@@ -193,12 +193,11 @@ display.gene.expression.MS.lineage = function(tf.mat)
   #for(n in 1:10)
   {
     cat(n, ' -- ', rownames(tf.mat)[n], '\n')
+    
     tf.expr = tf.mat[n, ]
-    #names(tf.expr)[which(names(tf.expr) == "MSxppapp/MSxpappp")] = 'MSxpappp'
     bwm_tree$value = tf.expr[match(bwm_tree$lineage, ids.names)]
     out.tree = make_lineage_ggtree(bwm_tree, root = 'MS', color.annot = "value") + 
       ggtitle(rownames(tf.mat)[n])
-    
     plot(out.tree)
     
   }

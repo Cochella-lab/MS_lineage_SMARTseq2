@@ -31,7 +31,7 @@ setwd(paste0("~/workspace/imp/scRNAseq_MS_lineage_dev/", user))
 
 version.DATA = 'all_batches'
 version.analysis =  paste0(version.DATA, '_202008')
-dataDir = paste0("../data/gene_counts/")
+dataDir = paste0("../data/")
 resDir = paste0("results/", version.analysis)
 tabDir = paste0("results/", version.analysis, "/tables/")
 
