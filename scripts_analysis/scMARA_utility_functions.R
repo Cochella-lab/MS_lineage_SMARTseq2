@@ -184,7 +184,7 @@ display.gene.expression.MS.lineage = function(tf.mat)
   ids.names = colnames(tf.mat)
   ids.names[which(ids.names == "MSxppapp/MSxpappp")] = 'MSxpappp'
   
-  pdfname = paste0(resDir, "/BWM_lineage_expressed_TFs_profiles.pdf")
+  pdfname = paste0(resDir, "/BWM_lineage_expressed_TFs_profiles_v2.pdf")
   pdf(pdfname, width=10, height = 8)
   par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
@@ -201,6 +201,7 @@ display.gene.expression.MS.lineage = function(tf.mat)
     plot(out.tree)
     
   }
+  
   options(warn=0)
   dev.off()
   

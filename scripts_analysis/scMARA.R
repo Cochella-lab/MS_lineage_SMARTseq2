@@ -157,9 +157,9 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   }
   
   if(mode == 'time.bin'){
-    library(diffusionMap)
+    library(destiny)
     library(princurve)
-    library(pbapply)
+    #library(pbapply)
     library(RColorBrewer)
     
     lineage = c('MSx', 'MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
@@ -168,12 +168,13 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     cells.sels = unique(colnames(sub.obj)[!is.na(match(sub.obj$manual.annot.ids, lineage))])
     ll.obj = subset(sub.obj, cells = cells.sels)
     ll.obj = FindVariableFeatures(ll.obj, selection.method = "vst", nfeatures = 3000)
-    ll.obj = RunPCA(ll.obj, features = VariableFeatures(ll.obj), verbose = FALSE)
+    ll.obj = RunPCA(ll.obj, features = VariableFeatures(ll.obj), verbose = FALSE, weight.by.var = FALSE)
     
     ll.pca = ll.obj@reductions$pca@cell.embeddings[, c(1:50)]
     dm <- DiffusionMap(ll.pca)
-    plot(dm)
+    #plot(dm)
     plot(dm$DC1, dm$DC2)
+    
     dcs = as.matrix(cbind(dm$DC1, dm$DC2))
     princurve = principal_curve(dcs, start = dcs, smoother = 'lowess', stretch = 2)
     
@@ -189,10 +190,6 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     # Run diffusion map and return top 50 dimensions
     #set.seed(1)
     #diffmap = diffuse(mat.dist, maxdim=50)
-    
-    # Diffusion map eigen values
-    #plot(diffmap$eigenvals, type="o", col="blue",ylab = " Eigenvalues",
-    #     xlab="Eigenvalue Index",main="Diffusion Map Eigenvalues",lwd=2,cex.lab=1.5,cex.main=1.5)
     
     #diffmap.embedding = as.matrix(diffmap$X)
     #rownames(diffmap.embedding) = colnames(ll.obj)

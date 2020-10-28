@@ -109,7 +109,7 @@ make_lineage_ggtree <- function(in_tree = NULL, root = "MS", time.cut = 400,
   plot_tree$lifetime[correct_idx] <- (plot_tree$d_time - plot_tree$br_time)[correct_idx]
   plot_tree <- as.treedata(plot_tree)
   out_tree <- ggtree(plot_tree, branch.length=branch.length, aes_string(color = color.annot), size = edge.size, ladderize = F) +
-    scale_color_continuous(low="darkgreen", high="red")
+    scale_color_continuous(low="black", high="red")
   out_tree <- lineage_tree_flip(out_tree, silence = T)
   
   out_tree = out_tree + geom_tiplab(size = 5) + xlim(0, 380) + 
