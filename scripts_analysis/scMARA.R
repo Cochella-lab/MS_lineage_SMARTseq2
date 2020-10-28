@@ -7,7 +7,8 @@
 # Date of creation: Wed Oct  7 17:31:46 2020
 ##########################################################################
 ##########################################################################
-predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manual.annot.ids', Y_name = 'RNA')
+predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.bin', 'cell.based'), 
+                                      id = 'manual.annot.ids', Y_name = 'RNA')
 {
   library("pheatmap")
   library("RColorBrewer")
@@ -153,14 +154,78 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = 'cluster.wise', id = 'manu
     source.my.script('scMARA_utility_functions.R')
     res = run.penelized.lm(x, y, alpha = 0, Test = TRUE)
     
-        
-  }else{
-    Y.mat = Y.fpkm
   }
   
+  if(mode == 'time.bin'){
+    library(diffusionMap)
+    library(princurve)
+    library(pbapply)
+    library(RColorBrewer)
+    
+    lineage = c('MSx', 'MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+    lineage = c('MSx', 'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+    
+    cells.sels = unique(colnames(sub.obj)[!is.na(match(sub.obj$manual.annot.ids, lineage))])
+    ll.obj = subset(sub.obj, cells = cells.sels)
+    ll.obj = FindVariableFeatures(ll.obj, selection.method = "vst", nfeatures = 3000)
+    ll.obj = RunPCA(ll.obj, features = VariableFeatures(ll.obj), verbose = FALSE)
+    
+    ll.pca = ll.obj@reductions$pca@cell.embeddings[, c(1:50)]
+    dm <- DiffusionMap(ll.pca)
+    plot(dm)
+    plot(dm$DC1, dm$DC2)
+    dcs = as.matrix(cbind(dm$DC1, dm$DC2))
+    princurve = principal_curve(dcs, start = dcs, smoother = 'lowess', stretch = 2)
+    
+    plot(dcs)
+    lines(princurve$s[order(princurve$lambda),], lty=1,lwd=4,col="purple",type = "l")
+    
+    whiskers(dcs, princurve$s)
+    
+    pseudot = princurve$lambda
+    #plot(order(-diffmap$X[,3]), ll.obj$timingEst,  cex = 0.5)  
+    plot(pseudot, ll.obj$timingEst,  cex = 0.5)  
+    #mat.dist = as.matrix(dist(ll.pca, method = 'euclidean'))
+    # Run diffusion map and return top 50 dimensions
+    #set.seed(1)
+    #diffmap = diffuse(mat.dist, maxdim=50)
+    
+    # Diffusion map eigen values
+    #plot(diffmap$eigenvals, type="o", col="blue",ylab = " Eigenvalues",
+    #     xlab="Eigenvalue Index",main="Diffusion Map Eigenvalues",lwd=2,cex.lab=1.5,cex.main=1.5)
+    
+    #diffmap.embedding = as.matrix(diffmap$X)
+    #rownames(diffmap.embedding) = colnames(ll.obj)
+    #colnames(diffmap.embedding) = paste0('diffumap_', c(1:ncol(diffmap.embedding)))
+    
+    #ll.obj[['diffmap']] = Seurat::CreateDimReducObject(embeddings=diffmap.embedding , key='diffmap_', assay='RNA')
+    
+    # Save first two diffusion map coordinators
+    #shp@tsne.rot[1:2]=data.frame(shp.diff$X[,1:2],row.names = ll.obj@cell.names)
+    #colnames(shp@tsne.rot)=c("tSNE_1","tSNE_2")
+    # Visualize top two diffusion map components
+    #tsne.pseudo(shp, do.label = F,label.cex.text = 1,name.y = "Diffusion Map Coordinator 2",name.x = "Diffusion Map Coordinator1",label.cols.use = c("green","yellow","orange1","orange4","orange4"),label.pt.size = 1.5,xlim=c(-0.1,0.05),ylim=c(-0.05,0.05))
+    #legend("topleft",legend=c("12TVC","14STVC","16SHP","18SHP","20SHP"),col= c("green","yellow","orange1","orange4","orange4"),pch = 16,cex=0.5,pt.cex = 1)
+    #plot(diffmap$X[, c(1:2)])
+    # Fit the first two diffusion map components with principal curve
+    
+    
+    df=data.frame(princurve$s[order(princurve$lambda),]);colnames(df) = c("x","y")
+    
+    ggplot(data=df,aes(x,y))+
+      geom_line(size=1.5,colour="black")+
+      geom_density2d(aes(colour=..level..),bins=6) + 
+      scale_colour_gradient(low="darkgray",high="white",3) +
+      xlim(-0.084,0.08) + ylim(-0.05,0.05) +
+      geom_point(data=data.frame(shp@tsne.rot,color=shp@ident),aes(tSNE_1,tSNE_2),size=2,color=c(rep("green",table(shp@ident)[1]),rep("yellow",table(shp@ident)[2]),rep("orange1",table(shp@ident)[3]),rep("orange4",table(shp@ident)[4]),rep("orange4",table(shp@ident)[5]))) +
+      theme_classic() +  
+      theme(legend.position="none",axis.title=element_text(size = rel(1)),axis.text=element_blank(), axis.ticks = element_blank(),axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'))+ xlab(label = "Diffusion Component 1") + ylab(label = "Diffusion Component 2") +     geom_line(size=1.5,colour="black")
+    
+   
+    
+    
+  }
 }
-
-
 
 ########################################################
 ########################################################
