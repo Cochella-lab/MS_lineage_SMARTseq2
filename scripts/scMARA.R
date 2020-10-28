@@ -10,8 +10,8 @@
 predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.bin', 'cell.based'), 
                                       id = 'manual.annot.ids', Y_name = 'RNA')
 {
-  library("pheatmap")
-  library("RColorBrewer")
+  library(pheatmap)
+  library(RColorBrewer)
   library(grid)
   library(Seurat)
   library(scater)
@@ -159,23 +159,23 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   if(mode == 'time.bin'){
     library(destiny)
     library(princurve)
-    #library(pbapply)
-    library(RColorBrewer)
-    
+        
     lineage = c('MSx', 'MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
     lineage = c('MSx', 'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
     
     cells.sels = unique(colnames(sub.obj)[!is.na(match(sub.obj$manual.annot.ids, lineage))])
     ll.obj = subset(sub.obj, cells = cells.sels)
-    ll.obj = FindVariableFeatures(ll.obj, selection.method = "vst", nfeatures = 3000)
-    ll.obj = RunPCA(ll.obj, features = VariableFeatures(ll.obj), verbose = FALSE, weight.by.var = FALSE)
+    ll.obj = FindVariableFeatures(ll.obj, selection.method = "vst", nfeatures = 1000)
+    ll.obj = RunPCA(ll.obj, features = VariableFeatures(ll.obj), npcs = 50, verbose = FALSE, weight.by.var = TRUE)
     
     ll.pca = ll.obj@reductions$pca@cell.embeddings[, c(1:50)]
-    dm <- DiffusionMap(ll.pca)
+    dm <- DiffusionMap(ll.pca, sigma = 'local', n_eigs = 5)
     #plot(dm)
-    plot(dm$DC1, dm$DC2)
-    
+    #plot(dm$DC1, dm$DC2)
     dcs = as.matrix(cbind(dm$DC1, dm$DC2))
+    ll.obj[["DP"]] <- CreateDimReducObject(embeddings = as.matrix(dcs), key = "DC_", assay = DefaultAssay(ll.obj))
+    DimPlot(ll.obj, reduction = 'DP', group.by = 'manual.annot.ids')
+    
     princurve = principal_curve(dcs, start = dcs, smoother = 'lowess', stretch = 2)
     
     plot(dcs)
@@ -218,87 +218,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
       theme_classic() +  
       theme(legend.position="none",axis.title=element_text(size = rel(1)),axis.text=element_blank(), axis.ticks = element_blank(),axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'))+ xlab(label = "Diffusion Component 1") + ylab(label = "Diffusion Component 2") +     geom_line(size=1.5,colour="black")
     
-   
-    
     
   }
 }
 
-########################################################
-########################################################
-# Section : package installation
-# 
-########################################################
-########################################################
-install.magic = FALSE
-if(install.magic){
-  install.packages("Rmagic")
-  system('which python')
-  system('python --version')
-  system('pip install --user magic-impute') 
-  # at the same time the magic-impute was installed in default python 
-  # /usr/local/bin/python
-  
-}
-
-##########################################
-# test MAGIC and it works for the example
-# original code from https://github.com/KrishnaswamyLab/MAGIC
-##########################################
-Test.Rmagic = FALSE
-if(Test.Rmagic){
-  library(Rmagic)
-  library(ggplot2)
-  data(magic_testdata)
-  
-  ss = apply(magic_testdata, 2, sum)
-  magic_testdata = magic_testdata[, ss>0]
-  MAGIC_data <- Rmagic::magic(magic_testdata, genes=c("VIM", "CDH1", "ZEB1"), verbose = 1)
-  
-  ggplot(MAGIC_data) +
-    geom_point(aes(x=VIM, y=CDH1, color=ZEB1))
-  
-}
-
-Test.phateR = FALSE
-if(Test.phateR){
-  ##########################################
-  # test PHATE from https://github.com/KrishnaswamyLab/phateR
-  # FAQ
-  # 
-  # Should genes (features) by rows or columns?
-  #   
-  #   To be consistent with common dimensionality reductions such as PCA (stats::prcomp) and t-SNE (Rtsne::Rtsne), we require that cells (observations) be rows and genes (features) be columns of your input data.
-  # 
-  # Can I run PHATE with Seurat?
-  #   
-  #   PHATE was removed from Seurat in version 3. You can install a version of Seurat with RunPHATE included by following the instructions at https://github.com/satijalab/seurat/pull/1172#issuecomment-564782167.
-  # 
-  # I have installed PHATE in Python, but phateR says it is not installed!
-  #   
-  #   Check your reticulate::py_discover_config("phate") and compare it to the version of Python in which you installed PHATE (run which python and which pip in a terminal.) Chances are reticulate can’t find the right version of Python; you can fix this by adding the following line to your ~/.Renviron:
-  #   
-  #   PATH=/path/to/my/python
-  # 
-  # You can read more about Renviron at https://CRAN.R-project.org/package=startup/vignettes/startup-intro.html.
-  # Help
-  # 
-  # Please let us know of any issues at the GitHub repository. If you have any questions or require assistance using PHATE, please read the documentation at https://CRAN.R-project.org/package=phateR/phateR.pdf or by running help(phateR::phate) or contact us at https://krishnaswamylab.org/get-help.
-  ##########################################
-  library(phateR)
-  #> Loading required package: Matrix
-  data(tree.data)
-  plot(prcomp(tree.data$data)$x, col=tree.data$branches)
-  # runs phate
-  tree.phate <- phate(tree.data$data)
-  summary(tree.phate)
-  #> PHATE embedding
-  #> k = 5, alpha = 40, t = auto
-  #> Data: (3000, 100)
-  #> Embedding: (3000, 2)
-  
-  # plot embedding
-  palette(rainbow(10))
-  plot(tree.phate, col = tree.data$branches)
-  
-}
