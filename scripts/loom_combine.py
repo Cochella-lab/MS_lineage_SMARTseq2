@@ -42,9 +42,9 @@ loompy.combine(files,
 files = glob.glob("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/raw_ngs_data/*/LOOMS/*merged.loom")
 loompy.combine(files, '/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/data/raw_ngs_data/all_merged.loom')
 
-loompy.combine(files, '~/workspace/imp/scRNAseq_MS_lineage_dev/data/output_new.loom')
+loompy.combine(files, '/Users/jiwang/workspace/imp/scRNAseq_MS_lineage_dev/data/velocyto_all_merged.loom')
 
-dsmerged = loompy.connect('~/workspace/imp/scRNAseq_MS_lineage_dev/data/output_new.loom')
+#dsmerged = loompy.connect('/Users/jiwang/workspace/imp/scRNAseq_MS_lineage_dev/data/velocyto_all_merged.loom')
 
 #ds0.shape
-dsmerged.shape
+#dsmerged.shape
