@@ -13,9 +13,7 @@
 # sctransform HGV from seurat and functio all from seurat too
 ########################################################
 ########################################################
-
-
-test.velocity.in.R = function()
+test.velocyto.in.R = function()
 {
   library(Seurat)
   library(velocyto.R)
