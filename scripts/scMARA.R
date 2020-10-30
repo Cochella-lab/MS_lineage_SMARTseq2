@@ -86,7 +86,6 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     if(select.dyn.genes.with.pair.ratios){
       
       Y.mat = as.data.frame(Y.mat)
-      
       rownames(Y.sel) = rownames(Y.mat)
       colnames(Y.sel) = c('MSxa', 'MSxp')
       
@@ -129,18 +128,23 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     gene.sel = markers$gene[which(!is.na(match(markers$cluster, lineage)) & markers$p_val_adj<0.001 & markers$avg_logFC>0.5)]
     gene.sel = gene.sel[which(!is.na(match(gene.sel, rownames(Y.mat))))]
     
-    gene.sel_1 = gene.sel
-    gene.sel_2 = gene.sel
-    gene.shared = intersect(gene.sel_1, gene.sel_2)
+    remove.shared.genes = FALSE
+    if(remove.shared.genes){
+      gene.sel_1 = gene.sel
+      gene.sel_2 = gene.sel
+      gene.shared = intersect(gene.sel_1, gene.sel_2)
+      
+      gene.sel_1 = setdiff(gene.sel_1, gene.shared)
+      gene.sel_2 = setdiff(gene.sel_2, gene.shared)
+      
+      lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+      gene.sel = gene.sel_1
+      
+      lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+      gene.sel = gene.sel_2
+      
+    }
     
-    gene.sel_1 = setdiff(gene.sel_1, gene.shared)
-    gene.sel_2 = setdiff(gene.sel_2, gene.shared)
-    
-    lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
-    gene.sel = gene.sel_1
-    
-    lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
-    gene.sel = gene.sel_2
     index.sel = match(gene.sel, rownames(Y.mat))
     Y.sel = Y.mat[index.sel, match(lineage, colnames(Y.mat))]
     y = as.matrix(Y.sel)
@@ -153,6 +157,12 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     
     source.my.script('scMARA_utility_functions.R')
     res = run.penelized.lm(x, y, alpha = 0, Test = TRUE)
+    
+    ss = apply(res, 1, function(x) length(which(abs(x)>1.3)))
+    
+    pheatmap(res[which(ss>0), ], cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
+             scale = 'none', cluster_cols=FALSE, main = paste0("MARA prediction"), 
+             na_col = "white", fontsize_col = 10) 
     
   }
   
