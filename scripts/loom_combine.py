@@ -44,7 +44,6 @@ loompy.combine(files, '/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_li
 
 loompy.combine(files, '/Users/jiwang/workspace/imp/scRNAseq_MS_lineage_dev/data/velocyto_all_merged.loom')
 
-#dsmerged = loompy.connect('/Users/jiwang/workspace/imp/scRNAseq_MS_lineage_dev/data/velocyto_all_merged.loom')
+ds = loompy.connect('/Users/jiwang/workspace/imp/scRNAseq_MS_lineage_dev/data/velocyto_all_merged.loom')
 
-#ds0.shape
-#dsmerged.shape
+ds.shape 
