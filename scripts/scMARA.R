@@ -8,7 +8,8 @@
 ##########################################################################
 ##########################################################################
 predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.bin', 'cell.based'), 
-                                      id = 'manual.annot.ids', Y_name = 'RNA')
+                                      id = 'manual.annot.ids', process.motif.oc = FALSE, 
+                                      Y_name = 'RNA')
 {
   library(pheatmap)
   library(RColorBrewer)
@@ -19,8 +20,12 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   library(scran)
   source.my.script('scMARA_utility_functions.R')
   
-  ll = readRDS(file = '../data/motifs_tfs/ce11_proteinCoding_genes_geneLength_transcriptLength.rds')
+  # specify parameters for testing stage
+  process.motif.oc = FALSE
+  
+  ll = readRDS(file = '../data/motifs_tfs/ce11_proteinCoding_genes_geneLength_transcriptLength.rds') # gene length and transript length
   motif.oc = readRDS(file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
+  
   # modify this drosophila motif's name, because it is not for nhr-67 
   colnames(motif.oc)[which(colnames(motif.oc) == 'nhr-67.M141')] = 'M1471_1.02_M141' 
   motif.tf = readRDS(file = '../data/motifs_tfs/motif_tf_mapping.rds')

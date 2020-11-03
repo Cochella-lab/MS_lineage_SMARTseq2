@@ -395,6 +395,13 @@ RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.an
                   nb.iteration, '.rds')
 seurat.obj = readRDS(file = RDSsaved)
 
+DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+        na.value = "gray") + 
+  ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_annotedIDs")) +
+  scale_colour_hue(drop = FALSE) + 
+  NoLegend()
+
+
 ## select manually annotated bwm cells
 ids.bwm = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
 cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.bwm))])
@@ -426,12 +433,6 @@ toc()
 source.my.script('scMARA.R')
 
 res = predict.TF.MARA.for.scdata(sub.obj, mode = 'cluster.wise', id = 'manual.annot.ids')
-
-
-
-
-
-
 
 
 

@@ -227,27 +227,65 @@ display.gene.expression.MS.lineage = function(tf.mat)
 ##########################################
 make.motif.oc.matrix.from.fimo.output = function()
 {
+  
+  
   library(data.table)
   motif.tf = readRDS( '../data/motifs_tfs/motif_tf_mapping.rds')
-  
-  fimo.out = '../data/motifs_tfs/fimo.tsv'
+  fimo.out = '../data/motifs_tfs/fimo_scATAC_EE_cel.tsv'
   fimo = fread(fimo.out, header = TRUE)
   motif.oc = table(fimo$motif_id, fimo$sequence_name, useNA = 'ifany')
   motif.oc = t(motif.oc)
   
+  print(head(rownames(motif.oc)))
+  
   ##########################################
-  # import gene annotation and convert ensgene 
+  # associate the scanned regions with gene 
   ##########################################
+  assign.regions.to.genes = TRUE
   load(file = '../data/Hashimsholy_et_al/annotMapping_ensID_Wormbase_GeneName.Rdata')
-  mm = match(rownames(motif.oc), geneMapping$Wormbase)
-  rownames(motif.oc) = geneMapping$Gene.name[mm]
-  #kk = match(rownames(motif.oc, ))
   
-  ss1 = apply(motif.oc, 1, sum)
-  cat(length(which(ss1 == 0)), 'genes without scanned motifs \n')
-  ss2 = apply(motif.oc, 2, sum)
+  if(assign.regions.to.genes){
+    ## loading packages
+    library(ChIPseeker)
+    library(GenomicFeatures);
+    library(GenomicRanges)
+    
+    library(TxDb.Celegans.UCSC.ce11.ensGene)
+    txdb <- TxDb.Celegans.UCSC.ce11.ensGene
+    
+    get.peak.coord = function(x){
+      x = unlist(strsplit(as.character(x), '[:]'))
+      chr = x[1]
+      x = unlist(strsplit(as.character(x[2]), '-'))
+      return(c(chr, x))
+    }
+    peaks = rownames(motif.oc)
+    peaks = t(sapply(peaks, get.peak.coord))
+    colnames(peaks) = c('chr', 'start', 'end')
+    peaks = data.frame(peaks, strand=c("."), score=0, stringsAsFactors = FALSE)
+    peaks = makeGRangesFromDataFrame(peaks)
+    #peaks = data.frame(, gsub('^*:')))
+    #peak <- readPeakFile(peakfile = peak.file, as = 'GRanges')
+    
+    peakAnno <- annotatePeak(peak = peaks, tssRegion=c(-2000, 2000), level = 'gene', TxDb=txdb)
+    
+    assign = as.data.frame(peakAnno)
+    
+      
+  }else{
+    mm = match(rownames(motif.oc), geneMapping$Wormbase)
+    rownames(motif.oc) = geneMapping$Gene.name[mm]
+    #kk = match(rownames(motif.oc, ))
+    
+    ss1 = apply(motif.oc, 1, sum)
+    cat(length(which(ss1 == 0)), 'genes without scanned motifs \n')
+    ss2 = apply(motif.oc, 2, sum)
+    
+  }
   
-  ## merge occurrence for motifs in the same cluster
+  ##########################################
+  # remove motif redundancy by merging occurrence for motifs in the same cluster
+  ##########################################
   #mm = match(colnames(motif.oc), motif.tf$motifs)
   #colnames(motif.oc) = motif.tf$motifs.new[mm]
   names = unique(motif.tf$names[match(colnames(motif.oc), motif.tf$motifs)])
