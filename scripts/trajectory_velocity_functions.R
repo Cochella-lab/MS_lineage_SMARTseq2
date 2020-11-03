@@ -136,7 +136,7 @@ run.RNAvelocity.with.velocyto.in.R = function(pm)
   pm <- FindNeighbors(object = pm, dims = 1:20)
   pm <- FindClusters(object = pm)
   
-  nb.pcs = 30 # nb of pcs depends on the considered clusters or ids 
+  nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
   n.neighbors = 30;
   min.dist = 0.1
   pm <- RunUMAP(object = pm, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
@@ -150,12 +150,14 @@ run.RNAvelocity.with.velocyto.in.R = function(pm)
   pm <- RunVelocity(object = pm, spliced = 'spliced', unspliced = 'unspliced',
                     deltaT = 1, kCells = 25, fit.quantile = 0.02)
   
+  Idents(pm) = pm$annoted.ids
   ident.colors <- (scales::hue_pal())(n = length(x = levels(x = pm)))
   names(x = ident.colors) <- levels(x = pm)
   cell.colors <- ident.colors[Idents(object = pm)]
   names(x = cell.colors) <- colnames(x = pm)
-  show.velocity.on.embedding.cor(emb = Embeddings(object = pm, reduction = "umap"), vel = Tool(object = pm, 
-                                                                                               slot = "RunVelocity"), n = 200, scale = "sqrt", cell.colors = ac(x = cell.colors, alpha = 0.5), 
+  
+  show.velocity.on.embedding.cor(emb = Embeddings(object = pm, reduction = "umap"), vel = Tool(object = pm, slot = "RunVelocity"), 
+                                 n = 200, scale = "sqrt", cell.colors = ac(x = cell.colors, alpha = 0.5), 
                                  cex = 0.8, arrow.scale = 3, show.grid.flow = TRUE, min.grid.cell.mass = 0.5, grid.n = 40, arrow.lwd = 1, 
                                  do.par = FALSE, cell.border.alpha = 0.1)
   
@@ -208,7 +210,8 @@ run.RNAvelocity.with.velocyto.in.R = function(pm)
     cell.colors <- ident.colors[Idents(object = pm)]
     names(x = cell.colors) <- colnames(x = pm)
     show.velocity.on.embedding.cor(emb = Embeddings(object = pm, reduction = "umap"), vel = Tool(object = pm, 
-                                                                                                 slot = "RunVelocity"), n = 200, scale = "sqrt", cell.colors = ac(x = cell.colors, alpha = 0.5), 
+                                                                                                 slot = "RunVelocity"), 
+                                   n = 200, scale = "sqrt", cell.colors = ac(x = cell.colors, alpha = 0.5), 
                                    cex = 0.8, arrow.scale = 3, show.grid.flow = TRUE, min.grid.cell.mass = 0.5, grid.n = 40, arrow.lwd = 1, 
                                    do.par = FALSE, cell.border.alpha = 0.1)
     
