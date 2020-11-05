@@ -20,11 +20,9 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   library(scran)
   source.my.script('scMARA_utility_functions.R')
   
-  # specify parameters for testing stage
-  process.motif.oc = FALSE
-  
   ll = readRDS(file = '../data/motifs_tfs/ce11_proteinCoding_genes_geneLength_transcriptLength.rds') # gene length and transript length
-  motif.oc = readRDS(file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
+  #motif.oc = readRDS(file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
+  motif.oc = readRDS(file = '../data/motifs_tfs/motif_oc_scATACpeaks_all_proteinCodingGenes.rds')
   
   # modify this drosophila motif's name, because it is not for nhr-67 
   colnames(motif.oc)[which(colnames(motif.oc) == 'nhr-67.M141')] = 'M1471_1.02_M141' 
@@ -128,7 +126,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     ##########################################
     require(glmnet)
     lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
-    lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+    #lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
     
     gene.sel = markers$gene[which(!is.na(match(markers$cluster, lineage)) & markers$p_val_adj<0.001 & markers$avg_logFC>0.5)]
     gene.sel = gene.sel[which(!is.na(match(gene.sel, rownames(Y.mat))))]
@@ -161,7 +159,10 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     x[which(is.na(x) == TRUE)] = 0
     
     source.my.script('scMARA_utility_functions.R')
-    res = run.penelized.lm(x, y, alpha = 0, Test = TRUE)
+    res = run.penelized.lm(x, y, alpha = 0, standardize = FALSE, intercept = TRUE, use.lambda.min = FALSE, 
+                           Test = TRUE, Test.zscore.cutoff = 2.0)
+    
+    print(res[grep('pha-4|unc-120|hnd-1|M1471_1.02_M141', rownames(res)),])
     
     ss = apply(res, 1, function(x) length(which(abs(x)>1.3)))
     

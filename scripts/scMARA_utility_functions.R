@@ -7,15 +7,15 @@
 # Date of creation: Fri Oct 23 18:27:14 2020
 ##########################################################################
 ##########################################################################
-run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE,  standardize.response=FALSE, 
-                            Test = FALSE )
+run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE,  standardize.response=FALSE, use.lambda.min = TRUE,
+                            zscore.output = TRUE, Test = FALSE, Test.zscore.cutoff = 2.0)
 {
   # check the x and y
-  cat(length(which(apply(x, 2, sum) == 0)), '  motifs which were not found among all considered genes \n')
-  cat(length(which(apply(x, 1, sum) == 0)), ' genes without motifs \n')
-  
   cat(ncol(x), ' motifs \n')
   cat(nrow(x), ' gene selected \n')
+  
+  cat(length(which(apply(x, 2, sum) == 0)), '  motifs without target genes  \n')
+  cat(length(which(apply(x, 1, sum) == 0)), ' genes without motifs \n')
   
   ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
   if(is.null(ncol(y))){
@@ -32,9 +32,11 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
                    alpha=alpha, nlambda=100, standardize=standardize, 
                    standardize.response=standardize.response, intercept=intercept, relax = FALSE)
   plot(cv.fit)
-  #s.optimal = cv.fit$lambda.1se
-  s.optimal = cv.fit$lambda.min
-  
+  if(use.lambda.min){
+    s.optimal = cv.fit$lambda.min
+  }else{
+    s.optimal = cv.fit$lambda.1se
+  }
   fit=glmnet(x,y,alpha=alpha, lambda=s.optimal, family=family, 
              standardize=standardize, standardize.response=standardize.response, intercept=intercept, 
              relax = FALSE)
@@ -49,7 +51,7 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
     keep = as.data.frame(coef.glmnet(fit, s = s.optimal))
     keep = keep[-1, ] # remove intecept
     colnames(keep) = names(fit$beta)
-    keep = apply(keep, 2, scale)
+    if(zscore.output) keep = apply(keep, 2, scale)
     rownames(keep) = rownames(fit$beta[[2]])
     #ss = apply(keep, 1, function(x) !all(x==0))
     #keep = keep[ss, ]
@@ -57,7 +59,7 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
     #head(rownames(keep)[order(-abs(keep$MSxa))], 10)
     res = keep
     if(Test){
-      ss = apply(keep, 1, function(x) length(which(abs(x)>2.0)))
+      ss = apply(keep, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
       keep = keep[which(ss>0), ]
       print(keep)
     }
@@ -69,12 +71,12 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
     keep = keep[-1]
     names(keep) = motif.names
     
-    keep = scale(keep)
+    if(zscore.output) keep = scale(keep)
     o1 = order(-abs(keep))
     keep = keep[o1]
     motif.names = motif.names[o1]
     res = data.frame(motif = motif.names, scores = keep, stringsAsFactors = FALSE)
-    if(Test) print(res[which(abs(res$scores) > 2.0), ])
+    if(Test) print(res[which(abs(res$scores) > Test.zscore.cutoff), ])
     
     # if(alpha > 0.0) {
     #   keep = keep[which(keep != 0)]
@@ -227,8 +229,6 @@ display.gene.expression.MS.lineage = function(tf.mat)
 ##########################################
 make.motif.oc.matrix.from.fimo.output = function()
 {
-  
-  
   library(data.table)
   motif.tf = readRDS( '../data/motifs_tfs/motif_tf_mapping.rds')
   fimo.out = '../data/motifs_tfs/fimo_scATAC_EE_cel.tsv'
@@ -242,8 +242,6 @@ make.motif.oc.matrix.from.fimo.output = function()
   # associate the scanned regions with gene 
   ##########################################
   assign.regions.to.genes = TRUE
-  load(file = '../data/Hashimsholy_et_al/annotMapping_ensID_Wormbase_GeneName.Rdata')
-  
   if(assign.regions.to.genes){
     ## loading packages
     library(ChIPseeker)
@@ -252,6 +250,8 @@ make.motif.oc.matrix.from.fimo.output = function()
     
     library(TxDb.Celegans.UCSC.ce11.ensGene)
     txdb <- TxDb.Celegans.UCSC.ce11.ensGene
+    
+    annot = readRDS(file = '../data/motifs_tfs/ce11_proteinCoding_genes_geneLength_transcriptLength.rds') 
     
     get.peak.coord = function(x){
       x = unlist(strsplit(as.character(x), '[:]'))
@@ -271,8 +271,35 @@ make.motif.oc.matrix.from.fimo.output = function()
     
     assign = as.data.frame(peakAnno)
     
+    mm = match(assign$geneId, annot$wormbase.id)
+    assign$genes = annot$gene.name[mm]
+    rownames(assign) = rownames(motif.oc)
+    
+    # keep scanned regions with mapped protein coding genes
+    jj = which(!is.na(assign$genes))
+    #jj = match(rownames(sub.obj), assign$genes)
+    assign = assign[jj, ]
+    motif.oc = motif.oc[jj, ]
+    
+    gene.uniq = unique(assign$genes)
+    mocc = motif.oc[match(gene.uniq, assign$genes), ]
+    rownames(mocc) = gene.uniq
+    
+    for(n in 1:nrow(mocc))
+    {
+      kk = which(assign$genes == rownames(mocc)[n])
+      if(length(kk)>1) {
+        cat(n, '\n')
+        mocc[n, ] = apply(motif.oc[kk, ], 2, sum) 
+      }
+    }
+    
+    motif.oc = mocc
+    remove(mocc)
       
   }else{
+    load(file = '../data/Hashimsholy_et_al/annotMapping_ensID_Wormbase_GeneName.Rdata')
+    
     mm = match(rownames(motif.oc), geneMapping$Wormbase)
     rownames(motif.oc) = geneMapping$Gene.name[mm]
     #kk = match(rownames(motif.oc, ))
@@ -313,7 +340,7 @@ make.motif.oc.matrix.from.fimo.output = function()
   }
   
   motif.oc = xx;
-  saveRDS(motif.oc, file = '../data/motifs_tfs/motif_oc_all_proteinCodingGenes.rds')
+  saveRDS(motif.oc, file = '../data/motifs_tfs/motif_oc_scATACpeaks_all_proteinCodingGenes.rds')
   
 }
 
@@ -354,6 +381,51 @@ process.motif.tf.mapping = function()
   saveRDS(motif.tf, file = '../data/motifs_tfs/motif_tf_mapping.rds')
   
 }
+
+
+convert.cisbp.format.to.meme = function()
+{
+  library(universalmotif)
+  #pwmDIr = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/extra_pwm'
+  pwm.cisbp = '../data/test/PWM.txt'
+  xx = read_cisbp(file = pwm.cisbp, skip = 0)
+  yy = convert_type(xx, "PWM")
+  
+  write_meme(yy, file = '../data/test/PWM_converted.meme', overwrite = TRUE)
+    
+}
+
+comapre.motif.similarity.make.logo = function()
+{
+  library('universalmotif')
+  
+  pwm = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015_curated_extra.meme'
+  meme= read_meme(file = pwm, skip = 0, readsites = FALSE, readsites.meta = FALSE)
+  motifs = convert_motifs(meme, class = "universalmotif-universalmotif")
+  comparisons <- compare_motifs(motifs, method = "PCC", min.mean.ic = 0,
+                                score.strat = "a.mean")
+  
+  
+  write.table(comparisons, file = '../data/motifs_tfs/pwm_similarity_correction_PCC.txt', sep = '\t', col.names = TRUE, 
+              row.names = TRUE, quote = FALSE)
+  
+  p1 = view_motifs(motifs[[1]], use.type = 'ICM')
+  plot(p1)
+  
+  for(n in 1:length(motifs))
+  {
+    cat(n, '\n')
+    pdfname = paste0('../data/motifs_tfs/pwm_logos', motifs[[n]]@name, '.pdf')
+    pdf(pdfname, width=8, height = 6)
+    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    p1 = view_motifs(motifs[[n]], use.type = 'ICM')
+    plot(p1)
+    
+    dev.off()
+  }
+  
+}
+
 
 cluster.pwm.based.similarity = function()
 {
