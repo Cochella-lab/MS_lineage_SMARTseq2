@@ -126,7 +126,8 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     ##########################################
     require(glmnet)
     lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
-    #lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+    
+    lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
     
     gene.sel = markers$gene[which(!is.na(match(markers$cluster, lineage)) & markers$p_val_adj<0.001 & markers$avg_logFC>0.5)]
     gene.sel = gene.sel[which(!is.na(match(gene.sel, rownames(Y.mat))))]
@@ -162,10 +163,9 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     res = run.penelized.lm(x, y, alpha = 0, standardize = FALSE, intercept = TRUE, use.lambda.min = FALSE, 
                            Test = TRUE, Test.zscore.cutoff = 2.0)
     
-    print(res[grep('pha-4|unc-120|hnd-1|M1471_1.02_M141', rownames(res)),])
+    print(res[grep('pha-4.mus|hnd-1..Tcf|nhr-67.homo.M227|hlh-1.M175|unc-120.dm', rownames(res)),])
     
-    ss = apply(res, 1, function(x) length(which(abs(x)>1.3)))
-    
+    #ss = apply(res, 1, function(x) length(which(abs(x)>1.3)))
     pheatmap(res[which(ss>0), ], cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
              scale = 'none', cluster_cols=FALSE, main = paste0("MARA prediction"), 
              na_col = "white", fontsize_col = 10) 
