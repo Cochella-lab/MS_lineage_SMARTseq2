@@ -467,20 +467,28 @@ make.motif.oc.matrix.from.fimo.output = function()
   
   ##########################################
   # associate the scanned regions with gene
+  # here we restrict the assignment to protein-coding genes using ChIPpeakAnno 
+  # https://www.bioconductor.org/packages/release/bioc/vignettes/ChIPpeakAnno/inst/doc/pipeline.html
   ##########################################
   assign.regions.to.genes = TRUE
   if(assign.regions.to.genes){
     ## loading packages
-    library(ChIPseeker)
-    library(GenomicFeatures);
+    #library(ChIPseeker)
+    library(ChIPpeakAnno)
+    library(GenomicFeatures)
     library(GenomicRanges)
+    library(plyranges)
     
-    library(TxDb.Hsapiens.UCSC.hg19.knownGene)
-    txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
-    library(TxDb.Celegans.UCSC.ce11.ensGene)
-    txdb <- TxDb.Celegans.UCSC.ce11.ensGene
-    
-    annot = readRDS(file = '../data/motifs_tfs/ce11_proteinCoding_genes_geneLength_transcriptLength.rds') 
+    annot = read.csv(file = '/Volumes/groups/cochella/jiwang/annotations/BioMart_WBcel235_noFilters.csv') # all annotation included
+    annot = annot[grep('protein_coding', annot$Gene.type), ] # keep only protein-coding genes
+    #library(TxDb.Celegans.UCSC.ce11.ensGene)
+    #txdb <- TxDb.Celegans.UCSC.ce11.ensGene
+    annot = annot[match(unique(annot$Gene.name), annot$Gene.name), ]
+    xx = data.frame(seqnames = paste0('chr', annot$Chromosome.scaffold.name), start = annot$Gene.start..bp., end= annot$Gene.end..bp., 
+                    gene_id = as.character(annot$Gene.name),
+                    strand=c("."), score=0, stringsAsFactors = FALSE)
+    xx = makeGRangesFromDataFrame(xx, keep.extra.columns = TRUE)
+    names(xx) = as.character(annot$Gene.name)
     
     get.peak.coord = function(x){
       x = unlist(strsplit(as.character(x), '[:]'))
@@ -495,25 +503,29 @@ make.motif.oc.matrix.from.fimo.output = function()
     peaks = makeGRangesFromDataFrame(peaks)
     #peaks = data.frame(, gsub('^*:')))
     #peak <- readPeakFile(peakfile = peak.file, as = 'GRanges')
-    
-    peakAnno <- annotatePeak(peak = peaks, tssRegion=c(-2000, 2000), level = 'gene', TxDb=txdb)
-    
+    peakAnno = annotatePeakInBatch(peaks, 
+                        AnnotationData=xx, 
+                        output='nearestLocation', 
+                        bindingRegion=c(-2000, 500))
+    #peakAnno <- annotatePeak(peak = peaks, tssRegion=c(-2000, 2000), level = 'gene', TxDb=txdb)
     assign = as.data.frame(peakAnno)
     
-    mm = match(assign$geneId, annot$wormbase.id)
-    assign$genes = annot$gene.name[mm]
-    rownames(assign) = rownames(motif.oc)
+    #mm = match(assign$geneId, annot$wormbase.id)
+    assign$genes = assign$feature
+    rownames(assign) = assign$peak
     
     # keep scanned regions with mapped protein coding genes
     jj = which(!is.na(assign$genes))
-    #jj = match(rownames(sub.obj), assign$genes)
     assign = assign[jj, ]
     motif.oc = motif.oc[jj, ]
     
     gene.uniq = unique(assign$genes)
+    cat(nrow(motif.oc),  'scanned regions assigned to :', length(gene.uniq), ' genes \n')
+    
     mocc = motif.oc[match(gene.uniq, assign$genes), ]
     rownames(mocc) = gene.uniq
     
+    ## motif occurrency gene * motif
     for(n in 1:nrow(mocc))
     {
       kk = which(assign$genes == rownames(mocc)[n])
@@ -549,26 +561,37 @@ make.motif.oc.matrix.from.fimo.output = function()
   rownames(xx) = rownames(motif.oc)
   colnames(xx) = names
   
+  ## to get motif occurrency gene * non-redundant-motif
+  ## among the redundant motifs in the same cluster, the one with median of total occurrence is chosen.
   for(n in 1:ncol(xx))
   {
-    # n = 2
-    cat(n, '\n')
+    # n = 3
+    cat(n, ' -- ', colnames(xx)[n],  '\n')
     mtf = motif.tf$motifs[which(motif.tf$names == colnames(xx)[n])]
+    
     kk = match(mtf, colnames(motif.oc))
     kk = kk[!is.na(kk)]
     
     if(length(kk) == 0){
       cat('Error : no motif found \n')
+      
     }else{
       if(length(kk) == 1){
+        
         xx[,n] = motif.oc[, kk]
+        
       }else{
-        xx[,n] = ceiling(apply(motif.oc[,kk], 1, median))
+        cat('>>>>>>>>>',  length(kk), 'columns found \n')
+        ss = apply(motif.oc[,kk], 2, sum)
+        ss.o = ss[order(ss)]
+        kk.sel = kk[which(ss == ss.o[ceiling(length(ss)/2)])]
+        xx[,n] = motif.oc[, kk.sel[1]]
       }
     }
   }
   
   motif.oc = xx;
+  remove(xx)
   saveRDS(motif.oc, file = '../data/motifs_tfs/motif_oc_scATACpeaks_all_proteinCodingGenes.rds')
   
 }
