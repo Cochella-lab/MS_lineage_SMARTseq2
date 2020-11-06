@@ -415,17 +415,21 @@ sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxppppp.MSx
 sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxpaaap.MSxppapp.MSxpappp.MSxpapap')] = 
   'mixture_terminal_2'
 
-source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
-require(tictoc)
-tic()
-test.umap.params.for.BWM.cells(sub.obj, 
-                               pdfname = 'UMAP_param_TEST_BWM_all.pdf',
-                               group.by = 'manual.annot.ids', with_legend = FALSE,
-                               nfeatures.sampling = c(3000, 5000, 8000), nb.pcs.sampling = c(10, 20, 30, 50),
-                               n.neighbors.sampling = c(5, 10, 30, 50), 
-                               min.dist.sampling = c(0.01, 0.1)
-)
-toc()
+Test.Umap.Params = FALSE
+if(Test.Umap.Params){
+  source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
+  require(tictoc)
+  tic()
+  test.umap.params.for.BWM.cells(sub.obj, 
+                                 pdfname = 'UMAP_param_TEST_BWM_all.pdf',
+                                 group.by = 'manual.annot.ids', with_legend = FALSE,
+                                 nfeatures.sampling = c(3000, 5000, 8000), nb.pcs.sampling = c(10, 20, 30, 50),
+                                 n.neighbors.sampling = c(5, 10, 30, 50), 
+                                 min.dist.sampling = c(0.01, 0.1)
+  )
+  toc()
+  
+}
 
 ##########################################
 # run the sctf_MARA
