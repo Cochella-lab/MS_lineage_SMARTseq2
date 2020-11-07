@@ -18,6 +18,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   library(scater)
   library(SingleCellExperiment)
   library(scran)
+  require(glmnet)
   source.my.script('scMARA_utility_functions.R')
   
   ##########################################
@@ -57,18 +58,18 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   # determine lineage-specific signatures 
   # i.e. selected gene sets (lineage-wide, specific, or restricted)
   ##########################################
-  define.modules.for.lineags(sub.obj)
+  define.modules.for.lineags(Y.fpkm)
   
- 
+  
   ##########################################
   # prepare matrix A and reponse Y and run penalized.lm
   ##########################################
-  require(glmnet)
   lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
   
   lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+  lineage = setdiff(ids.uniq, c("mixture_terminal_1", "mixture_terminal_2"))
   
-  gene.sel = markers$gene[which(!is.na(match(markers$cluster, lineage)) & markers$p_val_adj<0.001 & markers$avg_logFC>0.5)]
+  gene.sel = unique(markers$gene[which(!is.na(match(markers$cluster, lineage)) & markers$p_val_adj<10^-5 & markers$avg_logFC > 0.7)])
   gene.sel = gene.sel[which(!is.na(match(gene.sel, rownames(Y.mat))))]
   
   remove.shared.genes = FALSE
@@ -99,8 +100,8 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   x[which(is.na(x) == TRUE)] = 0
   
   source.my.script('scMARA_utility_functions.R')
-  res = run.penelized.lm(x, y, alpha = 0, standardize = FALSE, intercept = TRUE, use.lambda.min = FALSE, 
-                         Test = TRUE, Test.zscore.cutoff = 2.0)
+  res = run.penelized.lm(x, y, alpha = 0.1, standardize = FALSE, intercept = TRUE, use.lambda.min = FALSE, 
+                         Test = TRUE)
   
   print(res[grep('pha-4.mus|hnd-1..Tcf|nhr-67.homo.M227|hlh-1.M175|unc-120.dm', rownames(res)),])
   

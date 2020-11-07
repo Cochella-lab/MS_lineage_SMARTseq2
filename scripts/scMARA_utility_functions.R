@@ -11,6 +11,8 @@
 run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE,  standardize.response=FALSE, use.lambda.min = TRUE,
                             zscore.output = TRUE, Test = FALSE, Test.zscore.cutoff = 2.0)
 {
+  # intercept=TRUE; standardize=TRUE;  standardize.response=FALSE; alpha = 0.5; use.lambda.min = TRUE; zscore.output = TRUE;
+  
   # check the x and y
   cat(ncol(x), ' motifs \n')
   cat(nrow(x), ' gene selected \n')
@@ -30,9 +32,10 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
   cat('-- start the penalized linear regression -- \n')
   ### use Cross-validation to select tuning paprameter
   cv.fit=cv.glmnet(x, y, family=family, grouped=FALSE, 
-                   alpha=alpha, nlambda=100, standardize=standardize, 
+                   alpha=alpha, nlambda=200, standardize=standardize, 
                    standardize.response=standardize.response, intercept=intercept, relax = FALSE)
   plot(cv.fit)
+  
   if(use.lambda.min){
     s.optimal = cv.fit$lambda.min
   }else{
@@ -42,9 +45,6 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
              standardize=standardize, standardize.response=standardize.response, intercept=intercept, 
              relax = FALSE)
   #plot(fit, xvar = "lambda", label = TRUE, type.coef = "coef")
-  ## collect result from the elastic-net
-  #colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
-  #colnames(x)[which(fit$beta[[2]][,optimal]!=0)]
   
   # extract fitting results for either multiple response or single response; 
   # in particular, we decided to use only ridge penalized linear regression here
@@ -52,18 +52,40 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
     keep = as.data.frame(coef.glmnet(fit, s = s.optimal))
     keep = keep[-1, ] # remove intecept
     colnames(keep) = names(fit$beta)
-    if(zscore.output) keep = apply(keep, 2, scale)
-    rownames(keep) = rownames(fit$beta[[2]])
-    #ss = apply(keep, 1, function(x) !all(x==0))
-    #keep = keep[ss, ]
-    #head(rownames(keep)[order(-abs(keep$MSxp))], 10)
-    #head(rownames(keep)[order(-abs(keep$MSxa))], 10)
-    res = keep
-    if(Test){
-      ss = apply(keep, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
-      keep = keep[which(ss>0), ]
-      print(keep)
+    if(alpha > 0.0){
+      rownames(keep) = rownames(fit$beta[[2]])
+      ## collect result from the elastic-net
+      kk = apply(keep, 1, function(x) !all(x==0))
+      keep = keep[kk, ]
+      #colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
+      #colnames(x)[which(fit$beta[[2]][,optimal]!=0)]
+      
+      # rerun lm with selected features
+      fit.lm = lm(y ~ x[, match(rownames(keep), colnames(x))])
+      res = data.frame(fit.lm$coefficients)
+      res = res[-1, ] # remove intercept
+      rownames(res) = rownames(keep)
+      
+      pheatmap(res, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
+               scale = 'none', cluster_cols=FALSE, main = paste0("motif activity"), 
+               na_col = "white", fontsize_col = 10
+      )
+      
+    }else{
+      if(zscore.output) keep = apply(keep, 2, scale)
+      rownames(keep) = rownames(fit$beta[[2]])
+      #ss = apply(keep, 1, function(x) !all(x==0))
+      #keep = keep[ss, ]
+      #head(rownames(keep)[order(-abs(keep$MSxp))], 10)
+      #head(rownames(keep)[order(-abs(keep$MSxa))], 10)
+      res = keep
+      if(Test){
+        ss = apply(keep, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
+        keep = keep[which(ss>0), ]
+        print(keep)
+      }
     }
+   
     
   }else{
     keep = coef.glmnet(fit, s = s.optimal)
@@ -267,10 +289,14 @@ process.detected.tf.expression.profiles = function(Y.mat)
 ##########################################
 # important function to define genes relevant to lineage
 ##########################################
-define.modules.for.lineags = function(sub.obj)
+define.modules.for.lineags = function(Y.fpkm, sub.obj)
 {
-  if(mode == 'cluster.wise'){
-    cat('-- averging the gene expression in clusters -- \n')
+  ids = sub.obj$manual.annot.ids
+  ids.uniq = unique(ids)
+  ids.uniq = ids.uniq[order(nchar(ids.uniq))]
+  
+  if(mode == 'cluster.mode'){
+    cat('-- cluster mode : averging the gene expression in clusters -- \n')
     
     Y.mat = matrix(NA, nrow = nrow(Y.fpkm), ncol = length(ids.uniq))
     colnames(Y.mat) = ids.uniq
@@ -285,6 +311,33 @@ define.modules.for.lineags = function(sub.obj)
     
     # process.detected.tf.expression.profiles(Y.mat)
     remove(Y.fpkm)
+    
+    
+    select.dyn.genes.with.FindAllMarker.MST = FALSE
+    if(select.dyn.genes.with.FindAllMarker.MST){
+      run.FindAllMarkers = FALSE # it takes ~ 30 minutes
+      if(run.FindAllMarkers){
+        Idents(sub.obj) = sub.obj$manual.annot.ids
+        markers.new <- FindAllMarkers(sub.obj, only.pos = FALSE, min.pct = 0.1, logfc.threshold = 0.25)
+        saveRDS(markers.new, file = paste0(RdataDir,  'AllMarkers_MST_manual.annotation.rds'))
+      }else{
+        markers = readRDS(file = paste0(RdataDir,  'AllMarkers_MST_manual.annotation.rds'))
+      }
+      
+      gene.sels = markers[which(markers$p_val<10^-5 & markers$avg_logFC>1), ]
+      gene.sels = unique(gene.sels$gene)
+      gene.sels = gene.sels[which(!is.na(match(gene.sels, rownames(Y.mat))))]
+      print(length(gene.sels))
+      
+      #top.markers <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+      #DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()
+    }
+    mm = match(gene.sels, rownames(Y.mat))
+    pheatmap(Y.mat[mm, ], cluster_rows=TRUE, show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
+             scale = 'row', cluster_cols=FALSE, main = paste0("dynamic genes"), 
+             na_col = "white", fontsize_col = 10
+    )
+    
     
     ##########################################
     # select dynamic genes for reponse Y
@@ -321,27 +374,7 @@ define.modules.for.lineags = function(sub.obj)
       Y.sel = Y.sel[sels, ]
       
     }
-    
-    select.dyn.genes.with.FindAllMarker.MST = FALSE
-    if(select.dyn.genes.with.FindAllMarker.MST){
-      run.FindAllMarkers = FALSE # it takes ~ 30 minutes
-      if(run.FindAllMarkers){
-        Idents(sub.obj) = sub.obj$manual.annot.ids
-        markers.new <- FindAllMarkers(sub.obj, only.pos = FALSE, min.pct = 0.1, logfc.threshold = 0.25)
-        saveRDS(markers.new, file = paste0(RdataDir,  'AllMarkers_MST_manual.annotation.rds'))
-      }else{
-        markers = readRDS(file = paste0(RdataDir,  'AllMarkers_MST_manual.annotation.rds'))
-      }
-      
-      #top.markers <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
-      #DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()
-      
-    }
-    
-    pheatmap(Y.norm, cluster_rows=TRUE, show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
-             scale = 'row', cluster_cols=FALSE, main = paste0("dynamic genes"), 
-             na_col = "white", fontsize_col = 10
-    )
+  
   }
   
   
