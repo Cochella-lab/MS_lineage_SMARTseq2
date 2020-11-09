@@ -67,7 +67,7 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
       rownames(res) = rownames(keep)
       
       pheatmap(res, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
-               scale = 'none', cluster_cols=FALSE, main = paste0("motif activity"), 
+               scale = 'column', cluster_cols=FALSE, main = paste0("motif activity"), 
                na_col = "white", fontsize_col = 10
       )
       
@@ -289,11 +289,13 @@ process.detected.tf.expression.profiles = function(Y.mat)
 ##########################################
 # important function to define genes relevant to lineage
 ##########################################
-define.modules.for.lineags = function(Y.fpkm, sub.obj)
+define.modules.for.lineags = function(sub.obj, Y.fpkm, lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp'))
 {
   ids = sub.obj$manual.annot.ids
   ids.uniq = unique(ids)
   ids.uniq = ids.uniq[order(nchar(ids.uniq))]
+  
+  ids.uniq = ids.uniq[grep('mixture_terminal_', ids.uniq, invert = TRUE)]
   
   if(mode == 'cluster.mode'){
     cat('-- cluster mode : averging the gene expression in clusters -- \n')
@@ -310,8 +312,7 @@ define.modules.for.lineags = function(Y.fpkm, sub.obj)
     }
     
     # process.detected.tf.expression.profiles(Y.mat)
-    remove(Y.fpkm)
-    
+    remove(Y.fpkm) # free memory
     
     select.dyn.genes.with.FindAllMarker.MST = FALSE
     if(select.dyn.genes.with.FindAllMarker.MST){
@@ -324,20 +325,71 @@ define.modules.for.lineags = function(Y.fpkm, sub.obj)
         markers = readRDS(file = paste0(RdataDir,  'AllMarkers_MST_manual.annotation.rds'))
       }
       
-      gene.sels = markers[which(markers$p_val<10^-5 & markers$avg_logFC>1), ]
+      gene.sels = markers[which(markers$p_val<10^-3 & markers$avg_logFC > 0.5), ]
+      print(table(gene.sels$cluster))
+      
       gene.sels = unique(gene.sels$gene)
       gene.sels = gene.sels[which(!is.na(match(gene.sels, rownames(Y.mat))))]
-      print(length(gene.sels))
+      cat(length(gene.sels), ' marker genes were identified \n')
+      
+      means = apply(Y.mat, 1, mean)
+      vars = apply(Y.mat, 1, var)
       
       #top.markers <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
       #DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()
+      mm = match(gene.sels, rownames(Y.mat))
+      
+      plot(means[mm], vars[mm], cex = 0.3)
+      
+      pheatmap(Y.mat[mm, ], cluster_rows=TRUE, show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
+               gaps_col = c(6, 20),
+               scale = 'row', cluster_cols=FALSE, main = paste0("dynamic genes by marker finding"), 
+               na_col = "white", fontsize_col = 10
+      )
+      
+      pheatmap(Y.mat[mm, ], cluster_rows=TRUE, show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
+               gaps_col = c(6, 20), cutree_rows = 5, 
+               scale = 'row', cluster_cols=FALSE, main = paste0("dynamic genes by marker finding"), 
+               na_col = "white", fontsize_col = 10
+      )
+      
+      
+      
+      cluster.coexprssed.genes = FALSE
+      if(cluster.coexprssed.genes){
+        # cluster co-expressing modules 
+        library(tidyverse)  # data manipulation
+        library(cluster)    # clustering algorithms
+        library(factoextra) # clustering algorithms & visualization
+        
+        df <- t(scale(t(Y.mat[mm, ])))
+        head(df)
+        #distance <- get_dist(df, method = 'euclidean')
+        #fviz_dist(distance, gradient = list(low = "#00AFBB", mid = "white", high = "#FC4E07"))
+        
+        # Elbow method to determine nb of clusters
+        set.seed(123)
+        fviz_nbclust(df, kmeans, method = "wss", k.max = 30)
+        
+        # set.seed(123)
+        # gap_stat <- clusGap(df, FUN = kmeans, nstart = 25,
+        #                     K.max = 20, B = 50)
+        # 
+        # print(gap_stat, method = "firstmax")
+        # fviz_gap_stat(gap_stat)
+        
+        pheatmap(df, cluster_rows=TRUE, show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
+                 #clustering_distance_rows = "euclidean", 
+                 cutree_rows = 20,
+                 scale = 'none', cluster_cols=FALSE, main = paste0("dynamic genes by marker finding"), 
+                 na_col = "white", fontsize_col = 10
+        )
+        #set.seed(123)
+        #final <- kmeans(df, 4, nstart = 25)
+        #print(final)
+      }
+      
     }
-    mm = match(gene.sels, rownames(Y.mat))
-    pheatmap(Y.mat[mm, ], cluster_rows=TRUE, show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
-             scale = 'row', cluster_cols=FALSE, main = paste0("dynamic genes"), 
-             na_col = "white", fontsize_col = 10
-    )
-    
     
     ##########################################
     # select dynamic genes for reponse Y
@@ -442,7 +494,6 @@ define.modules.for.lineags = function(Y.fpkm, sub.obj)
     
     
   }
-  
   
   
 }

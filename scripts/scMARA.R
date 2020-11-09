@@ -58,16 +58,12 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   # determine lineage-specific signatures 
   # i.e. selected gene sets (lineage-wide, specific, or restricted)
   ##########################################
-  define.modules.for.lineags(Y.fpkm)
-  
-  
-  ##########################################
-  # prepare matrix A and reponse Y and run penalized.lm
-  ##########################################
   lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
   
   lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
   lineage = setdiff(ids.uniq, c("mixture_terminal_1", "mixture_terminal_2"))
+  
+  gene.sels = define.modules.for.lineags(sub.obj, Y.fpkm, lineage = lineage)
   
   gene.sel = unique(markers$gene[which(!is.na(match(markers$cluster, lineage)) & markers$p_val_adj<10^-5 & markers$avg_logFC > 0.7)])
   gene.sel = gene.sel[which(!is.na(match(gene.sel, rownames(Y.mat))))]
@@ -89,6 +85,10 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     
   }
   
+  
+  ##########################################
+  # prepare matrix A and reponse Y and run penalized.lm
+  ##########################################
   index.sel = match(gene.sel, rownames(Y.mat))
   Y.sel = Y.mat[index.sel, match(lineage, colnames(Y.mat))]
   y = as.matrix(Y.sel)
