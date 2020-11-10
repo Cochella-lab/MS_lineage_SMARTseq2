@@ -40,7 +40,10 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   ##########################################
   ids = sub.obj$manual.annot.ids
   ids.uniq = unique(ids)
+  ids.uniq = ids.uniq[order(ids.uniq)]
   ids.uniq = ids.uniq[order(nchar(ids.uniq))]
+  
+  ids.uniq = ids.uniq[grep('mixture_terminal_', ids.uniq, invert = TRUE)]
   
   # convert to SingleCellExperiment, recalculate scaling factor and normalized to fpkm
   sce = as.SingleCellExperiment(sub.obj)
@@ -57,65 +60,102 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   
   remove(sce)
   
+  ##########################################
+  # average cells with the same ids (i.e. cluster-based motif activity )
+  ##########################################
+  Y.mat = matrix(NA, nrow = nrow(Y.fpkm), ncol = length(ids.uniq))
+  colnames(Y.mat) = ids.uniq
+  rownames(Y.mat) = rownames(Y.fpkm)
+  for(n in 1:length(ids.uniq))
+  {
+    cat(ids.uniq[n], '\n')
+    jj = which(ids == ids.uniq[n])
+    if(length(jj) == 1) Y.mat[, n] = Y.fpkm[,jj]
+    if(length(jj) > 1) Y.mat[, n] = apply(Y.fpkm[,jj], 1, mean)
+  }
+  
+  # process.detected.tf.expression.profiles(Y.mat)
+  remove(Y.fpkm) # free memory
   
   ##########################################
   # determine lineage-specific signatures 
   # i.e. selected gene sets (lineage-wide, specific, or restricted)
+  # here we used markers from scRNA analysis
   ##########################################
-  lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+  # gene.sels = define.modules.for.lineags(sub.obj, Y.fpkm, lineage = lineage)
   
-  lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
-  lineage = setdiff(ids.uniq, c("mixture_terminal_1", "mixture_terminal_2"))
+  markers = readRDS(file = paste0(RdataDir,  'AllMarkers_MST_manual.annotation.rds'))
+  markers.sels = markers[which(markers$p_val<10^-3 & markers$avg_logFC > 0.5), ]
+  print(table(markers.sels$cluster))
   
-  gene.sels = define.modules.for.lineags(sub.obj, Y.fpkm, lineage = lineage)
+  ids.groups = list(ids.uniq[which(nchar(ids.uniq) <=5)], 
+                    ids.uniq[which(nchar(ids.uniq) == 6)],
+                    ids.uniq[which(nchar(ids.uniq) == 7)], 
+                    ids.uniq[which(nchar(ids.uniq) > 7)]) 
   
-  gene.sel = unique(markers$gene[which(!is.na(match(markers$cluster, lineage)) & markers$p_val_adj<10^-5 & markers$avg_logFC > 0.7)])
-  gene.sel = gene.sel[which(!is.na(match(gene.sel, rownames(Y.mat))))]
   
-  remove.shared.genes = FALSE
-  if(remove.shared.genes){
-    gene.sel_1 = gene.sel
-    gene.sel_2 = gene.sel
-    gene.shared = intersect(gene.sel_1, gene.sel_2)
+  for(n in 1:length(ids.groups)){
     
-    gene.sel_1 = setdiff(gene.sel_1, gene.shared)
-    gene.sel_2 = setdiff(gene.sel_2, gene.shared)
+    # n = 1;
+    lineage = ids.groups[[n]]
+    cat(n, ' --- ')
+    print(lineage)
+    # lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+    # lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+    # lineage = setdiff(ids.uniq, c("mixture_terminal_1", "mixture_terminal_2"))
     
-    lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
-    gene.sel = gene.sel_1
+    gene.sels = markers.sels[!is.na(match(markers.sels$cluster, lineage)), ]
+    gene.sels = gene.sels[!is.na(match(gene.sels$gene, rownames(Y.mat))), ]
+    #print(table(gene.sels$cluster))
+    gene.sels = unique(gene.sels$gene)
     
-    lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
-    gene.sel = gene.sel_2
+    #gene.sels = unique(markers$gene[which(!is.na(match(markers$cluster, lineage)) & markers$p_val_adj<10^-5 & markers$avg_logFC > 0.7)])
+    #gene.sels = gene.sels[which(!is.na(match(gene.sels, rownames(Y.mat))))]
+    ##########################################
+    # prepare matrix A and reponse Y and run penalized.lm
+    ##########################################
+    index.sel = match(gene.sels, rownames(Y.mat))
+    Y.sel = Y.mat[index.sel, match(lineage, colnames(Y.mat))]
+    y = as.matrix(Y.sel)
     
+    #mm = match(rownames(Y.sel), rownames(motif.oc))
+    mm = match(gene.sels, rownames(motif.oc))
+    y = y[!is.na(mm), ]
+    x = as.matrix(motif.oc[mm[!is.na(mm)], ])
+    x[which(is.na(x) == TRUE)] = 0
+    
+    source.my.script('scMARA_utility_functions.R')
+    res = run.penelized.lm(x, y, alpha = 0, standardize = TRUE, intercept = TRUE, use.lambda.min = TRUE, 
+                           Test = FALSE)
+    
+    print(res[grep('pha-4|hnd-1..Tcf|nhr-67.homo.M227|hlh-1.M175|unc-120.dm', rownames(res)),])
+    
+    if(n == 1) {
+      keep = res[match(colnames(x), rownames(res)), ]
+    }else{
+      keep = cbind(keep, res[match(colnames(x), rownames(res)), ])
+    }
+        
   }
   
   
-  ##########################################
-  # prepare matrix A and reponse Y and run penalized.lm
-  ##########################################
-  index.sel = match(gene.sel, rownames(Y.mat))
-  Y.sel = Y.mat[index.sel, match(lineage, colnames(Y.mat))]
-  y = as.matrix(Y.sel)
+  print(keep[grep('pha-4|hnd-1..Tcf|nhr-67.homo.M227|hlh-1.M175|unc-120.dm', rownames(keep)),])
   
-  #mm = match(rownames(Y.sel), rownames(motif.oc))
-  mm = match(gene.sel, rownames(motif.oc))
-  y = y[!is.na(mm), ]
-  x = as.matrix(motif.oc[mm[!is.na(mm)], ])
-  x[which(is.na(x) == TRUE)] = 0
+  ss = apply(keep, 1, function(x) length(which(abs(x)>1.5)))
+  length(which(ss>=1))
   
-  source.my.script('scMARA_utility_functions.R')
-  res = run.penelized.lm(x, y, alpha = 0.1, standardize = FALSE, intercept = TRUE, use.lambda.min = FALSE, 
-                         Test = TRUE)
+  yy = keep[which(ss>0), ] 
+  yy[which(abs(yy)>2.5)] = 2.5
   
-  print(res[grep('pha-4.mus|hnd-1..Tcf|nhr-67.homo.M227|hlh-1.M175|unc-120.dm', rownames(res)),])
+  pdfname = paste0(resDir, "/MARA_prediction_all_lineages_v1.pdf")
+  pdf(pdfname, width=18, height = 16)
+  par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
-  #ss = apply(res, 1, function(x) length(which(abs(x)>1.3)))
-  pheatmap(res[which(ss>0), ], cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
            scale = 'none', cluster_cols=FALSE, main = paste0("MARA prediction"), 
            na_col = "white", fontsize_col = 10) 
   
   
-  
-  return(res)
+  dev.off()
   
 }

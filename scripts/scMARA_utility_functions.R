@@ -354,7 +354,6 @@ define.modules.for.lineags = function(sub.obj, Y.fpkm, lineage = c('MSxp', 'MSxp
       )
       
       
-      
       cluster.coexprssed.genes = FALSE
       if(cluster.coexprssed.genes){
         # cluster co-expressing modules 
@@ -595,23 +594,44 @@ compare.mRNA.and.unspliced.matrix = function(sub.obj)
   
   yy1 = Y.mat[mm, ]
   yy1 = t(scale(t(yy1)))
-  yy1[which(abs(yy1)>2.5)] = 2.5
   
-  pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, show_colnames = TRUE, 
-           gaps_col = c(6, 20), cutree_rows = 5, breaks = NA,
-           scale = 'none', cluster_cols=FALSE, main = paste0("dynamic genes by marker finding"), 
-           na_col = "white", fontsize_col = 10
+  d <- dist(yy1, method = "euclidean") # distance matrix
+  fit <- hclust(d, method="complete")
+  #plot(fit) # display dendogram
+  groups <- cutree(fit, k=10) 
+  yy1 = yy1[order(groups), ]
+  my_gene_clusters = as.data.frame(groups)
+  #my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = 2)
+  yy1[which(abs(yy1)>2.)] = 2.
+  
+  pdfname = paste0(resDir, "/mRNA_preRNA_comparison.pdf")
+  pdf(pdfname, width=12, height = 8)
+  par(cex =0.5, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  pheatmap(yy1, cluster_rows=FALSE, show_rownames=FALSE, show_colnames = TRUE, 
+           gaps_col = c(6, 20), breaks = NA,
+           #annotation_row = my_gene_clusters,
+           scale = 'none', cluster_cols=FALSE, main = paste0("mRNA - dynamic genes by marker finding"), 
+           na_col = "white", 
+           fontsize_col = 10
   )
   
-  jj = match(gene.sels, rownames(P.mat))
+  jj = match(rownames(yy1), rownames(P.mat))
+  yy2 = P.mat[jj, ]
+  yy2 = t(apply(yy2, 1, scale))
+  yy2[which(abs(yy2)>2.)] = 2.
+  colnames(yy2) = colnames(P.mat)
   
-  pheatmap(P.mat[jj, ], cluster_rows=FALSE, show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
+  pheatmap(yy2, cluster_rows=FALSE, show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
            gaps_col = c(6, 20), 
-           scale = 'row', cluster_cols=FALSE, main = paste0("dynamic genes by marker finding"), 
+           scale = 'none', cluster_cols=FALSE, main = paste0("pre-RNA - dynamic genes by marker finding"), 
            na_col = "white", fontsize_col = 10
   )
   
   nb.genes = apply(P.mat[jj, ], 2, function(x) return(length(which(x>10^-6))))
+  
+  dev.off()
+  
   
 }
 
