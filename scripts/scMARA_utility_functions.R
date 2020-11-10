@@ -497,6 +497,124 @@ define.modules.for.lineags = function(sub.obj, Y.fpkm, lineage = c('MSxp', 'MSxp
   
   
 }
+
+##########################################
+# compare mRNA and unspliced matrix 
+##########################################
+compare.mRNA.and.unspliced.matrix = function(sub.obj)
+{
+  ll = readRDS(file = '../data/motifs_tfs/ce11_proteinCoding_genes_geneLength_transcriptLength.rds') # gene length and transript length
+  
+  # convert to SingleCellExperiment, recalculate scaling factor and normalized to fpkm
+  sce = as.SingleCellExperiment(sub.obj)
+  qclust <- quickCluster(sce)
+  sce <- computeSumFactors(sce, clusters = qclust)
+  sce <- logNormCounts(sce, log = TRUE, pseudo_count = 1)
+  
+  mm = match(rownames(sce), ll$gene.name)
+  sce = sce[which(!is.na(mm)), ] # keep genes with correponding lengths
+  
+  transcript.length  = ll$transcript.length[mm[which(!is.na(mm) == TRUE)]]
+  
+  sce <- logNormCounts(sce, log = FALSE, size_factors = NULL)
+  Y.fpkm <- log2(calculateFPKM(sce, lengths = transcript.length) + 1)
+  
+  remove(sce)
+  
+  # convert to SingleCellExperiment, recalculate scaling factor and normalized to fpkm
+  pm = readRDS(file = paste0(RdataDir, 'unsplicedData_processed_by_velocyto_scranNormalized_BWM.rds'))
+  
+  sce = as.SingleCellExperiment(pm)
+  qclust <- quickCluster(sce)
+  sce <- computeSumFactors(sce, clusters = qclust)
+  sce <- logNormCounts(sce, log = TRUE, pseudo_count = 1)
+  
+  mm = match(rownames(sce), ll$gene.name)
+  sce = sce[which(!is.na(mm)), ] # keep genes with correponding lengths
+  intron.length  = (ll$gene.length - ll$transcript.length)[mm[which(!is.na(mm) == TRUE)]]
+  
+  sce <- logNormCounts(sce, log = FALSE, size_factors = NULL)
+  unspliced <- log2(calculateFPKM(sce, lengths = intron.length) + 1)
+  
+  remove(sce)
+  
+  ##########################################
+  # average the gene expressoin for ids
+  ##########################################
+  ids = sub.obj$manual.annot.ids
+  ids.uniq = unique(ids)
+  ids.uniq = ids.uniq[order(ids.uniq)]
+  ids.uniq = ids.uniq[order(nchar(ids.uniq))]
+  
+  ids.uniq = ids.uniq[grep('mixture_terminal_', ids.uniq, invert = TRUE)]
+  
+  Y.mat = matrix(NA, nrow = nrow(Y.fpkm), ncol = length(ids.uniq))
+  colnames(Y.mat) = ids.uniq
+  rownames(Y.mat) = rownames(Y.fpkm)
+  
+  for(n in 1:length(ids.uniq))
+  {
+    cat(ids.uniq[n], '\n')
+    jj = which(sub.obj$manual.annot.ids == ids.uniq[n])
+    if(length(jj) == 1) Y.mat[, n] = Y.fpkm[,jj]
+    if(length(jj) > 1) Y.mat[, n] = apply(Y.fpkm[,jj], 1, mean)
+  }
+  
+  P.mat = matrix(NA, nrow = nrow(unspliced), ncol = length(ids.uniq))
+  colnames(P.mat) = ids.uniq
+  rownames(P.mat) = rownames(unspliced)
+  
+  for(n in 1:length(ids.uniq))
+  {
+    cat(ids.uniq[n], '\n')
+    jj = which(pm$annoted.ids == ids.uniq[n])
+    if(length(jj) == 1) P.mat[, n] = unspliced[,jj]
+    if(length(jj) > 1) P.mat[, n] = apply(unspliced[,jj], 1, mean)
+  }
+  
+  remove(unspliced)
+  remove(Y.fpkm)
+  
+  # select dynamic genes
+  markers = readRDS(file = paste0(RdataDir,  'AllMarkers_MST_manual.annotation.rds'))
+  gene.sels = markers[which(markers$p_val<10^-3 & markers$avg_logFC > 0.5), ]
+  print(table(gene.sels$cluster))
+  
+  gene.sels = unique(gene.sels$gene)
+  gene.sels = gene.sels[which(!is.na(match(gene.sels, rownames(Y.mat))))]
+  cat(length(gene.sels), ' marker genes were identified \n')
+  
+  means = apply(Y.mat, 1, mean)
+  vars = apply(Y.mat, 1, var)
+  
+  #top.markers <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+  #DoHeatmap(sub.obj, features = top.markers$gene, size = 5, hjust = 0, label = TRUE) + NoLegend()
+  mm = match(gene.sels, rownames(Y.mat))
+  
+  plot(means[mm], vars[mm], cex = 0.3)
+  
+  yy1 = Y.mat[mm, ]
+  yy1 = t(scale(t(yy1)))
+  yy1[which(abs(yy1)>2.5)] = 2.5
+  
+  pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, show_colnames = TRUE, 
+           gaps_col = c(6, 20), cutree_rows = 5, breaks = NA,
+           scale = 'none', cluster_cols=FALSE, main = paste0("dynamic genes by marker finding"), 
+           na_col = "white", fontsize_col = 10
+  )
+  
+  jj = match(gene.sels, rownames(P.mat))
+  
+  pheatmap(P.mat[jj, ], cluster_rows=FALSE, show_rownames=FALSE, show_colnames = TRUE, breaks = NA,
+           gaps_col = c(6, 20), 
+           scale = 'row', cluster_cols=FALSE, main = paste0("dynamic genes by marker finding"), 
+           na_col = "white", fontsize_col = 10
+  )
+  
+  nb.genes = apply(P.mat[jj, ], 2, function(x) return(length(which(x>10^-6))))
+  
+}
+
 ########################################################
 ########################################################
 # Section III : process motifs and scanning regions 

@@ -44,15 +44,19 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   
   # convert to SingleCellExperiment, recalculate scaling factor and normalized to fpkm
   sce = as.SingleCellExperiment(sub.obj)
+  qclust <- quickCluster(sce)
+  sce <- computeSumFactors(sce, clusters = qclust)
+  sce <- logNormCounts(sce, log = TRUE, pseudo_count = 1)
   
   mm = match(rownames(sce), ll$gene.name)
   sce = sce[which(!is.na(mm)), ] # keep genes with correponding lengths
-  ll = ll[mm[which(!is.na(mm))], ]
+  transcript.length  = ll$transcript.length[mm[which(!is.na(mm) == TRUE)]]
   
   sce <- logNormCounts(sce, log = FALSE, size_factors = NULL)
-  Y.fpkm <- log2(calculateFPKM(sce, lengths = ll$transcript.length) + 1)
+  Y.fpkm <- log2(calculateFPKM(sce, lengths = transcript.length) + 1)
   
   remove(sce)
+  
   
   ##########################################
   # determine lineage-specific signatures 
