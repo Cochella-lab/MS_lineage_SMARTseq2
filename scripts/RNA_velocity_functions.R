@@ -61,14 +61,32 @@ import.loomFiles.velocytoOut = function(seurat.obj) # import the loom file and p
 process.unspliced.mRNA.check.cell.identities = function(pm)
 {
   pm = readRDS(file = paste0(RdataDir, 'unsplicedData_processed_by_velocyto.rds'))
+  DefaultAssay(pm) = 'unspliced'
+  
+  ## use sran normalization
+  library(SingleCellExperiment)
+  library(scater)
+  sce = as.SingleCellExperiment(pm, assay = 'unspliced')
+  colnames(sce) = sce$cells
+  
+  sce$library.size = apply(counts(sce), 2, sum)
+  qclust <- quickCluster(sce)
+  sce <- computeSumFactors(sce, clusters = qclust)
+  sce <- logNormCounts(sce, log = TRUE, pseudo_count = 1)
+  #sce <- logNormCounts(sce, log = FALSE, size_factors = NULL)
+  par(mfrow = c(1, 1))
+  plot(sce$library.size/1e6, sizeFactors(sce), log="xy", xlab="Library size (millions)", 
+       ylab="Size factor", cex = 0.5)
+  
+  pm = as.Seurat(sce, counts = 'counts', data = 'logcounts', assay = "unspliced") # scran normalized data were kept in Seurat
   pm = pm[, which(!is.na(pm$BWM.cells))]
   
   #pm <- SCTransform(object = pm, assay = "unspliced", variable.features.n = 3000)
   
-  DefaultAssay(pm) = 'unspliced'
   #FeatureScatter(pm, feature1 = "nCount_unspliced", feature2 = "nFeature_unspliced")
   #pbmc <- subset(pbmc, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
-  pm <- NormalizeData(pm, normalization.method = "LogNormalize", scale.factor = median(pm$nCount_unspliced))
+  #pm <- NormalizeData(pm, normalization.method = "LogNormalize", scale.factor = median(pm$nCount_unspliced))
+  
   #ids.bwm = names(table(pm$annoted.ids[!is.na(pm$BWM.cells)], useNA = 'ifany'))
   #cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.bwm))])
   #sub.obj = subset(seurat.obj, cells = cells.sels)
@@ -78,12 +96,13 @@ process.unspliced.mRNA.check.cell.identities = function(pm)
   require(tictoc)
   tic()
   test.umap.params.for.BWM.cells(pm, 
-                                 pdfname = 'UMAP_premRNA_param_TEST_BWM_all.pdf',
-                                 group.by = 'annoted.ids', with_legend = FALSE,
-                                 nfeatures.sampling = c(3000, 5000, 8000), nb.pcs.sampling = c(10, 20, 30, 50),
-                                 n.neighbors.sampling = c(5, 10, 30, 50), 
+                                 pdfname = 'UMAP_premRNA_param_TEST_BWM_all_scranNormalization.pdf',
+                                 group.by = 'annoted.ids', with_legend = FALSE, weight.by.var = TRUE,
+                                 nfeatures.sampling = c(1000, 3000, 5000), nb.pcs.sampling = c(10, 20, 30, 50),
+                                 n.neighbors.sampling = c(10, 30, 50), 
                                  min.dist.sampling = c(0.01, 0.1)
   )
+  
   toc()
   
   
@@ -95,7 +114,7 @@ process.unspliced.mRNA.check.cell.identities = function(pm)
   
   
   nb.pcs = 30 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 10;
+  n.neighbors = 50;
   min.dist = 0.1
   pm <- RunUMAP(object = pm, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
                      spread = 1, n.neighbors = n.neighbors,
@@ -104,6 +123,7 @@ process.unspliced.mRNA.check.cell.identities = function(pm)
   DimPlot(pm, group.by = 'annoted.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
     NoLegend()
   
+  saveRDS(pm, file = paste0(RdataDir, 'unsplicedData_processed_by_velocyto_scranNormalized_BWM.rds'))
   
 }
 
