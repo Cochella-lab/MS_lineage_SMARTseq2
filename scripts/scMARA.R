@@ -93,6 +93,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
                     ids.uniq[which(nchar(ids.uniq) == 7)], 
                     ids.uniq[which(nchar(ids.uniq) > 7)]) 
   
+  ids.groups = as.list(ids.uniq)
   
   for(n in 1:length(ids.groups)){
     
@@ -138,7 +139,6 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
         
   }
   
-  
   print(keep[grep('pha-4|hnd-1..Tcf|nhr-67.homo.M227|hlh-1.M175|unc-120.dm', rownames(keep)),])
   
   ss = apply(keep, 1, function(x) length(which(abs(x)>1.5)))
@@ -151,9 +151,14 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   pdf(pdfname, width=18, height = 16)
   par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
+  pheatmap(yy[grep('pha-4|hnd-1|nhr-67|hlh-1|unc-120.dm', rownames(yy)), ], 
+           cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
+           scale = 'none', cluster_cols=FALSE, main = paste0("MARA prediction for controls"), 
+           na_col = "white", fontsize_col = 12) 
+  
   pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
            scale = 'none', cluster_cols=FALSE, main = paste0("MARA prediction"), 
-           na_col = "white", fontsize_col = 10) 
+           na_col = "white", fontsize_col = 12) 
   
   
   dev.off()
