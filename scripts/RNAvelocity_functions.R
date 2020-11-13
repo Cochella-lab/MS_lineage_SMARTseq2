@@ -55,7 +55,7 @@ import.loomFiles.velocytoOut = function(seurat.obj) # import the loom file and p
   pm$seurat_clusters = seurat.obj$seurat_clusters[mm]
   
   saveRDS(pm, file = paste0(RdataDir, 'unsplicedData_processed_by_velocyto.rds'))
-  
+
 }
 
 process.unspliced.mRNA.check.cell.identities = function(pm)
@@ -269,6 +269,55 @@ run.RNAvelocity.with.velocyto.in.R = function(pm)
     FeaturePlot(ms, features = c(marker.genes.ms))
     
   }
+  
+  
+}
+
+test.scvelo = function() # original code from https://jef.works/blog/2020/08/25/using-scvelo-in-R-using-reticulate/
+{
+  library(reticulate)
+  conda_list()
+  use_condaenv("env_scanpy", required = TRUE)
+  scv <- import("scvelo")
+  scv$logging$print_version()
+ 
+  adata <- scv$datasets$pancreas()
+  adata
+  
+  scv$pl$scatter(adata, legend_loc='lower left', size=60)
+  
+  ## get embedding
+  emb <- adata$obsm['X_umap']
+  clusters <- adata$obs$clusters
+  rownames(emb) <- names(clusters) <- adata$obs_names$values
+  
+  ## get clusters, convert to colors
+  col <- rainbow(length(levels(clusters)), s=0.8, v=0.8)
+  cell.cols <- col[clusters]
+  names(cell.cols) <- names(clusters)
+  
+  ## simple plot
+  plot(emb, col=cell.cols, pch=16,
+       xlab='UMAP X', ylab='UMAP Y')
+  legend(x=-13, y=0, 
+         legend=levels(clusters),
+         col=col, 
+         pch=16)
+  
+  ## run scvelo dynamic model
+  scv$pp$filter_genes(adata) ## filter
+  scv$pp$moments(adata) ## normalize and compute moments
+  scv$tl$recover_dynamics(adata) ## model
+  
+  ## takes awhile, so uncomment to save
+  #adata$write('../data/test/pancreas.h5ad', compression='gzip')
+  #adata = scv$read('../data/test/pancreas.h5ad')
+  
+  ## plot (creates pop up window)
+  scv$tl$velocity(adata, mode='dynamical')
+  scv$tl$velocity_graph(adata)
+  scv$pl$velocity_embedding_stream(adata, basis='umap')
+  
   
 }
 
