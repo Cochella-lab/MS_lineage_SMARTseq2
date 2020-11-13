@@ -439,5 +439,9 @@ source.my.script('scMARA.R')
 res = predict.TF.MARA.for.scdata(sub.obj, mode = 'cluster.wise', id = 'manual.annot.ids')
 
 
+##########################################
+# run RNA velocity with velocyto  
+##########################################
+source.my.script('RNAvelocity_functions.R')
 
-
+run.RNAvelocity.with.velocyto.in.R(sub.obj = sub.obj)

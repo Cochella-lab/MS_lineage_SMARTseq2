@@ -127,7 +127,7 @@ process.unspliced.mRNA.check.cell.identities = function(pm)
   
 }
 
-run.RNAvelocity.with.velocyto.in.R = function(pm)
+run.RNAvelocity.with.velocyto.in.R = function(sub.obj)
 {
   library(Seurat)
   library(velocyto.R)
@@ -180,6 +180,9 @@ run.RNAvelocity.with.velocyto.in.R = function(pm)
                                  n = 200, scale = "sqrt", cell.colors = ac(x = cell.colors, alpha = 0.5), 
                                  cex = 0.8, arrow.scale = 3, show.grid.flow = TRUE, min.grid.cell.mass = 0.5, grid.n = 40, arrow.lwd = 1, 
                                  do.par = FALSE, cell.border.alpha = 0.1)
+  
+  
+  
   
   First.Test.Velocity.py.output = FALSE
   # original code found https://htmlpreview.github.io/?https://github.com/satijalab/seurat.wrappers/blob/master/docs/velocity.html
