@@ -79,13 +79,13 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
       #head(rownames(keep)[order(-abs(keep$MSxp))], 10)
       #head(rownames(keep)[order(-abs(keep$MSxa))], 10)
       res = keep
+      
       if(Test){
         ss = apply(keep, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
         keep = keep[which(ss>0), ]
         print(keep)
       }
     }
-   
     
   }else{
     keep = coef.glmnet(fit, s = s.optimal)
@@ -95,10 +95,12 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
     names(keep) = motif.names
     
     if(zscore.output) keep = scale(keep)
-    o1 = order(-abs(keep))
-    keep = keep[o1]
-    motif.names = motif.names[o1]
-    res = data.frame(motif = motif.names, scores = keep, stringsAsFactors = FALSE)
+    #o1 = order(-abs(keep))
+    #keep = keep[o1]
+    #motif.names = motif.names[o1]
+    #res = data.frame(motif = motif.names, scores = keep, stringsAsFactors = FALSE)
+    res = keep
+    
     if(Test) print(res[which(abs(res$scores) > Test.zscore.cutoff), ])
     
     # if(alpha > 0.0) {
