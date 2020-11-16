@@ -192,6 +192,23 @@ run.RNAvelocity.with.velocyto = function(sub.obj)
   #plot(gexp1, gexp2)
   good.genes <- genes[gexp1 > 2 & gexp2 > 1]
   
+  # prepare the umap to be embedded
+  nfeatures = 5000
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
+  sub.obj <- ScaleData(sub.obj, features = rownames(sub.obj))
+  sub.obj = RunPCA(sub.obj, features = VariableFeatures(object = sub.obj), verbose = FALSE, weight.by.var = FALSE)
+  
+  nb.pcs = 30 # nb of pcs depends on the considered clusters or ids 
+  n.neighbors = 50;
+  min.dist = 0.01
+  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
+                     spread = 1, n.neighbors = n.neighbors,
+                     min.dist = min.dist, verbose = TRUE)
+  DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
+    NoLegend()
+  
+  
+  
   ## velocyto model
   fit.quantile <- 0.05
   rvel.cd <- gene.relative.velocity.estimates(emat[good.genes,], 
@@ -244,19 +261,7 @@ run.RNAvelocity.with.velocyto = function(sub.obj)
                                  do.par = FALSE, cell.border.alpha = 0.1)
   
   
-  nfeatures = 3000
-  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
-  sub.obj <- ScaleData(sub.obj, features = rownames(sub.obj))
-  sub.obj = RunPCA(sub.obj, features = VariableFeatures(object = sub.obj), verbose = FALSE, weight.by.var = TRUE)
   
-  nb.pcs = 30 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 30;
-  min.dist = 0.1
-  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
-                     spread = 1, n.neighbors = n.neighbors,
-                     min.dist = min.dist, verbose = TRUE)
-  DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
-    NoLegend()
   
   
   

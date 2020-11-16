@@ -421,11 +421,11 @@ if(Test.Umap.Params){
   require(tictoc)
   tic()
   test.umap.params.for.BWM.cells(sub.obj, 
-                                 pdfname = 'UMAP_param_TEST_BWM_all.pdf',
-                                 group.by = 'manual.annot.ids', with_legend = FALSE,
-                                 nfeatures.sampling = c(3000, 5000, 8000), nb.pcs.sampling = c(10, 20, 30, 50),
-                                 n.neighbors.sampling = c(5, 10, 30, 50), 
-                                 min.dist.sampling = c(0.01, 0.1)
+                                 pdfname = 'UMAP_param_TEST_BWM_all_MSx_weight.by.var_v1.pdf',
+                                 group.by = 'manual.annot.ids', with_legend = FALSE, weight.by.var = TRUE,
+                                 nfeatures.sampling = c(3000, 5000), nb.pcs.sampling = c(10, 20, 30, 50),
+                                 n.neighbors.sampling = c(10, 20, 30, 50), 
+                                 min.dist.sampling = c(0.01, 0.1, 0.3)
   )
   toc()
   
