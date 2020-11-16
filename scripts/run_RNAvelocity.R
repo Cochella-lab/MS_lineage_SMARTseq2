@@ -127,38 +127,39 @@ process.unspliced.mRNA.check.cell.identities = function(pm)
   
 }
 
-run.RNAvelocity.with.velocyto.in.R = function(sub.obj)
+run.RNAvelocity.with.velocyto = function(sub.obj)
 {
   library(Seurat)
   library(velocyto.R)
   library(SeuratWrappers)
   library(ggplot2)
   
+  ##########################################
+  # import the spliced and unspliced matrix for BWM cells
+  ##########################################
   pm = readRDS(file = paste0(RdataDir, 'unsplicedData_processed_by_velocyto.rds'))
   pm = RenameCells(pm, new.names = pm$cells)
   #colnames(pm) = pm$cells
   #pm = subset(pm, cells = WhichCells(pm, ))
-  
   pm = pm[c(1:nrow(pm)), which(!is.na(pm$BWM.cells))]
   
   DefaultAssay(pm) = 'spliced'
   Idents(pm) = pm$annoted.ids
   
+  ## quick normalization and make umap for spliced visualization
   #FeatureScatter(pm, feature1 = "nCount_unspliced", feature2 = "nFeature_unspliced")
   #pbmc <- subset(pbmc, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
   pm <- NormalizeData(pm, normalization.method = "LogNormalize", scale.factor = median(pm$nCount_spliced))
-  
   pm <- FindVariableFeatures(pm, selection.method = "vst", nfeatures = 3000)
   VariableFeaturePlot(pm)
   pm <- ScaleData(pm, features = rownames(pm))
   pm = RunPCA(pm, features = VariableFeatures(object = pm), verbose = FALSE, weight.by.var = TRUE)
-  
-  pm <- FindNeighbors(object = pm, dims = 1:20)
+  pm <- FindNeighbors(object = pm, dims = 1:10)
   pm <- FindClusters(object = pm)
   
-  nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
+  nb.pcs = 20 # nb of pcs depends on the considered clusters or ids 
   n.neighbors = 30;
-  min.dist = 0.1
+  min.dist = 0.2
   pm <- RunUMAP(object = pm, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
                 spread = 1, n.neighbors = n.neighbors,
                 min.dist = min.dist, verbose = TRUE)
@@ -167,20 +168,95 @@ run.RNAvelocity.with.velocyto.in.R = function(sub.obj)
     NoLegend()
   
   
-  pm <- RunVelocity(object = pm, spliced = 'spliced', unspliced = 'unspliced',
-                    deltaT = 1, kCells = 25, fit.quantile = 0.02)
+  ##########################################
+  # run velocity with spliced and unspliced matrix
+  # refer to https://jef.works/blog/2020/01/14/rna_velocity_analysis_tutorial_tips/
+  ##########################################
+  #pm <- RunVelocity(object = pm, spliced = 'spliced', unspliced = 'unspliced', deltaT = 1, kCells = , fit.quantile = 0.02)
+  ## pull out spliced and unspliced matrices from AnnData
+  emat <- as.matrix(pm@assays$spliced@counts)
+  nmat <- as.matrix(pm@assays$unspliced@counts)
+  cells <- pm$cells
+  genes <- rownames(pm)
+  colnames(emat) <- colnames(nmat) <- cells
+  rownames(emat) <- rownames(nmat) <- genes
   
+  ## pull out PCA 
+  pcs <- Embeddings(object = pm, reduction = "pca")[, c(1:30)]
+  rownames(pcs) <- cells
+  cell.dist <- as.dist(1-cor(t(pcs))) ## cell distance in PC space
+  
+  ## filter genes
+  gexp1 <- log2(rowSums(emat)+1)
+  gexp2 <- log2(rowSums(nmat)+1)
+  #plot(gexp1, gexp2)
+  good.genes <- genes[gexp1 > 2 & gexp2 > 1]
+  
+  ## velocyto model
+  fit.quantile <- 0.05
+  rvel.cd <- gene.relative.velocity.estimates(emat[good.genes,], 
+                                              nmat[good.genes,],
+                                              deltaT = 1, 
+                                              kCells = 5,
+                                              cell.dist = cell.dist,
+                                              fit.quantile=fit.quantile 
+                                              )
+  ## takes awhile, so uncomment to save
+  save(rvel.cd, file=paste0(RdataDir, "velocyto_v2.RData"))
+  
+  ## Plot velocity on embedding umap in the selected umap
+  emb = Embeddings(object = pm, reduction = "umap")
+  plot(emb)
+  
+  ## get clusters, convert to colors
   Idents(pm) = pm$annoted.ids
+  #col <- rainbow(length(unique(annotated.ids)), s=0.8, v=0.8)
   ident.colors <- (scales::hue_pal())(n = length(x = levels(x = pm)))
   names(x = ident.colors) <- levels(x = pm)
   cell.colors <- ident.colors[Idents(object = pm)]
   names(x = cell.colors) <- colnames(x = pm)
   
-  show.velocity.on.embedding.cor(emb = Embeddings(object = pm, reduction = "umap"), vel = Tool(object = pm, slot = "RunVelocity"), 
+  # annotated.ids = pm$annoted.ids
+  # col <- rainbow(length(unique(annotated.ids)), s=0.8, v=0.8)
+  # cell.cols <- col[annotated.ids]
+  # names(cell.cols) <- names(annotated.ids)
+  
+  library(tictoc)
+  
+  tic("visualize velocity in umap ")
+  show.velocity.on.embedding.cor(emb = emb, 
+                                 rvel.cd, 
+                                 n = 20,
+                                 scale='sqrt',
+                                 cex=0.8, arrow.scale=3, show.grid.flow=TRUE,
+                                 min.grid.cell.mass=0.5, grid.n=50, arrow.lwd=2,
+                                 cell.colors=ac(x = cell.colors, alpha = 0.5), 
+                                 n.cores = 6)
+  
+  toc()
+  
+  
+  show.velocity.on.embedding.cor(emb = Embeddings(object = pm, reduction = "umap"), 
+                                 vel = Tool(object = pm, slot = "RunVelocity"), 
                                  n = 200, scale = "sqrt", cell.colors = ac(x = cell.colors, alpha = 0.5), 
-                                 cex = 0.8, arrow.scale = 3, show.grid.flow = TRUE, min.grid.cell.mass = 0.5, grid.n = 40, arrow.lwd = 1, 
+                                 cex = 0.8, arrow.scale = 3, show.grid.flow = TRUE, min.grid.cell.mass = 0.5, grid.n = 40, 
+                                 arrow.lwd = 1, 
                                  do.par = FALSE, cell.border.alpha = 0.1)
   
+  
+  nfeatures = 3000
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
+  sub.obj <- ScaleData(sub.obj, features = rownames(sub.obj))
+  sub.obj = RunPCA(sub.obj, features = VariableFeatures(object = sub.obj), verbose = FALSE, weight.by.var = TRUE)
+  
+  nb.pcs = 30 # nb of pcs depends on the considered clusters or ids 
+  n.neighbors = 30;
+  min.dist = 0.1
+  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
+                     spread = 1, n.neighbors = n.neighbors,
+                     min.dist = min.dist, verbose = TRUE)
+  DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
+    NoLegend()
   
   
   
