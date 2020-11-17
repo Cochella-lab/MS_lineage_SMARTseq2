@@ -417,14 +417,14 @@ sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxpaaap.MSx
 
 Test.Umap.Params = FALSE
 if(Test.Umap.Params){
-  source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
+  source.my.script('scRNA_functions.R')
   require(tictoc)
   tic()
   test.umap.params.for.BWM.cells(sub.obj, 
-                                 pdfname = 'UMAP_param_TEST_BWM_all_MSx_weight.by.var_v1.pdf',
-                                 group.by = 'manual.annot.ids', with_legend = FALSE, weight.by.var = TRUE,
+                                 pdfname = 'UMAP_param_TEST_BWM_all_MSx_weight.by.var.FALSE_v2.pdf',
+                                 group.by = 'manual.annot.ids', with_legend = FALSE, weight.by.var = FALSE,
                                  nfeatures.sampling = c(3000, 5000), nb.pcs.sampling = c(10, 20, 30, 50),
-                                 n.neighbors.sampling = c(10, 20, 30, 50), 
+                                 n.neighbors.sampling = c(20, 30, 50), 
                                  min.dist.sampling = c(0.01, 0.1, 0.3)
   )
   toc()

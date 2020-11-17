@@ -133,6 +133,24 @@ run.RNAvelocity.with.velocyto = function(sub.obj)
   library(velocyto.R)
   library(SeuratWrappers)
   library(ggplot2)
+  ##########################################
+  ## prepare the umap of BWM to be embedded
+  ##########################################
+  nfeatures = 3000; weight.by.var = TRUE;
+  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
+  sub.obj <- ScaleData(sub.obj, features = rownames(sub.obj))
+  sub.obj = RunPCA(sub.obj, features = VariableFeatures(object = sub.obj), verbose = FALSE, weight.by.var = weight.by.var)
+  
+  nb.pcs = 50 # nb of pcs depends on the considered clusters or ids 
+  n.neighbors = 30;
+  min.dist = 0.3
+  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
+                     spread = 1, n.neighbors = n.neighbors,
+                     min.dist = min.dist, verbose = TRUE)
+  p0 = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
+    NoLegend()
+  
+  
   
   ##########################################
   # import the spliced and unspliced matrix for BWM cells
@@ -192,78 +210,143 @@ run.RNAvelocity.with.velocyto = function(sub.obj)
   #plot(gexp1, gexp2)
   good.genes <- genes[gexp1 > 2 & gexp2 > 1]
   
-  # prepare the umap to be embedded
-  nfeatures = 5000
-  sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
-  sub.obj <- ScaleData(sub.obj, features = rownames(sub.obj))
-  sub.obj = RunPCA(sub.obj, features = VariableFeatures(object = sub.obj), verbose = FALSE, weight.by.var = FALSE)
-  
-  nb.pcs = 30 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 50;
-  min.dist = 0.01
-  sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
-                     spread = 1, n.neighbors = n.neighbors,
-                     min.dist = min.dist, verbose = TRUE)
-  DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
-    NoLegend()
-  
-  
-  
   ## velocyto model
-  fit.quantile <- 0.05
-  rvel.cd <- gene.relative.velocity.estimates(emat[good.genes,], 
-                                              nmat[good.genes,],
-                                              deltaT = 1, 
-                                              kCells = 5,
-                                              cell.dist = cell.dist,
-                                              fit.quantile=fit.quantile 
-                                              )
-  ## takes awhile, so uncomment to save
-  save(rvel.cd, file=paste0(RdataDir, "velocyto_v2.RData"))
+  fit.quantile <- 0.1
+  Run.RNAvelocyto = TRUE
+  file2save = paste0(RdataDir, 'velocyto_v3.rds')
   
-  ## Plot velocity on embedding umap in the selected umap
-  emb = Embeddings(object = pm, reduction = "umap")
-  plot(emb)
+  if(Run.RNAvelocyto){
+    rvel.cd <- gene.relative.velocity.estimates(emat[good.genes,], 
+                                                nmat[good.genes,],
+                                                deltaT = 1, 
+                                                kCells = 10,
+                                                cell.dist = cell.dist,
+                                                fit.quantile=fit.quantile 
+    )
+    ## takes awhile, so uncomment to save
+    saveRDS(rvel.cd, file = file2save)
+  }else{
+    rvel.cd = readRDS(file = file2save)
+  }
   
-  ## get clusters, convert to colors
-  Idents(pm) = pm$annoted.ids
+  ##########################################
+  # embed the velocity into the BWM umap (overlayed on cell ids)  
+  ##########################################
+  ## get embedding reduction, clusters, convert to colors
+  emb = Embeddings(object = sub.obj, reduction = "umap")
+  
+  library(RColorBrewer)
+  ggplotColours <- function(n = 6, h = c(0, 360) + 15){
+    if ((diff(h) %% 360) < 1) h[2] <- h[2] - 360/n
+    hcl(h = (seq(h[1], h[2], length = n)), c = 100, l = 65)
+  }
+  #color_list <- ggplotColours(n=12)
+  Idents(sub.obj) = sub.obj$manual.annot.ids
   #col <- rainbow(length(unique(annotated.ids)), s=0.8, v=0.8)
-  ident.colors <- (scales::hue_pal())(n = length(x = levels(x = pm)))
-  names(x = ident.colors) <- levels(x = pm)
-  cell.colors <- ident.colors[Idents(object = pm)]
-  names(x = cell.colors) <- colnames(x = pm)
+  #ident.colors <- (scales::hue_pal())(n = length(x = levels(x = sub.obj)))
+  ident.colors = ggplotColours(n = length(x = levels(sub.obj)))
+  #ident.colors <- RColorBrewer::brewer.pal(n = length(x = levels(x = sub.obj)), name = '')
+  names(x = ident.colors) <- levels(x = sub.obj)
+  cell.colors <- ident.colors[Idents(object = sub.obj)]
+  names(x = cell.colors) <- colnames(x = sub.obj)
   
-  # annotated.ids = pm$annoted.ids
-  # col <- rainbow(length(unique(annotated.ids)), s=0.8, v=0.8)
-  # cell.cols <- col[annotated.ids]
-  # names(cell.cols) <- names(annotated.ids)
+  cells = colnames(rvel.cd$conv.emat.norm)
+  names = rownames(emb)
+  names = gsub('[.]', '_', names)
+  rownames(emb) = names
+  jj = match(cells, rownames(emb))
+  
+  emb = emb[jj, ]
+  cell.colors = cell.colors[jj]
+  names(x = cell.colors) <- rownames(emb)
+  
+  #plot(emb, col = cell.colors, pch = 16)
   
   library(tictoc)
   
   tic("visualize velocity in umap ")
+  # velocity overlaying cell ids
   show.velocity.on.embedding.cor(emb = emb, 
                                  rvel.cd, 
-                                 n = 20,
-                                 scale='sqrt',
-                                 cex=0.8, arrow.scale=3, show.grid.flow=TRUE,
-                                 min.grid.cell.mass=0.5, grid.n=50, arrow.lwd=2,
-                                 cell.colors=ac(x = cell.colors, alpha = 0.5), 
-                                 n.cores = 6)
+                                 n = 30,
+                                 cell.colors= ac(x = cell.colors, alpha = 1), 
+                                 scale='log',
+                                 show.grid.flow=TRUE, 
+                                 grid.n=100,
+                                 arrow.scale=2, 
+                                 arrow.lwd=1,
+                                 min.grid.cell.mass=0.5,
+                                 cex=0.8,
+                                 n.cores = 2, 
+                                 cell.border.alpha = 0.1
+                                 )
   
   toc()
   
   
-  show.velocity.on.embedding.cor(emb = Embeddings(object = pm, reduction = "umap"), 
-                                 vel = Tool(object = pm, slot = "RunVelocity"), 
-                                 n = 200, scale = "sqrt", cell.colors = ac(x = cell.colors, alpha = 0.5), 
-                                 cex = 0.8, arrow.scale = 3, show.grid.flow = TRUE, min.grid.cell.mass = 0.5, grid.n = 40, 
-                                 arrow.lwd = 1, 
-                                 do.par = FALSE, cell.border.alpha = 0.1)
+  ##########################################
+  # embed the velocity into the BWM umap overlayed on estimated timing
+  ##########################################
+  ## get embedding reduction, clusters, convert to colors
+  emb = Embeddings(object = sub.obj, reduction = "umap")
+  
+  library(RColorBrewer)
+  ggplotColours <- function(n = 6, h = c(0, 360) + 15){
+    if ((diff(h) %% 360) < 1) h[2] <- h[2] - 360/n
+    hcl(h = (seq(h[1], h[2], length = n)), c = 100, l = 65)
+  }
+  
+  #color_list <- ggplotColours(n=12)
+  Idents(sub.obj) = sub.obj$manual.annot.ids
+  #col <- rainbow(length(unique(annotated.ids)), s=0.8, v=0.8)
+  #ident.colors <- (scales::hue_pal())(n = length(x = levels(x = sub.obj)))
+  ident.colors = ggplotColours(n = length(x = levels(sub.obj)))
+  #ident.colors <- RColorBrewer::brewer.pal(n = length(x = levels(x = sub.obj)), name = '')
+  names(x = ident.colors) <- levels(x = sub.obj)
+  cell.colors <- ident.colors[Idents(object = sub.obj)]
+  names(x = cell.colors) <- colnames(x = sub.obj)
+  
+  cells = colnames(rvel.cd$conv.emat.norm)
+  names = rownames(emb)
+  names = gsub('[.]', '_', names)
+  rownames(emb) = names
+  jj = match(cells, rownames(emb))
+  
+  emb = emb[jj, ]
+  cell.colors = cell.colors[jj]
+  names(x = cell.colors) <- rownames(emb)
+  
+  #plot(emb, col = cell.colors, pch = 16)
+  
+  library(tictoc)
+  
+  tic("visualize velocity in umap ")
+  # velocity overlaying cell ids
+  show.velocity.on.embedding.cor(emb = emb, 
+                                 rvel.cd, 
+                                 n = 30,
+                                 cell.colors= ac(x = cell.colors, alpha = 1), 
+                                 scale='log',
+                                 show.grid.flow=TRUE, 
+                                 grid.n=100,
+                                 arrow.scale=2, 
+                                 arrow.lwd=1,
+                                 min.grid.cell.mass=0.5,
+                                 cex=0.8,
+                                 n.cores = 2, 
+                                 cell.border.alpha = 0.1
+  )
+  
+  toc()
   
   
   
-  
-  
+  # show.velocity.on.embedding.cor(emb = Embeddings(object = pm, reduction = "umap"), 
+  #                                vel = Tool(object = pm, slot = "RunVelocity"), 
+  #                                n = 200, scale = "sqrt", cell.colors = ac(x = cell.colors, alpha = 0.5), 
+  #                                cex = 0.8, arrow.scale = 3, show.grid.flow = TRUE, min.grid.cell.mass = 0.5, grid.n = 40, 
+  #                                arrow.lwd = 1, 
+  #                                do.par = FALSE, cell.border.alpha = 0.1)
   
   First.Test.Velocity.py.output = FALSE
   # original code found https://htmlpreview.github.io/?https://github.com/satijalab/seurat.wrappers/blob/master/docs/velocity.html
