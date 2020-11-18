@@ -85,7 +85,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   # gene.sels = define.modules.for.lineags(sub.obj, Y.fpkm, lineage = lineage)
   
   markers = readRDS(file = paste0(RdataDir,  'AllMarkers_MST_manual.annotation.rds'))
-  markers.sels = markers[which(markers$p_val<10^-3 & markers$avg_logFC > 0.5), ]
+  markers.sels = markers[which(markers$p_val<10^-3 & markers$avg_logFC > 0.7), ]
   print(table(markers.sels$cluster))
   
   ids.groups = list(ids.uniq[which(nchar(ids.uniq) <=5)], 
@@ -95,15 +95,20 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   
   ids.groups = as.list(ids.uniq)
   
+  ids.groups = list(c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx'), 
+                    c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp'))
+  #ids.groups = list(c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx', 
+  #                  'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp'))
+  
   for(n in 1:length(ids.groups)){
     
-    # n = 1;
-    lineage = ids.groups[[n]]
+    # n = 1;  
     cat(n, ' --- ')
-    print(lineage)
-    # lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
-    # lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+    lineage = ids.groups[[n]]
+    #lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+    #lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
     # lineage = setdiff(ids.uniq, c("mixture_terminal_1", "mixture_terminal_2"))
+    print(lineage)
     
     gene.sels = markers.sels[!is.na(match(markers.sels$cluster, lineage)), ]
     gene.sels = gene.sels[!is.na(match(gene.sels$gene, rownames(Y.mat))), ]
@@ -126,10 +131,10 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     x[which(is.na(x) == TRUE)] = 0
     
     source.my.script('scMARA_utility_functions.R')
-    res = run.penelized.lm(x, y, alpha = 0, standardize = TRUE, intercept = TRUE, use.lambda.min = TRUE, 
+    res = run.penelized.lm(x, y, alpha = 0, standardize = TRUE, intercept = TRUE, use.lambda.min = FALSE, 
                            Test = FALSE)
     
-    print(res[grep('pha-4|hnd-1..Tcf|nhr-67.homo.M227|hlh-1.M175|unc-120.dm', rownames(res)),])
+    print(res[grep('pha-4.mus|hnd-1..Tcf3|nhr-67.mus.M226|nhr-67.dm.M141|hlh-1.M175|unc-120.dm', rownames(res)),])
     
     if(n == 1) {
       keep = res[match(colnames(x), rownames(res)), ]
@@ -139,19 +144,19 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   }
   
   #colnames(keep) = ids.uniq
-  print(keep[grep('pha-4|hnd-1..Tcf|nhr-67.homo.M227|hlh-1.M175|unc-120.dm', rownames(keep)),])
+  print(keep[grep('pha-4.mus|hnd-1..Tcf3|nhr-67.mus.M226|nhr-67.dm.M141|hlh-1.M175|unc-120.dm|tbx-|ceh-51', rownames(keep)),])
   
-  ss = apply(keep, 1, function(x) length(which(abs(x)>2)))
+  ss = apply(keep, 1, function(x) length(which(abs(x)>1.2)))
   length(which(ss>=1))
   
   yy = keep[which(ss>0), ] 
   yy[which(abs(yy)>2.5)] = 2.5
   
-  pdfname = paste0(resDir, "/MARA_prediction_all_lineages_v2.pdf")
+  pdfname = paste0(resDir, "/MARA_prediction_lineages_two_selected.pdf")
   pdf(pdfname, width=18, height = 16)
   par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
-  pheatmap(yy[grep('pha-4|hnd-1|nhr-67|hlh-1|unc-120.dm', rownames(yy)), ], 
+  pheatmap(yy[grep('pha-4.mus|hnd-1..Tcf3|nhr-67.mus.M226|nhr-67.dm.M141|hlh-1.M175|unc-120.dm', rownames(yy)), ], 
            cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
            scale = 'none', cluster_cols=FALSE, main = paste0("MARA prediction for controls"), 
            na_col = "white", fontsize_col = 12) 
@@ -162,5 +167,8 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   
   
   dev.off()
+  
+  
+  
   
 }

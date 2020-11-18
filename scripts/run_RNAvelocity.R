@@ -133,6 +133,7 @@ run.RNAvelocity.with.velocyto = function(sub.obj)
   library(velocyto.R)
   library(SeuratWrappers)
   library(ggplot2)
+  library(RColorBrewer)
   ##########################################
   ## prepare the umap of BWM to be embedded
   ##########################################
@@ -230,25 +231,36 @@ run.RNAvelocity.with.velocyto = function(sub.obj)
   }
   
   ##########################################
-  # embed the velocity into the BWM umap (overlayed on cell ids)  
+  # embed the velocity into the BWM umap 
   ##########################################
   ## get embedding reduction, clusters, convert to colors
   emb = Embeddings(object = sub.obj, reduction = "umap")
   
-  library(RColorBrewer)
-  ggplotColours <- function(n = 6, h = c(0, 360) + 15){
-    if ((diff(h) %% 360) < 1) h[2] <- h[2] - 360/n
-    hcl(h = (seq(h[1], h[2], length = n)), c = 100, l = 65)
+  getEmbColors = function(sub.obj, use.ident = 'manual.annot.ids')
+  {
+    ggplotColours <- function(n = 6, h = c(0, 360) + 15){
+      if ((diff(h) %% 360) < 1) h[2] <- h[2] - 360/n
+      hcl(h = (seq(h[1], h[2], length = n)), c = 100, l = 65)
+    }
+    
+    if(use.ident == 'manual.annot.ids') {
+      Idents(sub.obj) = sub.obj$manual.annot.ids
+    }
+    if(use.ident == 'timingEs'){
+      Idents(sub.obj) = sub.obj$timingEst
+    }
+    #col <- rainbow(length(unique(annotated.ids)), s=0.8, v=0.8)
+    #ident.colors <- (scales::hue_pal())(n = length(x = levels(x = sub.obj)))
+    ident.colors = ggplotColours(n = length(x = levels(sub.obj)))
+    #ident.colors <- RColorBrewer::brewer.pal(n = length(x = levels(x = sub.obj)), name = '')
+    names(x = ident.colors) <- levels(x = sub.obj)
+    cell.colors <- ident.colors[Idents(object = sub.obj)]
+    names(x = cell.colors) <- colnames(x = sub.obj)
+    
+    return(cell.colors)
   }
-  #color_list <- ggplotColours(n=12)
-  Idents(sub.obj) = sub.obj$manual.annot.ids
-  #col <- rainbow(length(unique(annotated.ids)), s=0.8, v=0.8)
-  #ident.colors <- (scales::hue_pal())(n = length(x = levels(x = sub.obj)))
-  ident.colors = ggplotColours(n = length(x = levels(sub.obj)))
-  #ident.colors <- RColorBrewer::brewer.pal(n = length(x = levels(x = sub.obj)), name = '')
-  names(x = ident.colors) <- levels(x = sub.obj)
-  cell.colors <- ident.colors[Idents(object = sub.obj)]
-  names(x = cell.colors) <- colnames(x = sub.obj)
+  
+  cell.colors = getEmbColors(sub.obj = sub.obj, use.ident = 'timingEs')
   
   cells = colnames(rvel.cd$conv.emat.norm)
   names = rownames(emb)
@@ -260,63 +272,7 @@ run.RNAvelocity.with.velocyto = function(sub.obj)
   cell.colors = cell.colors[jj]
   names(x = cell.colors) <- rownames(emb)
   
-  #plot(emb, col = cell.colors, pch = 16)
-  
-  library(tictoc)
-  
-  tic("visualize velocity in umap ")
-  # velocity overlaying cell ids
-  show.velocity.on.embedding.cor(emb = emb, 
-                                 rvel.cd, 
-                                 n = 30,
-                                 cell.colors= ac(x = cell.colors, alpha = 1), 
-                                 scale='log',
-                                 show.grid.flow=TRUE, 
-                                 grid.n=100,
-                                 arrow.scale=2, 
-                                 arrow.lwd=1,
-                                 min.grid.cell.mass=0.5,
-                                 cex=0.8,
-                                 n.cores = 2, 
-                                 cell.border.alpha = 0.1
-                                 )
-  
-  toc()
-  
-  
-  ##########################################
-  # embed the velocity into the BWM umap overlayed on estimated timing
-  ##########################################
-  ## get embedding reduction, clusters, convert to colors
-  emb = Embeddings(object = sub.obj, reduction = "umap")
-  
-  library(RColorBrewer)
-  ggplotColours <- function(n = 6, h = c(0, 360) + 15){
-    if ((diff(h) %% 360) < 1) h[2] <- h[2] - 360/n
-    hcl(h = (seq(h[1], h[2], length = n)), c = 100, l = 65)
-  }
-  
-  #color_list <- ggplotColours(n=12)
-  Idents(sub.obj) = sub.obj$manual.annot.ids
-  #col <- rainbow(length(unique(annotated.ids)), s=0.8, v=0.8)
-  #ident.colors <- (scales::hue_pal())(n = length(x = levels(x = sub.obj)))
-  ident.colors = ggplotColours(n = length(x = levels(sub.obj)))
-  #ident.colors <- RColorBrewer::brewer.pal(n = length(x = levels(x = sub.obj)), name = '')
-  names(x = ident.colors) <- levels(x = sub.obj)
-  cell.colors <- ident.colors[Idents(object = sub.obj)]
-  names(x = cell.colors) <- colnames(x = sub.obj)
-  
-  cells = colnames(rvel.cd$conv.emat.norm)
-  names = rownames(emb)
-  names = gsub('[.]', '_', names)
-  rownames(emb) = names
-  jj = match(cells, rownames(emb))
-  
-  emb = emb[jj, ]
-  cell.colors = cell.colors[jj]
-  names(x = cell.colors) <- rownames(emb)
-  
-  #plot(emb, col = cell.colors, pch = 16)
+  plot(emb, col = cell.colors, pch = 16)
   
   library(tictoc)
   
