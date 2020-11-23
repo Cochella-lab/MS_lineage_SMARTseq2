@@ -432,7 +432,7 @@ if(Test.Umap.Params){
 }
 
 ##########################################
-# run the sctf_MARA
+# run the sc_MARA
 ##########################################
 source.my.script('scMARA.R')
 

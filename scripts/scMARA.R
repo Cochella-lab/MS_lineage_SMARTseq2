@@ -97,60 +97,51 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   
   ids.groups = list(c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx'), 
                     c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp'))
-  #ids.groups = list(c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx', 
-  #                  'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp'))
+  ids.groups = list(c('MSx', 'MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx', 
+                    'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp'))
   
-  for(n in 1:length(ids.groups)){
-    
-    # n = 1;  
-    cat(n, ' --- ')
-    lineage = ids.groups[[n]]
-    #lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
-    #lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
-    # lineage = setdiff(ids.uniq, c("mixture_terminal_1", "mixture_terminal_2"))
-    print(lineage)
-    
-    gene.sels = markers.sels[!is.na(match(markers.sels$cluster, lineage)), ]
-    gene.sels = gene.sels[!is.na(match(gene.sels$gene, rownames(Y.mat))), ]
-    #print(table(gene.sels$cluster))
-    gene.sels = unique(gene.sels$gene)
-    
-    #gene.sels = unique(markers$gene[which(!is.na(match(markers$cluster, lineage)) & markers$p_val_adj<10^-5 & markers$avg_logFC > 0.7)])
-    #gene.sels = gene.sels[which(!is.na(match(gene.sels, rownames(Y.mat))))]
-    ##########################################
-    # prepare matrix A and reponse Y and run penalized.lm
-    ##########################################
-    index.sel = match(gene.sels, rownames(Y.mat))
-    Y.sel = Y.mat[index.sel, match(lineage, colnames(Y.mat))]
-    y = as.matrix(Y.sel)
-    
-    #mm = match(rownames(Y.sel), rownames(motif.oc))
-    mm = match(gene.sels, rownames(motif.oc))
-    y = y[!is.na(mm), ]
-    x = as.matrix(motif.oc[mm[!is.na(mm)], ])
-    x[which(is.na(x) == TRUE)] = 0
-    
-    source.my.script('scMARA_utility_functions.R')
-    res = run.penelized.lm(x, y, alpha = 0, standardize = TRUE, intercept = TRUE, use.lambda.min = FALSE, 
-                           Test = FALSE)
-    
-    print(res[grep('pha-4.mus|hnd-1..Tcf3|nhr-67.mus.M226|nhr-67.dm.M141|hlh-1.M175|unc-120.dm', rownames(res)),])
-    
-    if(n == 1) {
-      keep = res[match(colnames(x), rownames(res)), ]
-    }else{
-      keep = cbind(keep, res[match(colnames(x), rownames(res)), ])
-    }
-  }
+  lineage = ids.groups[[n]]
+  #lineage = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+  #lineage = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+  # lineage = setdiff(ids.uniq, c("mixture_terminal_1", "mixture_terminal_2"))
+  print(lineage)
   
-  #colnames(keep) = ids.uniq
-  print(keep[grep('pha-4.mus|hnd-1..Tcf3|nhr-67.mus.M226|nhr-67.dm.M141|hlh-1.M175|unc-120.dm|tbx-|ceh-51', rownames(keep)),])
+  gene.sels = markers.sels[!is.na(match(markers.sels$cluster, lineage)), ]
+  gene.sels = gene.sels[!is.na(match(gene.sels$gene, rownames(Y.mat))), ]
+  #print(table(gene.sels$cluster))
+  gene.sels = unique(gene.sels$gene)
   
-  ss = apply(keep, 1, function(x) length(which(abs(x)>1.2)))
+  #gene.sels = unique(markers$gene[which(!is.na(match(markers$cluster, lineage)) & markers$p_val_adj<10^-5 & markers$avg_logFC > 0.7)])
+  #gene.sels = gene.sels[which(!is.na(match(gene.sels, rownames(Y.mat))))]
+  ##########################################
+  # prepare matrix A and reponse Y and run penalized.lm
+  ##########################################
+  index.sel = match(gene.sels, rownames(Y.mat))
+  Y.sel = Y.mat[index.sel, match(lineage, colnames(Y.mat))]
+  y = as.matrix(Y.sel)
+  
+  #mm = match(rownames(Y.sel), rownames(motif.oc))
+  mm = match(gene.sels, rownames(motif.oc))
+  y = y[!is.na(mm), ]
+  x = as.matrix(motif.oc[mm[!is.na(mm)], ])
+  x[which(is.na(x) == TRUE)] = 0
+  
+  source.my.script('scMARA_utility_functions.R')
+  res = run.penelized.lm(x, y, alpha = 0, standardize = TRUE, intercept = TRUE, use.lambda.min = FALSE, 
+                         Test = FALSE)
+  
+  print(res[grep('pha-4.mus|hnd-1..Tcf3|nhr-67.mus.M226|nhr-67.dm.M141|hlh-1.M175|unc-120.dm', rownames(res)),])
+  
+  
+  #colnames(res) = ids.uniq
+  print(res[grep('pha-4.mus|hnd-1..Tcf3|nhr-67.mus.M226|nhr-67.dm.M141|hlh-1.M175|unc-120.dm|tbx-|ceh-51', rownames(res)),])
+  
+  ss = apply(res, 1, function(x) length(which(abs(x)>1.2)))
   length(which(ss>=1))
   
-  yy = keep[which(ss>0), ] 
+  yy = res[which(ss>0), ] 
   yy[which(abs(yy)>2.5)] = 2.5
+  
   
   pdfname = paste0(resDir, "/MARA_prediction_lineages_two_selected.pdf")
   pdf(pdfname, width=18, height = 16)
@@ -165,10 +156,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
            scale = 'none', cluster_cols=FALSE, main = paste0("MARA prediction"), 
            na_col = "white", fontsize_col = 12) 
   
-  
   dev.off()
-  
-  
   
   
 }
