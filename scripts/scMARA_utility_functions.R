@@ -430,7 +430,10 @@ define.modules.for.lineags = function(sub.obj, Y.fpkm, lineage = c('MSxp', 'MSxp
   
   }
   
-  
+  ##########################################
+  # the following code is modified based on original code from https://github.com/stevexniu/single-cell-ciona
+  # in addition, the following code is redundant with part of code in scMARA.R (to do)
+  ##########################################
   if(mode == 'time.bin'){
     library(destiny)
     library(princurve)
