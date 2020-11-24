@@ -60,9 +60,17 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   
   remove(sce)
   
+  ########################################################
+  ########################################################
+  # with manually annoted ids, there are seveval options to consider trajectories
+  # 1) collapse cells in the same cell states to have pseudo-bulk
+  # 2) pseudotime for trajectories, better resolution than pseud-bulk
+  # 3) retain single cell 
+  ########################################################
+  ########################################################
   trajectory.resolution = 'pseudotime'
+  
   if(trajectory.resolution == 'cluster.based'){
-    
     ##########################################
     # average cells with the same ids (i.e. cluster-based motif activity )
     ##########################################
@@ -168,61 +176,50 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
   
   if(trajectory.resolution == 'pseudotime'){
     
-    ##########################################
-    # here the pseudotime were to be inferred and lineage-dependent genes will be identified with pseudotime
-    ##########################################
     library(tradeSeq)
     library(RColorBrewer)
     library(SingleCellExperiment)
     library(slingshot)
     
+    # lineage or trajectory to consider
+    lineages = list(c('MSx', 'MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx'),
+                    c('MSx', 'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+                    )
     
-    # infer pseudotime using slingshot or diffusion map
-    #lineage = c('MSx', 'MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx', 'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
-    lineage = c('MSx', 'MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+    pseudotime.method = 'diffusion.map'
     
-    cells.sels = unique(colnames(sub.obj)[!is.na(match(sub.obj$manual.annot.ids, lineage))])
-    ll.obj = subset(sub.obj, cells = cells.sels)
-    ll.obj = FindVariableFeatures(ll.obj, selection.method = "vst", nfeatures = 2000)
+    ##########################################
+    # # infer pseudotime using slingshot or diffusion map
+    # here the pseudotime were to be inferred and lineage-dependent genes will be identified with pseudotime
+    # two options for pseudotime inferring: slingshot or diffusion map + princi_curve
+    # diffusion map + princi_curve method is one trajectory one time
+    ##########################################
     
-    ll.obj = ScaleData(ll.obj, features = rownames(ll.obj))
-    ll.obj <- RunPCA(object = ll.obj, features = VariableFeatures(ll.obj), verbose = FALSE, weight.by.var = FALSE)
-    ElbowPlot(ll.obj, ndims = 50)
-    
-    DimPlot(ll.obj, reduction = 'pca', dims = c(1, 2),
-            group.by = 'manual.annot.ids', label = TRUE) + NoLegend()
-    
-    nb.pcs = 10; n.neighbors = 30; min.dist = 0.3;
-    ll.obj <- RunUMAP(object = ll.obj, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-    
-    p1 = DimPlot(ll.obj, reduction = 'pca', group.by = 'manual.annot.ids', label = TRUE) + NoLegend()
-    p2 = DimPlot(ll.obj, reduction = 'umap', group.by = 'manual.annot.ids', label = TRUE) + NoLegend()
-    p1 + p2
-    
-    pseudotime.method = 'slingshot'
-    if(pseudotime.method == 'slingshot'){
-      pca <- prcomp(t(log1p(ll.obj@assays$RNA@data)[match(VariableFeatures(ll.obj), rownames(ll.obj)), ]), scale. = FALSE)
-      rd1 <- pca$x[,1:2]
-      plot(rd1, col = rgb(0,0,0,.5), pch=16, asp = 1)
-      #plot(rd1, col = rgb(0,0,0,.5), pch=16, asp = 1)
-      
-      library(uwot)
-      
-      rd2 <- umap(t(log1p(ll.obj@assays$RNA@data)[match(VariableFeatures(ll.obj), rownames(ll.obj)), ]))
-      colnames(rd2) <- c('UMAP1', 'UMAP2')
-      
-      plot(rd2, col = rgb(0,0,0,.5), pch=16, asp = 1)
-      DimPlot(ll.obj, reduction = 'umap', group.by = 'manual.annot.ids')
-      
-      
-      
-      
-    }
-    
+    # the code were modified based on https://github.com/stevexniu/single-cell-ciona
     if(pseudotime.method == 'diffusion.map'){
-      # the code were modified based on https://github.com/stevexniu/single-cell-ciona
+      
       library(destiny)
       library(princurve)
+      
+      lineage = c('MSx', 'MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+      
+      cells.sels = unique(colnames(sub.obj)[!is.na(match(sub.obj$manual.annot.ids, lineage))])
+      ll.obj = subset(sub.obj, cells = cells.sels)
+      ll.obj = FindVariableFeatures(ll.obj, selection.method = "vst", nfeatures = 2000)
+      
+      ll.obj = ScaleData(ll.obj, features = rownames(ll.obj))
+      ll.obj <- RunPCA(object = ll.obj, features = VariableFeatures(ll.obj), verbose = FALSE, weight.by.var = FALSE)
+      ElbowPlot(ll.obj, ndims = 50)
+      
+      DimPlot(ll.obj, reduction = 'pca', dims = c(1, 2),
+              group.by = 'manual.annot.ids', label = TRUE) + NoLegend()
+      
+      nb.pcs = 10; n.neighbors = 30; min.dist = 0.3;
+      ll.obj <- RunUMAP(object = ll.obj, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+      
+      p1 = DimPlot(ll.obj, reduction = 'pca', group.by = 'manual.annot.ids', label = TRUE) + NoLegend()
+      p2 = DimPlot(ll.obj, reduction = 'umap', group.by = 'manual.annot.ids', label = TRUE) + NoLegend()
+      p1 + p2
       
       #ll.obj = RunPCA(ll.obj, features = VariableFeatures(ll.obj), npcs = 50, verbose = FALSE, weight.by.var = FALSE)
       
@@ -250,44 +247,36 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
       ll.obj$timingEst = as.numeric(as.character(ll.obj$timingEst))
       Idents(ll.obj) = ll.obj$manual.annot.ids
       FeatureScatter(ll.obj, feature1 = "pseudotime", feature2 = "timingEst")
-      #mat.dist = as.matrix(dist(ll.pca, method = 'euclidean'))
-      # Run diffusion map and return top 50 dimensions
-      #set.seed(1)
-      #diffmap = diffuse(mat.dist, maxdim=50)
-      
-      #diffmap.embedding = as.matrix(diffmap$X)
-      #rownames(diffmap.embedding) = colnames(ll.obj)
-      #colnames(diffmap.embedding) = paste0('diffumap_', c(1:ncol(diffmap.embedding)))
-      
-      #ll.obj[['diffmap']] = Seurat::CreateDimReducObject(embeddings=diffmap.embedding , key='diffmap_', assay='RNA')
-      
-      # Save first two diffusion map coordinators
-      #shp@tsne.rot[1:2]=data.frame(shp.diff$X[,1:2],row.names = ll.obj@cell.names)
-      #colnames(shp@tsne.rot)=c("tSNE_1","tSNE_2")
-      # Visualize top two diffusion map components
-      #tsne.pseudo(shp, do.label = F,label.cex.text = 1,name.y = "Diffusion Map Coordinator 2",name.x = "Diffusion Map Coordinator1",label.cols.use = c("green","yellow","orange1","orange4","orange4"),label.pt.size = 1.5,xlim=c(-0.1,0.05),ylim=c(-0.05,0.05))
-      #legend("topleft",legend=c("12TVC","14STVC","16SHP","18SHP","20SHP"),col= c("green","yellow","orange1","orange4","orange4"),pch = 16,cex=0.5,pt.cex = 1)
-      #plot(diffmap$X[, c(1:2)])
-      # Fit the first two diffusion map components with principal curve
-      
-      
-      df=data.frame(princurve$s[order(princurve$lambda),]);colnames(df) = c("x","y")
-      
-      ggplot(data=df,aes(x,y))+
-        geom_line(size=1.5,colour="black")+
-        geom_density2d(aes(colour=..level..),bins=6) + 
-        scale_colour_gradient(low="darkgray",high="white",3) +
-        xlim(-0.084,0.08) + ylim(-0.05,0.05) +
-        geom_point(data=data.frame(shp@tsne.rot,color=shp@ident),aes(tSNE_1,tSNE_2),size=2,color=c(rep("green",table(shp@ident)[1]),
-                                                                                                   rep("yellow",table(shp@ident)[2]),rep("orange1",table(shp@ident)[3]),rep("orange4",table(shp@ident)[4]),rep("orange4",table(shp@ident)[5]))) +
-        theme_classic() +  
-        theme(legend.position="none",axis.title=element_text(size = rel(1)),axis.text=element_blank(), axis.ticks = element_blank(),axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'))+ xlab(label = "Diffusion Component 1") + ylab(label = "Diffusion Component 2") +     geom_line(size=1.5,colour="black")
       
     }
     
+    if(pseudotime.method == 'slingshot'){
+      pca <- prcomp(t(log1p(ll.obj@assays$RNA@data)[match(VariableFeatures(ll.obj), rownames(ll.obj)), ]), scale. = FALSE)
+      rd1 <- pca$x[,1:2]
+      plot(rd1, col = rgb(0,0,0,.5), pch=16, asp = 1)
+      #plot(rd1, col = rgb(0,0,0,.5), pch=16, asp = 1)
+      
+      library(uwot)
+      
+      rd2 <- umap(t(log1p(ll.obj@assays$RNA@data)[match(VariableFeatures(ll.obj), rownames(ll.obj)), ]))
+      colnames(rd2) <- c('UMAP1', 'UMAP2')
+      
+      plot(rd2, col = rgb(0,0,0,.5), pch=16, asp = 1)
+      DimPlot(ll.obj, reduction = 'umap', group.by = 'manual.annot.ids')
+      
+      
+      
+      
+    }
     
+    ##########################################
+    # idnetify trajectory-associated genes using tradeSeq
+    # the orignial code was from https://statomics.github.io/tradeSeq/articles/tradeSeq.html
+    # updated version of analysis for multiple conditions were found 
+    # https://kstreet13.github.io/bioc2020trajectories/articles/workshopTrajectories.html
+    ##########################################
     # For reproducibility
-    #RNGversion("3.5.0")
+    #RNGversion("3.6.1")
     palette(brewer.pal(8, "Dark2"))
     data(countMatrix, package = "tradeSeq")
     counts <- as.matrix(countMatrix)
