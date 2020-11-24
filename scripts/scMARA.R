@@ -182,11 +182,24 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     library(slingshot)
     
     # lineage or trajectory to consider
-    lineages = list(c('MSx', 'MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx'),
+    lineage.list = list(c('MSx', 'MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx'),
                     c('MSx', 'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
                     )
     
     pseudotime.method = 'diffusion.map'
+    cat(length(lineage.list), ' lineages or trajectories to consider \n')
+    
+    # prepare input matrix for tradeSeq
+    ids.sels = c()
+    for(m in 1:length(lineage.list)) ids.sels = unique(c(ids.sels, lineage.list[[m]]))
+    cells.sels = unique(colnames(sub.obj)[!is.na(match(sub.obj$manual.annot.ids, ids.sels))])
+    lineages.obj = subset(sub.obj, cells = cells.sels)
+    
+    counts.sel = as.matrix(lineages.obj@assays$RNA@counts)
+    pseudotime <- matrix(0, nrow = ncol(lineages.obj), ncol = length(lineage.list))
+    rownames(pseudotime) = colnames(lineages.obj);
+    colnames(pseudotime) = paste0('curve', c(1:length(lineage.list)))
+    cellWeights <- pseudotime
     
     ##########################################
     # # infer pseudotime using slingshot or diffusion map
@@ -201,73 +214,68 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
       library(destiny)
       library(princurve)
       
-      lineage = c('MSx', 'MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
-      
-      cells.sels = unique(colnames(sub.obj)[!is.na(match(sub.obj$manual.annot.ids, lineage))])
-      ll.obj = subset(sub.obj, cells = cells.sels)
-      ll.obj = FindVariableFeatures(ll.obj, selection.method = "vst", nfeatures = 2000)
-      
-      ll.obj = ScaleData(ll.obj, features = rownames(ll.obj))
-      ll.obj <- RunPCA(object = ll.obj, features = VariableFeatures(ll.obj), verbose = FALSE, weight.by.var = FALSE)
-      ElbowPlot(ll.obj, ndims = 50)
-      
-      DimPlot(ll.obj, reduction = 'pca', dims = c(1, 2),
-              group.by = 'manual.annot.ids', label = TRUE) + NoLegend()
-      
-      nb.pcs = 10; n.neighbors = 30; min.dist = 0.3;
-      ll.obj <- RunUMAP(object = ll.obj, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
-      
-      p1 = DimPlot(ll.obj, reduction = 'pca', group.by = 'manual.annot.ids', label = TRUE) + NoLegend()
-      p2 = DimPlot(ll.obj, reduction = 'umap', group.by = 'manual.annot.ids', label = TRUE) + NoLegend()
-      p1 + p2
-      
-      #ll.obj = RunPCA(ll.obj, features = VariableFeatures(ll.obj), npcs = 50, verbose = FALSE, weight.by.var = FALSE)
-      
-      ll.pca = ll.obj@reductions$pca@cell.embeddings[, c(1:5)]
-      dm <- DiffusionMap(ll.pca, sigma = 'local', n_eigs = 5, k = 50, distance = 'euclidean')
-      plot(dm)
-      #plot(dm$DC1, dm$DC2)
-      dcs = as.matrix(cbind(dm$DC1, dm$DC2))
-      ll.obj[["DP"]] <- CreateDimReducObject(embeddings = as.matrix(dcs), key = "DC_", assay = DefaultAssay(ll.obj))
-      DimPlot(ll.obj, reduction = 'DP', group.by = 'manual.annot.ids')
-      
-      dcs = dcs[order(dcs[, 1]), ]
-      princurve = principal_curve(dcs, start = dcs, smoother = 'smooth_spline', stretch = 2)
-      
-      plot(dcs)
-      lines(princurve$s[order(princurve$lambda),], lty=1,lwd=4,col="purple",type = "l")
-      
-      whiskers(dcs, princurve$s)
-      
-      pseudot = princurve$lambda
-      pseudot.scaled = (pseudot - min(pseudot))/diff(range(pseudot))
-      #plot(order(-diffmap$X[,3]), ll.obj$timingEst,  cex = 0.5)  
-      plot(pseudot, as.numeric(ll.obj$timingEst),  cex = 0.5)
-      ll.obj$pseudotime = pseudot.scaled
-      ll.obj$timingEst = as.numeric(as.character(ll.obj$timingEst))
-      Idents(ll.obj) = ll.obj$manual.annot.ids
-      FeatureScatter(ll.obj, feature1 = "pseudotime", feature2 = "timingEst")
+      # loop over the trajectories
+      for(n in 1:lineage.list){
+        
+        n = 2
+        
+        lineage = lineage.list[[n]]
+        print(lineage)
+        
+        ll.obj = subset(sub.obj, cells = unique(colnames(sub.obj)[!is.na(match(sub.obj$manual.annot.ids, lineage))]))
+        ll.obj = FindVariableFeatures(ll.obj, selection.method = "vst", nfeatures = 2000)
+        
+        ll.obj = ScaleData(ll.obj, features = rownames(ll.obj))
+        ll.obj <- RunPCA(object = ll.obj, features = VariableFeatures(ll.obj), verbose = FALSE, weight.by.var = FALSE)
+        ElbowPlot(ll.obj, ndims = 50)
+        
+        nb.pcs = 10; n.neighbors = 30; min.dist = 0.3;
+        ll.obj <- RunUMAP(object = ll.obj, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
+        
+        p1 = DimPlot(ll.obj, reduction = 'pca', group.by = 'manual.annot.ids', label = TRUE) + NoLegend()
+        p2 = DimPlot(ll.obj, reduction = 'umap', group.by = 'manual.annot.ids', label = TRUE) + NoLegend()
+        p1 + p2
+        
+        ll.pca = ll.obj@reductions$pca@cell.embeddings[, c(1:5)]
+        dm <- DiffusionMap(ll.pca, sigma = 'local', n_eigs = 5, k = 50, distance = 'euclidean')
+        plot(dm)
+        
+        #plot(dm$DC1, dm$DC2)
+        dcs = as.matrix(cbind(dm$DC1, dm$DC2))
+        ll.obj[["DP"]] <- CreateDimReducObject(embeddings = as.matrix(dcs), key = "DC_", assay = DefaultAssay(ll.obj))
+        DimPlot(ll.obj, reduction = 'DP', group.by = 'manual.annot.ids')
+        
+        dcs = dcs[order(dcs[, 1]), ]
+        princurve = principal_curve(dcs, start = dcs, smoother = 'smooth_spline', stretch = 2)
+        
+        plot(dcs)
+        lines(princurve$s[order(princurve$lambda),], lty=1,lwd=4,col="purple",type = "l")
+        whiskers(dcs, princurve$s)
+        
+        pseudotime.scaling = function(X) {
+          return(X - min(X)/diff(range(X)))
+        }
+        
+        pseudot = pseudotime.scaling(princurve$lambda)
+        pseudot = pseudot[match(colnames(ll.obj), names(pseudot))] # match back with cell names
+        
+        #plot(pseudot, as.numeric(as.character(ll.obj$timingEst)),  cex = 0.5)
+        Idents(ll.obj) = ll.obj$manual.annot.ids
+        ll.obj$pseudotime = pseudot
+        ll.obj$timingEst = as.numeric(as.character(ll.obj$timingEst))
+        
+        FeatureScatter(ll.obj, feature1 = "pseudotime", feature2 = "timingEst")
+        
+        # save the pseudotime in the initialized matrix
+        mm = match(colnames(ll.obj), rownames(pseudotime))
+        pseudotime[mm, n] = pseudot
+        cellWeights[mm, n] = 1
+        
+      }
       
     }
     
-    if(pseudotime.method == 'slingshot'){
-      pca <- prcomp(t(log1p(ll.obj@assays$RNA@data)[match(VariableFeatures(ll.obj), rownames(ll.obj)), ]), scale. = FALSE)
-      rd1 <- pca$x[,1:2]
-      plot(rd1, col = rgb(0,0,0,.5), pch=16, asp = 1)
-      #plot(rd1, col = rgb(0,0,0,.5), pch=16, asp = 1)
-      
-      library(uwot)
-      
-      rd2 <- umap(t(log1p(ll.obj@assays$RNA@data)[match(VariableFeatures(ll.obj), rownames(ll.obj)), ]))
-      colnames(rd2) <- c('UMAP1', 'UMAP2')
-      
-      plot(rd2, col = rgb(0,0,0,.5), pch=16, asp = 1)
-      DimPlot(ll.obj, reduction = 'umap', group.by = 'manual.annot.ids')
-      
-      
-      
-      
-    }
+    # save(counts.sel, pseudotime, cellWeights, file = paste0(RdataDir, 'input_Matrix_for_tradeSeq.Rdata'))
     
     ##########################################
     # idnetify trajectory-associated genes using tradeSeq

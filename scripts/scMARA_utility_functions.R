@@ -503,6 +503,29 @@ define.modules.for.lineags = function(sub.obj, Y.fpkm, lineage = c('MSxp', 'MSxp
 }
 
 ##########################################
+# function to infer pseudotime 
+##########################################
+pseudotime.inferrence = function()
+{
+  if(pseudotime.method == 'slingshot'){
+    pca <- prcomp(t(log1p(ll.obj@assays$RNA@data)[match(VariableFeatures(ll.obj), rownames(ll.obj)), ]), scale. = FALSE)
+    rd1 <- pca$x[,1:2]
+    plot(rd1, col = rgb(0,0,0,.5), pch=16, asp = 1)
+    #plot(rd1, col = rgb(0,0,0,.5), pch=16, asp = 1)
+    
+    library(uwot)
+    
+    rd2 <- umap(t(log1p(ll.obj@assays$RNA@data)[match(VariableFeatures(ll.obj), rownames(ll.obj)), ]))
+    colnames(rd2) <- c('UMAP1', 'UMAP2')
+    
+    plot(rd2, col = rgb(0,0,0,.5), pch=16, asp = 1)
+    DimPlot(ll.obj, reduction = 'umap', group.by = 'manual.annot.ids')
+    
+  }
+}
+
+
+##########################################
 # compare mRNA and unspliced matrix 
 ##########################################
 compare.mRNA.and.unspliced.matrix = function(sub.obj)
