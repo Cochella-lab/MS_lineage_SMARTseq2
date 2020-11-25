@@ -196,6 +196,9 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     lineages.obj = subset(sub.obj, cells = cells.sels)
     
     counts.sel = as.matrix(lineages.obj@assays$RNA@counts)
+    #crv <- newSlingshotDataSet(reducedDim = lineages.obj@reductions$umap@cell.embeddings[, c(1:2)], 
+    #                           clusterLabels = lineages.obj$manual.annot.ids)
+    
     pseudotime <- matrix(0, nrow = ncol(lineages.obj), ncol = length(lineage.list))
     rownames(pseudotime) = colnames(lineages.obj);
     colnames(pseudotime) = paste0('curve', c(1:length(lineage.list)))
@@ -285,24 +288,67 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     ##########################################
     # For reproducibility
     #RNGversion("3.6.1")
-    palette(brewer.pal(8, "Dark2"))
-    data(countMatrix, package = "tradeSeq")
-    counts <- as.matrix(countMatrix)
-    rm(countMatrix)
-    data(crv, package = "tradeSeq")
-    data(celltype, package = "tradeSeq")
+    require(tictoc)
+    load(file = paste0(RdataDir, 'input_Matrix_for_tradeSeq.Rdata'))
     
+    palette(brewer.pal(8, "Dark2"))
+    #data(countMatrix, package = "tradeSeq")
+    #counts <- as.matrix(countMatrix)
+    #rm(countMatrix)
+    #data(crv, package = "tradeSeq")
+    #data(celltype, package = "tradeSeq")
     set.seed(5)
-    icMat <- evaluateK(counts = counts, sds = crv, k = 3:10, 
+    tic()
+    icMat <- evaluateK(counts = counts.sel, k = 3:7,
+                       pseudotime = pseudotime, cellWeights = cellWeights,
                        nGenes = 200, verbose = T)
     
+    toc()
     
+   
+    BPPARAM <- BiocParallel::bpparam()
+    BPPARAM # lists current options
+    BPPARAM$workers <- 4 # use 2 cores
+    
+    # subsetting the genes of intest rather than all genes (too slow)
+    ss = apply(counts.sel, 1, function(x) length(which(x>100)))
+    genes.sel = which(ss>30)
+    
+    tic()
     set.seed(7)
-    pseudotime <- slingPseudotime(crv, na = FALSE)
-    cellWeights <- slingCurveWeights(crv)
-    sce <- fitGAM(counts = counts, pseudotime = pseudotime, cellWeights = cellWeights,
-                  nknots = 6, verbose = FALSE)
+    #pseudotime <- slingPseudotime(crv, na = FALSE)
+    #cellWeights <- slingCurveWeights(crv)
+    sce <- fitGAM(counts = counts.sel, pseudotime = pseudotime, cellWeights = cellWeights,
+                  nknots = 5, verbose = TRUE, parallel=TRUE, BPPARAM = BPPARAM, genes = genes.sel)
+    toc()
     
+    save(sce, file = paste0(RdataDir, 'fitGAM_output_tradeSeq_v2.Rdata'))
+    
+    mean(rowData(sce)$tradeSeq$converged)
+    
+    # Assess DE along pseudotime, see more details in 
+    # https://kstreet13.github.io/bioc2020trajectories/articles/workshopTrajectories.html
+    assocRes <- associationTest(sce, lineages = TRUE, l2fc = log2(2))
+    
+    Msxa.genes <-  rownames(assocRes)[
+      which(p.adjust(assocRes$pvalue_1, "fdr") <= 0.01)
+      ]
+    Msxp.genes <-  rownames(assocRes)[
+      which(p.adjust(assocRes$pvalue_2, "fdr") <= 0.01)
+      ]
+    
+    length(Msxa.genes)
+    length(Msxp.genes)
+    library(UpSetR)
+    UpSetR::upset(fromList(list(Msxa = Msxa.genes, Msxp = Msxp.genes)))
+    
+    yhatSmooth <- predictSmooth(sce, gene = Msxa.genes, nPoints = 50, tidy = FALSE)
+    heatSmooth <- pheatmap(t(scale(t(yhatSmooth[, 1:50]))),
+                           cluster_cols = FALSE,
+                           show_rownames = FALSE,
+                           show_colnames = FALSE)
+    
+    plotSmoothers(sce, assays(sce)$counts, gene = "unc-120", alpha = 1, border = TRUE) + ggtitle("hnd-1")
     
   }
   
