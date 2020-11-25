@@ -219,14 +219,14 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
       
       # save the pseudotime estimation 
       pdfname = paste0(resDir, "/pseudotime_estimation_v1.pdf")
-      pdf(pdfname, width=12, height = 8)
+      pdf(pdfname, width=12, height = 10)
       par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
       
       # loop over the trajectories
-      for(n in 1:lineage.list){
+      for(n in 1:length(lineage.list)){
         
-        n = 2
-        
+        #n = 2
+        cat('lineage ', n, ': \n')
         lineage = lineage.list[[n]]
         print(lineage)
         
@@ -251,7 +251,8 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
         #plot(dm$DC1, dm$DC2)
         dcs = as.matrix(cbind(dm$DC1, dm$DC2))
         ll.obj[["DP"]] <- CreateDimReducObject(embeddings = as.matrix(dcs), key = "DC_", assay = DefaultAssay(ll.obj))
-        DimPlot(ll.obj, reduction = 'DP', group.by = 'manual.annot.ids')
+        p1 = DimPlot(ll.obj, reduction = 'DP', group.by = 'manual.annot.ids')
+        plot(p1)
         
         dcs = dcs[order(dcs[, 1]), ]
         princurve = principal_curve(dcs, start = dcs, smoother = 'smooth_spline', stretch = 2)
@@ -272,8 +273,8 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
         ll.obj$pseudotime = pseudot
         ll.obj$timingEst = as.numeric(as.character(ll.obj$timingEst))
         
-        FeatureScatter(ll.obj, feature1 = "pseudotime", feature2 = "timingEst")
-        
+        p2 = FeatureScatter(ll.obj, feature1 = "pseudotime", feature2 = "timingEst")
+        plot(p2)
         # save the pseudotime in the initialized matrix
         mm = match(colnames(ll.obj), rownames(pseudotime))
         pseudotime[mm, n] = pseudot
@@ -293,8 +294,6 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     # updated version of analysis for multiple conditions were found 
     # https://kstreet13.github.io/bioc2020trajectories/articles/workshopTrajectories.html
     ##########################################
-    # For reproducibility
-    #RNGversion("3.6.1")
     require(tictoc)
     load(file = paste0(RdataDir, 'input_Matrix_for_tradeSeq.Rdata'))
     
@@ -312,24 +311,27 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     
     toc()
     
-   
+    
+    # subsetting the genes of intest rather than all genes (too slow)
+    nb.knots = 4;
+    
+    ss = apply(counts.sel, 1, function(x) length(which(x>10)))
+    genes.sel = which(ss>50)
+    length(genes.sel)
+    
     BPPARAM <- BiocParallel::bpparam()
     BPPARAM # lists current options
     BPPARAM$workers <- 4 # use 2 cores
-    
-    # subsetting the genes of intest rather than all genes (too slow)
-    ss = apply(counts.sel, 1, function(x) length(which(x>100)))
-    genes.sel = which(ss>30)
     
     tic()
     set.seed(7)
     #pseudotime <- slingPseudotime(crv, na = FALSE)
     #cellWeights <- slingCurveWeights(crv)
     sce <- fitGAM(counts = counts.sel, pseudotime = pseudotime, cellWeights = cellWeights,
-                  nknots = 5, verbose = TRUE, parallel=TRUE, BPPARAM = BPPARAM, genes = genes.sel)
+                  nknots = nb.knots, verbose = TRUE, parallel=TRUE, BPPARAM = BPPARAM, genes = genes.sel)
     toc()
     
-    save(sce, file = paste0(RdataDir, 'fitGAM_output_tradeSeq_v2.Rdata'))
+    save(sce, file = paste0(RdataDir, 'fitGAM_output_tradeSeq_v3.Rdata'))
     
     mean(rowData(sce)$tradeSeq$converged)
     
@@ -343,9 +345,9 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     Msxp.genes <-  rownames(assocRes)[
       which(p.adjust(assocRes$pvalue_2, "fdr") <= 0.01)
       ]
-    
     length(Msxa.genes)
     length(Msxp.genes)
+    
     library(UpSetR)
     UpSetR::upset(fromList(list(Msxa = Msxa.genes, Msxp = Msxp.genes)))
     
@@ -355,7 +357,61 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
                            show_rownames = FALSE,
                            show_colnames = FALSE)
     
-    plotSmoothers(sce, assays(sce)$counts, gene = "unc-120", alpha = 1, border = TRUE) + ggtitle("hnd-1")
+    shared.genes = intersect(Msxa.genes, Msxp.genes)
+    Msxa.specific.genes = setdiff(Msxa.genes, shared.genes)
+    Msxp.specific.genes = setdiff(Msxp.genes, shared.genes)
+    
+    gene.example = 'tbx-35'
+    plotSmoothers(sce, assays(sce)$counts, gene = gene.example, alpha = 1, border = TRUE) + ggtitle(gene.example)
+    
+    pdfname = paste0(resDir, "/lineage_dependant_genes_MSxa_MSxp_shared.pdf")
+    pdf(pdfname, width=16, height = 10)
+    par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    for(g in shared.genes){
+      cat(g, '\n')
+      kk = which(tfs$`Public name` == g)
+      gtitle = g
+      if(length(kk) >0 ) gtitle = paste0(gtitle, '-- TF') 
+      p1 = plotSmoothers(sce, assays(sce)$counts, gene = g, alpha = 1, border = TRUE,
+                         nPoints = 100, size = 1) + ggtitle(gtitle)
+      plot(p1)
+    }
+    
+    dev.off()
+    
+    pdfname = paste0(resDir, "/lineage_dependant_genes_MSxa_specific.pdf")
+    pdf(pdfname, width=16, height = 10)
+    par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    for(g in Msxa.specific.genes){
+      cat(g, '\n')
+      kk = which(tfs$`Public name` == g)
+      gtitle = g
+      if(length(kk) >0 ) gtitle = paste0(gtitle, '-- TF') 
+      p1 = plotSmoothers(sce, assays(sce)$counts, gene = g, alpha = 1, border = TRUE,
+                         nPoints = 100, size = 1) + ggtitle(gtitle)
+      plot(p1)
+    }
+    
+    dev.off()
+    
+    pdfname = paste0(resDir, "/lineage_dependant_genes_MSxp_specific.pdf")
+    pdf(pdfname, width=16, height = 10)
+    par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    for(g in Msxp.specific.genes){
+      cat(g, '\n')
+      kk = which(tfs$`Public name` == g)
+      gtitle = g
+      if(length(kk) >0 ) gtitle = paste0(gtitle, '-- TF') 
+      p1 = plotSmoothers(sce, assays(sce)$counts, gene = g, alpha = 1, border = TRUE,
+                         nPoints = 100, size = 1) + ggtitle(gtitle)
+      plot(p1)
+    }
+    
+    dev.off()
+    
     
   }
   
