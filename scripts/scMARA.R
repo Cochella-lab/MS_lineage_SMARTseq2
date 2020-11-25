@@ -201,7 +201,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     
     pseudotime <- matrix(0, nrow = ncol(lineages.obj), ncol = length(lineage.list))
     rownames(pseudotime) = colnames(lineages.obj);
-    colnames(pseudotime) = paste0('curve', c(1:length(lineage.list)))
+    colnames(pseudotime) = paste0('curve', c('MSxa', 'MSxp'))
     cellWeights <- pseudotime
     
     ##########################################
@@ -217,6 +217,11 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
       library(destiny)
       library(princurve)
       
+      # save the pseudotime estimation 
+      pdfname = paste0(resDir, "/pseudotime_estimation_v1.pdf")
+      pdf(pdfname, width=12, height = 8)
+      par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+      
       # loop over the trajectories
       for(n in 1:lineage.list){
         
@@ -230,7 +235,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
         
         ll.obj = ScaleData(ll.obj, features = rownames(ll.obj))
         ll.obj <- RunPCA(object = ll.obj, features = VariableFeatures(ll.obj), verbose = FALSE, weight.by.var = FALSE)
-        ElbowPlot(ll.obj, ndims = 50)
+        ElbowPlot(ll.obj, ndims = 30)
         
         nb.pcs = 10; n.neighbors = 30; min.dist = 0.3;
         ll.obj <- RunUMAP(object = ll.obj, reduction = 'pca', dims = 1:nb.pcs, n.neighbors = n.neighbors, min.dist = min.dist)
@@ -240,7 +245,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
         p1 + p2
         
         ll.pca = ll.obj@reductions$pca@cell.embeddings[, c(1:5)]
-        dm <- DiffusionMap(ll.pca, sigma = 'local', n_eigs = 5, k = 50, distance = 'euclidean')
+        dm <- DiffusionMap(ll.pca, sigma = 'local', n_eigs = 5, k = 100, distance = 'euclidean')
         plot(dm)
         
         #plot(dm$DC1, dm$DC2)
@@ -256,7 +261,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
         whiskers(dcs, princurve$s)
         
         pseudotime.scaling = function(X) {
-          return(X - min(X)/diff(range(X)))
+          return((X - min(X))/diff(range(X)))
         }
         
         pseudot = pseudotime.scaling(princurve$lambda)
@@ -275,6 +280,8 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
         cellWeights[mm, n] = 1
         
       }
+      
+      dev.off()
       
     }
     
