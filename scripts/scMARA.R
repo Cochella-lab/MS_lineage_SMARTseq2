@@ -120,10 +120,17 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     ##########################################
     # prepare matrix A and reponse Y and run penalized.lm
     ##########################################
-    for(n in 1:length(ids.groups)){
+    source.my.script('scMARA_utility_functions.R')
+    alpha = 0;
+    standardize = TRUE;
+    use.lambda.min = TRUE;
+    binarize.x = TRUE;
+    
+    for(n in 1:length(lineage.list)){
       
       # n = 1;
-      lineage = ids.groups[[n]]
+      lineage = lineage.list[[n]]
+      
       cat(n, ' --- ')
       print(lineage)
       index.sel = match(gene.sels, rownames(Y.mat))
@@ -136,8 +143,10 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
       x = as.matrix(motif.oc[mm[!is.na(mm)], ])
       x[which(is.na(x) == TRUE)] = 0
       
+      if(binarize.x) x = x > 0
+      
       source.my.script('scMARA_utility_functions.R')
-      res = run.penelized.lm(x, y, alpha = 0, standardize = TRUE, intercept = TRUE, use.lambda.min = FALSE, 
+      res = run.penelized.lm(x, y, alpha = alpha, standardize = standardize, intercept = TRUE, use.lambda.min = use.lambda.min, 
                              Test = FALSE)
       
       print(res[grep('pha-4.mus|hnd-1..Tcf3|nhr-67.mus.M226|nhr-67.dm.M141|hlh-1.M175|unc-120.dm', rownames(res)),])
@@ -148,19 +157,20 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
         keep = cbind(keep, res[match(colnames(x), rownames(res)), ])
       }
       
-      
     }
-   
     
-    print(keep[grep('pha-4|hnd-1..Tcf|nhr-67.homo.M227|hlh-1.M175|unc-120.dm', rownames(keep)),])
+    print(keep[grep('pha-4|hnd-1..Tcf|nhr-67|hlh-1.M175|unc-120.dm', rownames(keep)),])
     
-    ss = apply(keep, 1, function(x) length(which(abs(x)>1.5)))
+    zscore.cutoff = 2.0
+    ss = apply(keep, 1, function(x) length(which(abs(x)>zscore.cutoff)))
     length(which(ss>=1))
     
-    yy = keep[which(ss>0), ] 
-    yy[which(abs(yy)>2.5)] = 2.5
+    yy = keep[which(ss>=2), ] 
     
-    pdfname = paste0(resDir, "/MARA_prediction_lineages_MSxa_MSxp_try_v2.pdf")
+    
+    yy[which(abs(yy) > 2.5)] = 2.5
+    
+    pdfname = paste0(resDir, "/MARA_prediction_lineages_MSxa_MSxp_try_v3.pdf")
     pdf(pdfname, width=18, height = 16)
     par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
     
@@ -336,10 +346,12 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     
     save(sce, file = paste0(RdataDir, 'fitGAM_output_tradeSeq_v3.Rdata'))
     
+    load(file = paste0(RdataDir, 'fitGAM_output_tradeSeq_v3.Rdata'))
+    
     mean(rowData(sce)$tradeSeq$converged)
     
-    # Assess DE along pseudotime, see more details in 
-    # https://kstreet13.github.io/bioc2020trajectories/articles/workshopTrajectories.html
+    # Within-lineage comparisons : Assess if which genes are lineage- or pseudotime-dependant (basically expression is not constant) 
+    # see more details in https://kstreet13.github.io/bioc2020trajectories/articles/workshopTrajectories.html
     assocRes <- associationTest(sce, lineages = TRUE, l2fc = log2(2))
     
     Msxa.genes <-  rownames(assocRes)[
@@ -367,11 +379,57 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     gene.example = 'tbx-35'
     plotSmoothers(sce, assays(sce)$counts, gene = gene.example, alpha = 1, border = TRUE) + ggtitle(gene.example)
     
-    pdfname = paste0(resDir, "/lineage_dependant_genes_MSxa_MSxp_shared.pdf")
+    # Between-lineage comparisons 
+    # details in https://statomics.github.io/tradeSeq/articles/tradeSeq.html
+    endRes <- diffEndTest(sce) # Discovering differentiated cell type markers, used to define transiently changed genes 
+    o <- order(endRes$waldStat, decreasing = TRUE)
+    sigGene <- names(sce)[o[1]]
+    plotSmoothers(sce, assays(sce)$counts, sigGene)
+    
+    # Discovering genes with different expression patterns 
+    patternRes <- patternTest(sce)
+    oPat <- order(patternRes$waldStat, decreasing = TRUE)
+    head(rownames(patternRes)[oPat], 20)
+    
+    plotSmoothers(sce, assays(sce)$counts, gene = rownames(patternRes)[oPat][2])
+    
+    # Example on combining patternTest with diffEndTest results
+    Define.transient.genes = FALSE
+    if(Define.transient.genes){
+      library(ggplot2)
+      patternRes$Gene <- rownames(patternRes)
+      patternRes$pattern <- patternRes$waldStat
+      patternRes <- patternRes[, c("Gene", "pattern")]
+      
+      endRes$Gene <- rownames(endRes)
+      endRes$end <- endRes$waldStat
+      endRes <- endRes[, c("Gene", "end")]
+      
+      compare <- merge(patternRes, endRes, by = "Gene", all = FALSE)
+      compare$transientScore <- 
+        rank(-compare$end, ties.method = "min")^2 + rank(compare$pattern, ties.method = "random")^2
+      
+      ggplot(compare, aes(x = log(pattern), y = log(end))) +
+        geom_point(aes(col = transientScore)) +
+        labs(x = "patternTest Wald Statistic (log scale)",
+             y = "diffEndTest Wald Statistic (log scale)") +
+        scale_color_continuous(low = "yellow", high = "red") +
+        theme_classic()
+      
+      topTransient <- compare[which.max(compare$transientScore), "Gene"]
+      plotSmoothers(sce, assays(sce)$counts, gene = topTransient)
+      
+    }
+    
+    
+    ## plot the gene profiles in pseudotime
+    gene.tfs = intersect(rownames(assocRes), tfs$`Public name`)
+    
+    pdfname = paste0(resDir, "/lineage_dependant_genes_MSxa_MSxp_only_TFs.pdf")
     pdf(pdfname, width=16, height = 10)
     par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
     
-    for(g in shared.genes){
+    for(g in gene.tfs){
       cat(g, '\n')
       kk = which(tfs$`Public name` == g)
       gtitle = g
@@ -383,38 +441,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     
     dev.off()
     
-    pdfname = paste0(resDir, "/lineage_dependant_genes_MSxa_specific.pdf")
-    pdf(pdfname, width=16, height = 10)
-    par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-    
-    for(g in Msxa.specific.genes){
-      cat(g, '\n')
-      kk = which(tfs$`Public name` == g)
-      gtitle = g
-      if(length(kk) >0 ) gtitle = paste0(gtitle, '-- TF') 
-      p1 = plotSmoothers(sce, assays(sce)$counts, gene = g, alpha = 1, border = TRUE,
-                         nPoints = 100, size = 1) + ggtitle(gtitle)
-      plot(p1)
-    }
-    
-    dev.off()
-    
-    pdfname = paste0(resDir, "/lineage_dependant_genes_MSxp_specific.pdf")
-    pdf(pdfname, width=16, height = 10)
-    par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-    
-    for(g in Msxp.specific.genes){
-      cat(g, '\n')
-      kk = which(tfs$`Public name` == g)
-      gtitle = g
-      if(length(kk) >0 ) gtitle = paste0(gtitle, '-- TF') 
-      p1 = plotSmoothers(sce, assays(sce)$counts, gene = g, alpha = 1, border = TRUE,
-                         nPoints = 100, size = 1) + ggtitle(gtitle)
-      plot(p1)
-    }
-    
-    dev.off()
-    
+   
     
   }
   

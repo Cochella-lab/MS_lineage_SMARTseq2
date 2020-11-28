@@ -54,22 +54,25 @@ run.penelized.lm = function(x, y, alpha = 0, intercept=TRUE, standardize=FALSE, 
     colnames(keep) = names(fit$beta)
     if(alpha > 0.0){
       rownames(keep) = rownames(fit$beta[[2]])
+      res = keep;
       ## collect result from the elastic-net
-      kk = apply(keep, 1, function(x) !all(x==0))
-      keep = keep[kk, ]
+      #kk = apply(keep, 1, function(x) !all(x==0))
+      #keep = keep[kk, ]
       #colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
       #colnames(x)[which(fit$beta[[2]][,optimal]!=0)]
       
       # rerun lm with selected features
-      fit.lm = lm(y ~ x[, match(rownames(keep), colnames(x))])
-      res = data.frame(fit.lm$coefficients)
-      res = res[-1, ] # remove intercept
-      rownames(res) = rownames(keep)
-      
-      pheatmap(res, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
-               scale = 'column', cluster_cols=FALSE, main = paste0("motif activity"), 
-               na_col = "white", fontsize_col = 10
-      )
+      relax.fitting.lm = FALSE
+      if(relax.fitting.lm){
+        fit.lm = lm(y ~ x[, match(rownames(keep), colnames(x))])
+        res = data.frame(fit.lm$coefficients)
+        res = res[-1, ] # remove intercept
+        rownames(res) = rownames(keep)
+        
+        pheatmap(res, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
+                 scale = 'column', cluster_cols=FALSE, main = paste0("motif activity"), 
+                 na_col = "white", fontsize_col = 10)
+      }
       
     }else{
       if(zscore.output) keep = apply(keep, 2, scale)
