@@ -1061,6 +1061,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
 # Section : main function for pharynx annotation
 # here we will start the seurat.obj with iteration 37 from the BWM annotation
 # the iteration will be added
+# the newly annotated ids were added also in manual.annot.ids while manual.annot.ids.bwm.backup was to save the results from bwm annotaiton
 ########################################################
 ########################################################
 manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
@@ -1097,6 +1098,9 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                      nb.iteration, '.rds')
   seurat.obj = readRDS(file = RDSsaved)
   
+  # seurat.obj = save.clean.annotation.from.bwm(seurat.obj)
+  
+    
   #seurat.obj$predicted.ids.scmap = seurat.obj$scmap.pred.id.500
   #seurat.obj$predicted.ids.seurat = seurat.obj$seurat.pred.id
   #saveRDS(seurat.obj, file = RDS2save)
