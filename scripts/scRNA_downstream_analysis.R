@@ -374,6 +374,33 @@ sub.loom$close_all()
 
 ########################################################
 ########################################################
+# Section : manual annotat pharynx 
+# 
+########################################################
+########################################################
+source.my.script('scRNA_cluster_annotation_functions.R')
+
+resDir = paste0("results/", version.analysis, '/annoted_pharynx')
+
+if(!dir.exists("results/")){dir.create("results/")}
+if(!dir.exists(resDir)){dir.create(resDir)}
+
+nb.iteration = 37
+RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
+                  nb.iteration, '.rds')
+seurat.obj = readRDS(file = RDSsaved)
+
+DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+        na.value = "gray") + 
+  ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_annotedIDs")) +
+  scale_colour_hue(drop = FALSE) + 
+  NoLegend()
+
+
+seurat.obj = manual.annotation.for.pharynx.clusters(seurat.obj)
+
+########################################################
+########################################################
 # Section : regulator prediction using sc_TF_MARA.R
 # ideally, at the end we will have a package easily to be install in Github
 # inputs will be either mRNA or pre-mRNA matrix
