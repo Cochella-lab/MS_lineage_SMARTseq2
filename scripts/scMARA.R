@@ -193,6 +193,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     library(RColorBrewer)
     library(SingleCellExperiment)
     library(slingshot)
+    library(pheatmap)
     
     # lineage or trajectory to consider
     lineage.list = list(c('MSx', 'MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx'),
@@ -354,6 +355,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     # see more details in https://kstreet13.github.io/bioc2020trajectories/articles/workshopTrajectories.html
     assocRes <- associationTest(sce, lineages = TRUE, l2fc = log2(2))
     
+    
     Msxa.genes <-  rownames(assocRes)[
       which(p.adjust(assocRes$pvalue_1, "fdr") <= 0.01)
       ]
@@ -376,22 +378,28 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     Msxa.specific.genes = setdiff(Msxa.genes, shared.genes)
     Msxp.specific.genes = setdiff(Msxp.genes, shared.genes)
     
+    length(shared.genes)
+    length(Msxa.specific.genes)
+    length(Msxp.specific.genes)
+    
     gene.example = 'tbx-35'
     plotSmoothers(sce, assays(sce)$counts, gene = gene.example, alpha = 1, border = TRUE) + ggtitle(gene.example)
     
     # Between-lineage comparisons 
     # details in https://statomics.github.io/tradeSeq/articles/tradeSeq.html
-    endRes <- diffEndTest(sce) # Discovering differentiated cell type markers, used to define transiently changed genes 
-    o <- order(endRes$waldStat, decreasing = TRUE)
-    sigGene <- names(sce)[o[1]]
-    plotSmoothers(sce, assays(sce)$counts, sigGene)
+    #endRes <- diffEndTest(sce) # Discovering differentiated cell type markers, used to define transiently changed genes 
+    #o <- order(endRes$waldStat, decreasing = TRUE)
+    #sigGene <- names(sce)[o[1]]
+    #plotSmoothers(sce, assays(sce)$counts, sigGene)
     
-    # Discovering genes with different expression patterns 
-    patternRes <- patternTest(sce)
-    oPat <- order(patternRes$waldStat, decreasing = TRUE)
+    patternRes <- patternTest(sce, l2fc = 0)
+    
+    oPat <- order(patternRes$waldStat, decreasing = FALSE)
     head(rownames(patternRes)[oPat], 20)
+    plotSmoothers(sce, assays(sce)$counts, gene = rownames(patternRes)[oPat][1])
     
-    plotSmoothers(sce, assays(sce)$counts, gene = rownames(patternRes)[oPat][2])
+    
+    
     
     # Example on combining patternTest with diffEndTest results
     Define.transient.genes = FALSE
@@ -423,25 +431,27 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     
     
     ## plot the gene profiles in pseudotime
-    gene.tfs = intersect(rownames(assocRes), tfs$`Public name`)
-    
-    pdfname = paste0(resDir, "/lineage_dependant_genes_MSxa_MSxp_only_TFs.pdf")
-    pdf(pdfname, width=16, height = 10)
-    par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-    
-    for(g in gene.tfs){
-      cat(g, '\n')
-      kk = which(tfs$`Public name` == g)
-      gtitle = g
-      if(length(kk) >0 ) gtitle = paste0(gtitle, '-- TF') 
-      p1 = plotSmoothers(sce, assays(sce)$counts, gene = g, alpha = 1, border = TRUE,
-                         nPoints = 100, size = 1) + ggtitle(gtitle)
-      plot(p1)
+    plot.TFs.in.pseudotime = FALSE
+    if(plot.TFs.in.pseudotime){
+      gene.tfs = intersect(rownames(assocRes), tfs$`Public name`)
+      
+      pdfname = paste0(resDir, "/lineage_dependant_genes_MSxa_MSxp_only_TFs.pdf")
+      pdf(pdfname, width=16, height = 10)
+      par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+      
+      for(g in gene.tfs){
+        cat(g, '\n')
+        kk = which(tfs$`Public name` == g)
+        gtitle = g
+        if(length(kk) >0 ) gtitle = paste0(gtitle, '-- TF') 
+        p1 = plotSmoothers(sce, assays(sce)$counts, gene = g, alpha = 1, border = TRUE,
+                           nPoints = 100, size = 1) + ggtitle(gtitle)
+        plot(p1)
+      }
+      
+      dev.off()
+      
     }
-    
-    dev.off()
-    
-   
     
   }
   
