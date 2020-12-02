@@ -111,8 +111,12 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
         
     gene.sels = markers.sels[!is.na(match(markers.sels$cluster, ids.sels)), ]
     gene.sels = gene.sels[!is.na(match(gene.sels$gene, rownames(Y.mat))), ]
-    #print(table(gene.sels$cluster))
     gene.sels = unique(gene.sels$gene)
+    
+    gene.sels = shared.genes.samePattern
+    gene.sels = unique(gene.sels[!is.na(match(gene.sels, rownames(Y.mat)))])
+   
+    
     cat('nb of genes to use : ', length(gene.sels), '\n')
     
     #gene.sels = unique(markers$gene[which(!is.na(match(markers$cluster, lineage)) & markers$p_val_adj<10^-5 & markers$avg_logFC > 0.7)])
@@ -123,8 +127,8 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     source.my.script('scMARA_utility_functions.R')
     alpha = 0;
     standardize = TRUE;
-    use.lambda.min = TRUE;
-    binarize.x = TRUE;
+    use.lambda.min = FALSE;
+    binarize.x = FALSE;
     
     for(n in 1:length(lineage.list)){
       
@@ -194,6 +198,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     library(SingleCellExperiment)
     library(slingshot)
     library(pheatmap)
+    library(gridExtra)
     
     # lineage or trajectory to consider
     lineage.list = list(c('MSx', 'MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx'),
@@ -355,12 +360,11 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     # see more details in https://kstreet13.github.io/bioc2020trajectories/articles/workshopTrajectories.html
     assocRes <- associationTest(sce, lineages = TRUE, l2fc = log2(2))
     
-    
     Msxa.genes <-  rownames(assocRes)[
-      which(p.adjust(assocRes$pvalue_1, "fdr") <= 0.01 & assocRes$)
+      which(p.adjust(assocRes$pvalue_1, "fdr") <= 0.05)
       ]
     Msxp.genes <-  rownames(assocRes)[
-      which(p.adjust(assocRes$pvalue_2, "fdr") <= 0.01)
+      which(p.adjust(assocRes$pvalue_2, "fdr") <= 0.05)
       ]
     length(Msxa.genes)
     length(Msxp.genes)
@@ -374,13 +378,13 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
                            show_rownames = FALSE,
                            show_colnames = FALSE)
     
-    shared.genes = intersect(Msxa.genes, Msxp.genes)
-    Msxa.specific.genes = setdiff(Msxa.genes, shared.genes)
-    Msxp.specific.genes = setdiff(Msxp.genes, shared.genes)
+    shared.dynamic.genes = intersect(Msxa.genes, Msxp.genes)
+    Msxa.dynamic.genes = setdiff(Msxa.genes, shared.dynamic.genes)
+    Msxp.dynamic.genes = setdiff(Msxp.genes, shared.dynamic.genes)
     
-    length(shared.genes)
-    length(Msxa.specific.genes)
-    length(Msxp.specific.genes)
+    length(shared.dynamic.genes)
+    length(Msxa.dynamic.genes)
+    length(Msxp.dynamic.genes)
     
     gene.example = 'tbx-35'
     plotSmoothers(sce, assays(sce)$counts, gene = gene.example, alpha = 1, border = TRUE) + ggtitle(gene.example)
@@ -410,11 +414,56 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     plotSmoothers(sce, assays(sce)$counts, gene = 'crt-1')
     
     genes.diffPattern = rownames(patternRes)[which(patternRes$padj <= 0.01 & patternRes$fcMedian > 1.0)]
-    genes.samePattern = setdiff(rownames(patternRes), genes.diffPattern)
+    #genes.samePattern = setdiff(rownames(patternRes), genes.diffPattern)
     
-    shared.genes.samePattern = intersect(shared.genes, genes.samePattern)
-    shared.genes.diffPattern = 
-    Msxa.specific.genes = 
+    shared.genes.samePattern = setdiff(shared.dynamic.genes, genes.diffPattern)
+    shared.genes.diffPattern = setdiff(shared.dynamic.genes, shared.genes.samePattern)
+    #Msxa.specific.genes = unique(c(Msxa.dynamic.genes, shared.genes.diffPattern))
+    #Msxp.specific.genes = unique(c(Msxp.dynamic.genes, shared.genes.diffPattern))
+    
+    Msxa.specific.genes = Msxa.dynamic.genes
+    Msxp.specific.genes = Msxp.dynamic.genes
+    
+    for(gene.module in c('shared.genes.samePattern', 'shared.genes.diffPattern', 'Msxa.specific.genes', 'Msxp.specific.genes'))
+    {
+      if(length(dev.list()!=0)) { dev.off()}
+      
+      pdfname = paste0(resDir, "/lineage_dependent_genes_MSxa_MSxp_", gene.module, ".pdf")
+      
+      pdf(pdfname, width=16, height = 10)
+      par(cex =0.7, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+      
+      ggs = eval(parse(text= paste0(gene.module)))
+      for(g in ggs){
+        cat(g, '\n')
+        kk = which(tfs$`Public name` == g)
+        gtitle = g
+        if(length(kk) >0 ) gtitle = paste0(gtitle, '-- TF') 
+        p1 = plotSmoothers(sce, assays(sce)$counts, gene = g, alpha = 1, border = TRUE,
+                           nPoints = 100, size = 1) + ggtitle(gtitle)
+        plot(p1)
+      }
+      dev.off()
+      
+    }
+    
+    
+    # heatmap showing different groups
+    yhatSmooth <- predictSmooth(sce, gene = Msxa.specific.genes, nPoints = 50, tidy = FALSE)
+    heatSmooth_MSxa <- pheatmap(t(scale(t(yhatSmooth[, 1:50]))),
+                               cluster_cols = FALSE,
+                               show_rownames = FALSE, show_colnames = FALSE, main = "MSxa", legend = FALSE,
+                               silent = TRUE
+    )
+    
+    matchingHeatmap_MSxp <- pheatmap(t(scale(t(yhatSmooth[heatSmooth_MSxa$tree_row$order, 51:100]))),
+                                     cluster_cols = FALSE, cluster_rows = FALSE,
+                                     show_rownames = FALSE, show_colnames = FALSE, main = "MSxp",
+                                     legend = FALSE, silent = TRUE
+    )
+    
+    grid.arrange(heatSmooth_MSxa[[4]], matchingHeatmap_MSxp[[4]], ncol = 2)
+    
     
     # Example on combining patternTest with diffEndTest results
     Define.transient.genes = FALSE
