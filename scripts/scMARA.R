@@ -357,7 +357,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     
     
     Msxa.genes <-  rownames(assocRes)[
-      which(p.adjust(assocRes$pvalue_1, "fdr") <= 0.01)
+      which(p.adjust(assocRes$pvalue_1, "fdr") <= 0.01 & assocRes$)
       ]
     Msxp.genes <-  rownames(assocRes)[
       which(p.adjust(assocRes$pvalue_2, "fdr") <= 0.01)
@@ -394,12 +394,27 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     
     patternRes <- patternTest(sce, l2fc = 0)
     
-    oPat <- order(patternRes$waldStat, decreasing = FALSE)
+    oPat <- order(patternRes$waldStat, decreasing = TRUE)
     head(rownames(patternRes)[oPat], 20)
     plotSmoothers(sce, assays(sce)$counts, gene = rownames(patternRes)[oPat][1])
     
+    ##########################################
+    # define lineage-shared and -specific gene groups by combining the association test and pattern test
+    ##########################################
+    patternRes$padj <- p.adjust(patternRes$pvalue, "fdr")
+    mean(patternRes$padj <= 0.05, na.rm = TRUE)
     
+    sum(patternRes$padj <= 0.01 & patternRes$fcMedian > 1.0, na.rm = TRUE)
+    patternRes = patternRes[order(patternRes$waldStat, decreasing = TRUE), ]
     
+    plotSmoothers(sce, assays(sce)$counts, gene = 'crt-1')
+    
+    genes.diffPattern = rownames(patternRes)[which(patternRes$padj <= 0.01 & patternRes$fcMedian > 1.0)]
+    genes.samePattern = setdiff(rownames(patternRes), genes.diffPattern)
+    
+    shared.genes.samePattern = intersect(shared.genes, genes.samePattern)
+    shared.genes.diffPattern = 
+    Msxa.specific.genes = 
     
     # Example on combining patternTest with diffEndTest results
     Define.transient.genes = FALSE
