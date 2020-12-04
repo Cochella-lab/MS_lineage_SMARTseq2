@@ -843,7 +843,7 @@ library(ggplot2)
     ##########################################
     # subset seurat object with selected cells
     ##########################################
-    cat(length(cells.sels, ' cells selected to annotate \n'))
+    cat(length(cells.sels), ' cells selected to annotate \n')
     sub.obj = subset(seurat.obj, cells = cells.sels)
 
     #sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
@@ -908,7 +908,7 @@ library(ggplot2)
       NoLegend()
     #p1 = DimPlot(sub.obj, group.by = 'pred.ids.seurat.keep.bwm.all', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE)
     p1 = DimPlot(sub.obj, group.by = 'predicted.ids.scmap', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) +
-      NoLegend() + ggtitle('scamp prediction')
+      NoLegend() + ggtitle('scmap prediction')
 
     p2 = DimPlot(sub.obj, group.by = 'predicted.ids.seurat', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE)  +
       NoLegend() + ggtitle('scran prediction')
@@ -930,10 +930,11 @@ library(ggplot2)
     sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 2.0)
     DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
 
-    p1  = DimPlot(sub.obj, group.by = 'predicted.ids.seurat', reduction = 'umap', label = TRUE, label.size = 6, repel = TRUE,  pt.size = 2) +
+    p1  = DimPlot(sub.obj, group.by = 'predicted.ids.seurat', reduction = 'umap', label = TRUE, label.size = 6, repel = TRUE,  
+                  pt.size = 2) +
       ggtitle('manual.annot.ids') + NoLegend()
     p2 = DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2,
-                 label.size = 6, na.value = "gray", combine = TRUE)
+                 label.size = 8, na.value = "gray", combine = TRUE)
 
     p1 + p2 + ggsave(paste0(resDir, '/UMAP_pharynx_seurat_prediction_reclustering_newBase.pdf'), width = 22, height = 10)
 
@@ -952,8 +953,10 @@ library(ggplot2)
     plot(p3)
 
     seurat.obj$seurat_clusters_pharynx = NA
-    seurat.obj$seurat_clusters_pharynx[match(colnames(sub.obj), colnames(seurat.obj))] = sub.obj$seurat_clusters_split
-
+    seurat.obj$seurat_clusters_pharynx[match(colnames(sub.obj), colnames(seurat.obj))] = 
+      as.integer(as.character(sub.obj$seurat_clusters_split))
+    
+    
     dev.off()
 
     ##########################################

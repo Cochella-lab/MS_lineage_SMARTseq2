@@ -1189,6 +1189,13 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     scale_colour_hue(drop = FALSE) + 
     NoLegend()
   
+  DimPlot(seurat.obj, group.by = "seurat_clusters_pharynx", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+          na.value = "gray") + 
+    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_manual.annoted.IDs")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  
   cat(length(which(is.na(seurat.obj$manual.annot.ids))), ' cells not annotated \n')
   
   pdf(pdfname, width=18, height = 10)
@@ -1217,41 +1224,18 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   #cluster.sels = c('29', '32', '35', '40', '42')
   #ids.sel = c()
   
-  cluster.sels = c('6', '14', '0', '10', '38', '9', '12', '7', '20', '49', '47')
+  cluster.sels = c('22', '23', '3', '0', '21', '6')
   ids.sel = c('MSxaa', 'MSxaap', 'MSxaaa', 'MSxap')
   ids.excl = c('MSxapp', 'MSxppa', 'MSpappa')
   
   if(length(ids.sel)>0){
-    cells.sels = unique(colnames(seurat.obj)[(!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) |
+    cells.sels = unique(colnames(seurat.obj)[(!is.na(match(seurat.obj$seurat_clusters_pharynx, cluster.sels)) |
                                              !is.na(match(seurat.obj$manual.annot.ids, ids.sel))) &
                                                is.na(match(seurat.obj$manual.annot.ids, ids.excl))])
   }else{
     cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
   }
   
-  # select BWM terminal and middle time points cells
-  #' ##########################################
-  #' cluster.sels = c('36', '8', '39', '2', '19', '27', # BWM_terminal_1 without transition 
-  #'                  '13', '1', '11', '33', '48', '18', '46', '15', '26', # BWM_terminal_2
-  #'                  '25', # possible transition clusters
-  #'                  '24', # also transitions cells and many of them are not annotated
-  #'                  #'44', '31', '52', '28', '50', # cluster '44', '31', '52', '28', '50' were not included here
-  #'                  '3', '5', '16', '30', '22', '4' # all middle time points
-  #' )
-  #' 
-  #cluster.sels = c('29', '32', '35', '40', '42')
-  #sub.obj = subset(seurat.obj, cells = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
-  # cells.sels = unique(colnames(seurat.obj)[seurat.obj$BWM.cells == 'BWM' &
-  #   (!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) |
-  #    !is.na(match(seurat.obj$manual.annot.ids, ids.sels))                                       
-  #     )])
-  # cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) |
-  #                                               !is.na(match(seurat.obj$manual.annot.ids, ids.sels))                                       
-  #                                            ])
-  #seurat.obj$manual.annot.ids.6 = seurat.obj$manual.annot.ids
-  #seurat.obj$BWM.cells[which(seurat.obj$manual.annot.ids == 'unknown_MSxpppaa_MSxppppa_later')] = NA
-  
-  #kk = which(seurat.obj$pred.ids.terminals.mothers.seurat == 'MSpappax')
   #ids.current = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
   #ids.sels = ids.current[which(nchar(ids.current)>6)]
   #ids.sels = c('MSx', 'MSxp', 'MSxa', 'MSxpp', 'MSxpa', 'MSxap')
@@ -1268,9 +1252,10 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   ##########################################
   # subset seurat object with selected cells
   ##########################################
-  cat(length(cells.sels, ' cells selected to annotate \n'))
+  cat(length(cells.sels), ' cells selected to annotate \n')
   sub.obj = subset(seurat.obj, cells = cells.sels)
   
+  sub.obj$seurat_clusters = sub.obj$seurat_clusters_pharynx
   #sub.obj$predicted.ids.fitered[is.na(sub.obj$predicted.ids.fitered)] = 'unassigned'
   sub.obj$timingEst = as.numeric(as.character(sub.obj$timingEst))
   sub.obj$pred.ids = sub.obj$predicted.ids.seurat
