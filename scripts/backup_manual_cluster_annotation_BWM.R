@@ -2,7 +2,7 @@ manual.annotation.for.BWM.clusters = function(seurat.obj = ms, ids = c('MSx'))
 {
   ########################################################
   ########################################################
-  # Section : initial test for manual cluster annotation of BDW
+  # Section : initial test for manual cluster annotation of BWM
   #
   ########################################################
   ########################################################

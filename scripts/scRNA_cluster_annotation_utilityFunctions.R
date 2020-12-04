@@ -1562,29 +1562,6 @@ manual.assign.cluster.with.annotation = function(cluster.index = '0', id2assign 
 
 
 
-save.clean.annotation.from.bwm = function(seurat.obj)
-{
-  # 'manual.annot.ids.2' saved the non-BWM cluster annotation
-  DimPlot(seurat.obj, group.by = "manual.annot.ids.2", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
-          na.value = "gray") + 
-    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_annotedIDs")) +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
-  seurat.obj$manual.annot.ids.backupBWM = seurat.obj$manual.annot.ids
-  
-  # non-BWM cluster annotations were put back
-  kk = which(is.na(seurat.obj$manual.annot.ids) & !is.na(seurat.obj$manual.annot.ids.2))
-  
-  ids.1 = names(table(seurat.obj$manual.annot.ids))
-  ids.2 = names(table(seurat.obj$manual.annot.ids.2[kk]))
-  
-  ids2add = setdiff(ids.2, ids.1)
-  
-  
-}
-
-
 ########################################################
 ########################################################
 # Section :
