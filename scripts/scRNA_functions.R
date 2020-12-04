@@ -560,6 +560,7 @@ test.umap.params.for.BWM.cells = function(sub.obj,
                                           spread.sampling = 1
 )
 {
+  if (length(dev.list()!=0)) {dev.off()}
   pdfname = paste0(resDir,'/', pdfname);while (!is.null(dev.list()))  dev.off();
   pdf(pdfname, width=18, height = 12)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
