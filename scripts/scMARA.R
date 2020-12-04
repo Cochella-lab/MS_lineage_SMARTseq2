@@ -93,29 +93,37 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     # i.e. selected gene sets (lineage-wide, specific, or restricted)
     # here we used markers from scRNA analysis
     ##########################################
-    # gene.sels = define.modules.for.lineags(sub.obj, Y.fpkm, lineage = lineage)
-    markers = readRDS(file = paste0(RdataDir,  'AllMarkers_MST_manual.annotation.rds'))
-    markers.sels = markers[which(markers$p_val<10^-3 & markers$avg_logFC > 1), ]
-    cat(length(unique(markers.sels$gene)), ' marker genes selected \n')
-    print(table(markers.sels$cluster))
-    
     lineage.list = list(c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx'),
                         c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
     )
     
+    #lineage.list = list(c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx'))
+    #lineage.list = list(c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp'))
+    lineage.list = list(c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx', 'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp'))
+    
     cat(length(lineage.list), ' lineages or trajectories to consider \n')
     
-    # prepare input matrix for tradeSeq
-    ids.sels = c()
-    for(m in 1:length(lineage.list)) ids.sels = unique(c(ids.sels, lineage.list[[m]]))
-        
-    gene.sels = markers.sels[!is.na(match(markers.sels$cluster, ids.sels)), ]
-    gene.sels = gene.sels[!is.na(match(gene.sels$gene, rownames(Y.mat))), ]
-    gene.sels = unique(gene.sels$gene)
-    
-    gene.sels = shared.genes.samePattern
-    gene.sels = unique(gene.sels[!is.na(match(gene.sels, rownames(Y.mat)))])
-   
+    trajectory.genes.with.markers = FALSE
+    if(trajectory.genes.with.markers){
+      # gene.sels = define.modules.for.lineags(sub.obj, Y.fpkm, lineage = lineage)
+      markers = readRDS(file = paste0(RdataDir,  'AllMarkers_MST_manual.annotation.rds'))
+      markers.sels = markers[which(markers$p_val<10^-3 & markers$avg_logFC > 1), ]
+      cat(length(unique(markers.sels$gene)), ' marker genes selected \n')
+      print(table(markers.sels$cluster))
+      
+      
+      # prepare input matrix for tradeSeq
+      ids.sels = c()
+      for(m in 1:length(lineage.list)) ids.sels = unique(c(ids.sels, lineage.list[[m]]))
+      
+      gene.sels = markers.sels[!is.na(match(markers.sels$cluster, ids.sels)), ]
+      gene.sels = gene.sels[!is.na(match(gene.sels$gene, rownames(Y.mat))), ]
+      gene.sels = unique(gene.sels$gene)
+      
+    }else{
+      gene.sels = c(Msxa.specific.genes, shared.genes.diffPattern)
+      gene.sels = unique(gene.sels[!is.na(match(gene.sels, rownames(Y.mat)))])
+    }
     
     cat('nb of genes to use : ', length(gene.sels), '\n')
     
@@ -124,7 +132,7 @@ predict.TF.MARA.for.scdata = function(sub.obj, mode = c('cluster.based', 'time.b
     ##########################################
     # prepare matrix A and reponse Y and run penalized.lm
     ##########################################
-    source.my.script('scMARA_utility_functions.R')
+    source.my.script('scMARA_utility_functions.R')wewq
     alpha = 0;
     standardize = TRUE;
     use.lambda.min = FALSE;
