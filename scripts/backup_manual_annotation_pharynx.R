@@ -718,7 +718,7 @@ library(ggplot2)
      #   seurat.obj$BWM.cells[match(cells, colnames(seurat.obj))] = 'BWM'
      # }
    }
-
+  
    #seurat.obj$manual.annot.ids[match(colnames(sub.obj), colnames(seurat.obj))] = sub.obj$manual.annot.ids
 
    DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE,

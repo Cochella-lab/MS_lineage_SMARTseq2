@@ -1158,11 +1158,10 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   library(dplyr)
   library(openxlsx)
   
-  
   ##########################################
-  # Main aim:  to find MSxaa, while MSxa and MSxap were found already
+  # Main aim: because MSxaa, MSxaap, MSxaaa found, this iteration will devoted to MSxapa and to explore the daughters of them  
   # Notes:  
-  # adding whole MSxap actually does not help
+  # 
   ##########################################
   nb.iteration = 1
   Refine.annotated.ids = FALSE;
@@ -1183,10 +1182,13 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_MSxp_lineage_iteration_", nb.iteration, ".pdf")
       
-  #seurat.obj$predicted.ids.scmap = seurat.obj$scmap.pred.id.500
-  #seurat.obj$predicted.ids.seurat = seurat.obj$seurat.pred.id
+  DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+          na.value = "gray") + 
+    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_manual.annoted.IDs")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
   
-  
+  cat(length(which(is.na(seurat.obj$manual.annot.ids))), ' cells not annotated \n')
   
   pdf(pdfname, width=18, height = 10)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
@@ -1212,13 +1214,20 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   # select cells with cluster index
   ##########################################
   cluster.sels = c('29', '32', '35', '40', '42')
-  #cluster.sels = c('25', '36', '8', '39', '2', '19', '27', '13', '1', '11', '33', '48', '18', '46', '15', '26')
+  ids.sel = c()
   
-  cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
-  #cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
-  #cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) & is.na(seurat.obj$manual.annot.ids)]
-  #cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))] 
-  #                                   & is.na(seurat.obj$manual.annot.ids))]
+  cluster.sels = c('6', '14', '0', '10')
+  ids.sel = c('MSxaa', 'MSxaap', 'MSxaaa', 'MSxap')
+  ids.excl = c('MSxapp', 'MSxppa', 'MSpappa')
+  
+  if(length(ids.sel)>0){
+    cells.sels = unique(colnames(seurat.obj)[(!is.na(match(seurat.obj$seurat_clusters, cluster.sels)) |
+                                             !is.na(match(seurat.obj$manual.annot.ids, ids.sel))) &
+                                               is.na(match(seurat.obj$manual.annot.ids, ids.excl))])
+  }else{
+    cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
+  }
+  
   
   # select BWM terminal and middle time points cells
   #' ##########################################
@@ -1271,9 +1280,9 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   DimPlot(sub.obj, reduction = 'umap', label = TRUE, group.by = by.group) + NoLegend()
   
-  barplot(table(sub.obj$seurat_clusters)/table(seurat.obj$seurat_clusters), ylim = c(0, 1), cex.names = 1.0, las=2)
+  #barplot(table(sub.obj$seurat_clusters)/table(seurat.obj$seurat_clusters), ylim = c(0, 1), cex.names = 1.0, las=2)
   
-  # sub.obj$manual.annot.ids = sub.obj$predicted.ids.seurat.keep
+  
   ##########################################
   # check potential ids for selected clusters
   ##########################################
@@ -1306,14 +1315,14 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   Explore.umap.parameters.for.BWMcells = FALSE
   if(Explore.umap.parameters.for.BWMcells){
     
-    source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
+    source.my.script('scRNA_functions.R')
     require(tictoc)
     tic()
     test.umap.params.for.BWM.cells(sub.obj, 
-                                   pdfname = 'UMAP_param_TEST_BWM_searching_for_MSx.pdf',
+                                   pdfname = 'UMAP_param_TEST_BWM_.pdf',
                                    group.by = 'manual.annot.ids', with_legend = TRUE,
-                                   nfeatures.sampling = c(500, 1000), nb.pcs.sampling = c(10, 20, 30),
-                                   n.neighbors.sampling = c(5, 10, 30, 50), 
+                                   nfeatures.sampling = c(500, 1000, 2000), nb.pcs.sampling = c(10, 20, 30),
+                                   n.neighbors.sampling = c(5, 10, 30), 
                                    min.dist.sampling = c(0.01, 0.1)
     )
     toc()
@@ -1327,7 +1336,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, weight.by.var = FALSE)
   ElbowPlot(sub.obj, ndims = 50)
   
-  nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
+  nb.pcs = 20 # nb of pcs depends on the considered clusters or ids 
   n.neighbors = 30;
   min.dist = 0.01; spread = 1
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
@@ -1336,24 +1345,23 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
     NoLegend()
   
-  #VlnPlot(sub.obj, features = c('timingEst'), ncol = 1, group.by = 'manual.annot.ids') + NoLegend()
-  #xx = table(sub.obj$predicted.ids.seurat.keep)
-  #xx[xx>10]
-  #sub.obj$pred.ids.filtered = sub.obj$pred.ids
-  #sub.obj$pred.ids.filtered[is.na(match(sub.obj$pred.ids, names(xx[xx>10])))] = NA
-  #jj2 = which(!is.na(match(sub.obj$predicted.ids.seurat.keep, c('MSxppppx', 'MSxpppax'))) == TRUE)
+  
   p0 = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) + 
     NoLegend()
   #p1 = DimPlot(sub.obj, group.by = 'pred.ids.seurat.keep.bwm.all', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE)
-  p1 = DimPlot(sub.obj, group.by = 'predicted.ids.scmap', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) 
-  p2 = DimPlot(sub.obj, group.by = 'predicted.ids.seurat', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) 
+  p1 = DimPlot(sub.obj, group.by = 'predicted.ids.scmap', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE) + 
+    NoLegend() + ggtitle('scamp prediction')
   
-  p0 + p1
+  p2 = DimPlot(sub.obj, group.by = 'predicted.ids.seurat', reduction = 'umap', label = TRUE, label.size = 5, repel = TRUE)  +
+    NoLegend() + ggtitle('scran prediction')
   
   p0 + p2
+  p0 + p1
+  
+  
   p1 + p2
   
- 
+  
   ##########################################
   # redo the clustering using seurat FindCluster (SLM alogrithm) after testing k-mean from RaceID
   ##########################################
@@ -1429,10 +1437,11 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                     'ceh-36', # MSxaap
                     'tbx-2', 'ceh-27') # MSxaaa
   
-  VlnPlot(sub.obj, features = features.sels,  group.by = 'seurat_clusters_split', idents = idents.sel)
+  features.sels = c('dmd-4', 'cnd-1', 'swt-3')
   
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
+  VlnPlot(sub.obj, features = features.sels,  group.by = 'seurat_clusters_split', idents = idents.sel)
   # check info in JM data for specific lineage
   # ee = process.import.Murray.scRNA()
   # murray.ids = unique(ee$lineage)
