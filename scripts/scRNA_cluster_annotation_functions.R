@@ -1159,13 +1159,13 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   library(openxlsx)
   
   ##########################################
-  # Main aim: try to annotate cluster_pharynx 6, 20, 24, 7
-  # 
+  # Main aim: try to annotate cluster_pharynx 13, 17, 18, 11, 25, 10
+  # those well split clusters for terminal cells
   # Notes:    
-  # MSpaaappp.MSxapappa and MSxaapapa.ABalpappapp.or.others.not.sure to verify later,
-  # because the marker genes were not working greatly to comfirm the predicted annotations
+  # second MSpaaappp.MSxapappa and MSaaaappp.MSxapaapp were found more sure
+  # those two ids annotated in the previous iteration will be revised later
   ##########################################
-  nb.iteration = 6
+  nb.iteration = 7
   Refine.annotated.ids = FALSE;
   
   resDir = paste0("results/", version.analysis, '/annoted_pharynx')
@@ -1223,7 +1223,8 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   # select cells with cluster index
   ##########################################
   #cluster.sels = c('29', '32', '35', '40', '42')
-  cluster.sels = c('6', '24', '20', '7')
+  #cluster.sels = c('6', '24', '20', '7')
+  cluster.sels = c('13', '17', '18', '11', '25', '10')
   #ids.sel = c('MSxaaa')
   #ids.excl = c('MSxapp', 'MSxppa', 'MSpappa')
   
@@ -1337,13 +1338,13 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   ##########################################
   # redo the clustering using seurat FindCluster (SLM alogrithm) after testing k-mean from RaceID
   ##########################################
-  FindClusters_subclusters = function(sub.obj, resolution = 0.4)
+  FindClusters_subclusters = function(sub.obj, resolution = 1.0)
   {
     sub.obj <- FindClusters(sub.obj, resolution = resolution, algorithm = 3)
     return(sub.obj$seurat_clusters)
   }
   sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:10, compute.SNN = TRUE)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.0)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.5)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
   
   p1  = DimPlot(sub.obj, group.by = 'predicted.ids.seurat', reduction = 'umap', label = TRUE, label.size = 6, repel = TRUE,  pt.size = 2) +
@@ -1363,7 +1364,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   VlnPlot(sub.obj, features = c('timingEst'), ncol = 1,
           group.by = 'manual.annot.ids') + NoLegend()
   
-  p2 + p4 + ggsave(paste0(resDir, '/splitcluster_timingEstimation_iteration_6.pdf'), width = 18, height = 10)
+  p2 + p4 + ggsave(paste0(resDir, '/splitcluster_timingEstimation_iteration_', nb.iteration, '.pdf'), width = 18, height = 10)
   
   p1 + p4 
   
@@ -1388,7 +1389,6 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   counts.seurat = table(sub.obj$predicted.ids.seurat, sub.obj$seurat_clusters_split)
   #counts.seurat.filter = table(sub.obj$predicted.ids.fitered, sub.obj$seurat_clusters_split)
   counts.annot = table(sub.obj$manual.annot.ids, sub.obj$seurat_clusters_split)
-  
   
   Idents(sub.obj) = sub.obj$seurat_clusters_split
   idents.sel = as.character(levels(sub.obj$seurat_clusters_split))
@@ -1426,27 +1426,35 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                     #'let-381', 'fem-1', 'hphd-1', 'F26B1.1', # only MSaaaa
                     'ceh-13', # MSaaaap not MSpaaap
                     'hlh-3', 'fem-1'
-                    
                     )
-  
   features.sels = c(
     'nfki-1', 'unc-62', 'ser-2', 'tnc-2',
     'pax-1', 'ttx-1', 'agr-1', 'irx-1',
      'aff-1',  'ceh-27', 'unc-129', 'ceh-22'
   )
+  
+  features.sels = c('ceh-32', 'ceh-34', 'tbx-7', 'ngn-1', 'ces-1')
+  
+  features.sels = c('nhr-67', 'pha-4', 'cwn-2', 
+                    'ttx-1', 'pax-1', 'agr-1', 'irx-1', 'lin-12')
+  features.sels = c('hlh-6', 'ces-1', 'Y51H7C.10', 'Y62F5A.9', 'ceh-53', 'dmd-4', 'asp-4', 'ceh-6', 'C39E9.8')
+  
+  features.sels = c('nfki-1', 'unc-62', 'ser-2', 'tnc-2', 'irx-1',
+                    'ceh-22', 'spp-7')
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
   #VlnPlot(sub.obj, features = features.sels,  group.by = 'seurat_clusters_split', idents = idents.sel)
   # update the annotation with marker genes
   cluster.assingment = list(
-    c('3', 'MSaaapaa'),
-    c('0', 'MSxapaaa'), 
-    c('7', 'MSaaaappp/MSxapaapp'),
-    c('1', 'MSpaaaap'),
-    c('5', 'MSxapapp'),
-    c('2', 'MSpaaappp.MSxapappa'),
-    c('6', 'MSpaaappp.MSxapappa'), 
-    c('4', 'MSxaapapa.ABalpappapp.or.others.not.sure')
+    c('0', 'MSpaapaa'),
+    c('1', 'MSxaapapa.ABalpappapp'), 
+    c('3', 'MSaappa'),
+    c('7', 'MSaappa'),
+    c('8', 'MSxapaapa'), 
+    c('2', 'MSaaaaapa.and.MSxapaapa'), 
+    c('5', 'MSxapapa.and.MSxapapaa'),
+    c('4', 'MSaaaappp.MSxapaapp.sure'),
+    c('6', 'MSpaaappp.MSxapappa.sure')
     
   )
   
@@ -1459,7 +1467,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   #load(file = paste0(RdataDir, 'Seurat.object_JM_BWM_data_markers.Rdata'))
   source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
   
-  ids.sel = c('MSpaaappp.MSxapappa'); find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
+  ids.sel = c('MSaaaaapa'); find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
   
   
   ##########################################
