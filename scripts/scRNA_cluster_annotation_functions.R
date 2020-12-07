@@ -1160,13 +1160,11 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   ##########################################
   # Main aim: 
-  # iteration 5 is to tackle lineage MSxaaa that is totally asymmetric
-  #
+  # 
   # Notes:   
-  # cluster 21 is considered for lineage MSxapa, so it is not included in this iteration
-  # four daugthers of MSxaaa were annotated together with one grand daguther (likely)
+  # 
   ##########################################
-  nb.iteration = 5
+  nb.iteration = 6
   Refine.annotated.ids = FALSE;
   
   resDir = paste0("results/", version.analysis, '/annoted_pharynx')
@@ -1197,12 +1195,11 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     scale_colour_hue(drop = FALSE) + 
     NoLegend()
   
-  
   cat(length(which(is.na(seurat.obj$manual.annot.ids))), ' cells not annotated \n')
   cat(length(which(is.na(seurat.obj$manual.annot.ids) & !is.na(seurat.obj$seurat_clusters_pharynx))), ' pharynx cells left to annotate \n')
   
-  pdf(pdfname, width=18, height = 10)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  #pdf(pdfname, width=18, height = 10)
+  #par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   ##########################################
   # select subset of cells to annotate
   ##########################################
@@ -1225,20 +1222,19 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   # select cells with cluster index
   ##########################################
   #cluster.sels = c('29', '32', '35', '40', '42')
+  cluster.sels = c('6', '24', '20', '7')
+  #ids.sel = c('MSxaaa')
+  #ids.excl = c('MSxapp', 'MSxppa', 'MSpappa')
   
-  cluster.sels = c('15', '2', '5', '23')
-  ids.sel = c('MSxaaa')
-  ids.excl = c('MSxapp', 'MSxppa', 'MSpappa')
-  
-  # cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters_pharynx, cluster.sels))]
-                                            
-  if(length(ids.sel)>0){
-    cells.sels = unique(colnames(seurat.obj)[(!is.na(match(seurat.obj$seurat_clusters_pharynx, cluster.sels)) |
-                                             !is.na(match(seurat.obj$manual.annot.ids, ids.sel))) &
-                                               is.na(match(seurat.obj$manual.annot.ids, ids.excl))])
-  }else{
-    cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
-  }
+  cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters_pharynx, cluster.sels))]
+  #                                           
+  # if(length(ids.sel)>0){
+  #   cells.sels = unique(colnames(seurat.obj)[(!is.na(match(seurat.obj$seurat_clusters_pharynx, cluster.sels)) |
+  #                                            !is.na(match(seurat.obj$manual.annot.ids, ids.sel))) &
+  #                                              is.na(match(seurat.obj$manual.annot.ids, ids.excl))])
+  # }else{
+  #   cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
+  # }
   
   #ids.current = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
   #ids.sels = ids.current[which(nchar(ids.current)>6)]
@@ -1314,7 +1310,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
                      spread = spread, n.neighbors = n.neighbors,
                      min.dist = min.dist, verbose = TRUE)
-  DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
+  DimPlot(sub.obj, group.by = 'seurat_clusters', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
     NoLegend()
   
   
@@ -1346,7 +1342,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     return(sub.obj$seurat_clusters)
   }
   sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:5, compute.SNN = TRUE)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.0)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.5)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
   
   p1  = DimPlot(sub.obj, group.by = 'predicted.ids.seurat', reduction = 'umap', label = TRUE, label.size = 6, repel = TRUE,  pt.size = 2) +
@@ -1365,9 +1361,10 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   VlnPlot(sub.obj, features = c('timingEst'), ncol = 1,
           group.by = 'manual.annot.ids') + NoLegend()
+  p2 + p4
   
   p1 + p4
-  p2 + p4
+ 
   plot(p3)
   
   seurat.obj$seurat_clusters_pharynx = NA
