@@ -1159,10 +1159,11 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   library(openxlsx)
   
   ##########################################
-  # Main aim: 
+  # Main aim: try to annotate cluster_pharynx 6, 20, 24, 7
   # 
-  # Notes:   
-  # 
+  # Notes:    
+  # MSpaaappp.MSxapappa and MSxaapapa.ABalpappapp.or.others.not.sure to verify later,
+  # because the marker genes were not working greatly to comfirm the predicted annotations
   ##########################################
   nb.iteration = 6
   Refine.annotated.ids = FALSE;
@@ -1304,9 +1305,9 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, weight.by.var = FALSE)
   ElbowPlot(sub.obj, ndims = 50)
   
-  nb.pcs = 5 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 20;
-  min.dist = 0.1; spread = 1
+  nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
+  n.neighbors = 10;
+  min.dist = 0.01; spread = 1
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
                      spread = spread, n.neighbors = n.neighbors,
                      min.dist = min.dist, verbose = TRUE)
@@ -1341,17 +1342,17 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     sub.obj <- FindClusters(sub.obj, resolution = resolution, algorithm = 3)
     return(sub.obj$seurat_clusters)
   }
-  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:5, compute.SNN = TRUE)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.5)
+  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:10, compute.SNN = TRUE)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.0)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
   
   p1  = DimPlot(sub.obj, group.by = 'predicted.ids.seurat', reduction = 'umap', label = TRUE, label.size = 6, repel = TRUE,  pt.size = 2) +
     ggtitle('seurat.pred.ids') + NoLegend()
   p2 = DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2,
-               label.size = 6, na.value = "gray", combine = TRUE)
+               label.size = 8, na.value = "gray", combine = TRUE)
   
   p1 + p2  #+ ggsave(paste0(resDir, '/UMAP_pharynx_seurat_prediction_reclustering_newBase.pdf'), width = 22, height = 10)
-
+  
   
   p3 = VlnPlot(sub.obj, features = c("FSC_log2", "BSC_log2"), ncol = 2,
                group.by = 'seurat_clusters_split')
@@ -1361,14 +1362,16 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   VlnPlot(sub.obj, features = c('timingEst'), ncol = 1,
           group.by = 'manual.annot.ids') + NoLegend()
-  p2 + p4
   
-  p1 + p4
+  p2 + p4 + ggsave(paste0(resDir, '/splitcluster_timingEstimation_iteration_6.pdf'), width = 18, height = 10)
+  
+  p1 + p4 
+  
  
   plot(p3)
   
-  seurat.obj$seurat_clusters_pharynx = NA
-  seurat.obj$seurat_clusters_pharynx[match(colnames(sub.obj), colnames(seurat.obj))] = sub.obj$seurat_clusters_split
+  #seurat.obj$seurat_clusters_pharynx = NA
+  #seurat.obj$seurat_clusters_pharynx[match(colnames(sub.obj), colnames(seurat.obj))] = sub.obj$seurat_clusters_split
   
   #dev.off()
   
@@ -1385,14 +1388,6 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   counts.seurat = table(sub.obj$predicted.ids.seurat, sub.obj$seurat_clusters_split)
   #counts.seurat.filter = table(sub.obj$predicted.ids.fitered, sub.obj$seurat_clusters_split)
   counts.annot = table(sub.obj$manual.annot.ids, sub.obj$seurat_clusters_split)
-  
-  p1 = DimPlot(sub.obj, group.by = 'seurat_clusters_split', reduction = 'umap', label =TRUE, label.size = 6, repel = TRUE)
-  p2 = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label =TRUE, label.size = 4, repel = TRUE) + NoLegend()
-  p3 = DimPlot(sub.obj, group.by = 'predicted.ids', reduction = 'umap', label =TRUE, label.size = 5, repel = TRUE) + NoLegend()
-  p4 = DimPlot(sub.obj, group.by = 'predicted.ids.seurat', reduction = 'umap', label =TRUE, label.size = 5, repel = TRUE) + NoLegend()
-  
-  
-  (p1 + p2)/(p3 + p4)
   
   
   Idents(sub.obj) = sub.obj$seurat_clusters_split
@@ -1434,21 +1429,25 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                     
                     )
   
+  features.sels = c(
+    'nfki-1', 'unc-62', 'ser-2', 'tnc-2',
+    'pax-1', 'ttx-1', 'agr-1', 'irx-1',
+     'aff-1',  'ceh-27', 'unc-129', 'ceh-22'
+  )
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
   #VlnPlot(sub.obj, features = features.sels,  group.by = 'seurat_clusters_split', idents = idents.sel)
-  
   # update the annotation with marker genes
-  cluster.assingment = list(#c('0', 'MSxp'),
-    c('2', 'MSxaaa'),
-    c('1', 'MSaaaaa'),
-    c('0', 'MSpaaaa'),
-    c('5', 'MSxaaa.like.or.others'),
-    c('3', 'MSpaaap'),
-    c('7', 'MSaaaap'),
-    c('4', 'MSaaaaap.others')
-    #c('3', 'mixture_BWM_terminal_2'),
-    #c('4', 'mixture_BWM_terminal_2')
+  cluster.assingment = list(
+    c('3', 'MSaaapaa'),
+    c('0', 'MSxapaaa'), 
+    c('7', 'MSaaaappp/MSxapaapp'),
+    c('1', 'MSpaaaap'),
+    c('5', 'MSxapapp'),
+    c('2', 'MSpaaappp.MSxapappa'),
+    c('6', 'MSpaaappp.MSxapappa'), 
+    c('4', 'MSxaapapa.ABalpappapp.or.others.not.sure')
+    
   )
   
   # check info in JM data for specific lineage
@@ -1460,8 +1459,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   #load(file = paste0(RdataDir, 'Seurat.object_JM_BWM_data_markers.Rdata'))
   source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
   
-  ids.sel = c('MSpaaaa'); find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
-  
+  ids.sel = c('MSpaaappp.MSxapappa'); find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
   
   
   ##########################################
