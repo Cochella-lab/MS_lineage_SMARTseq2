@@ -1160,13 +1160,13 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   ##########################################
   # Main aim:
-  # revise close clusters in the MSxaaa lineage 
+  # revise terminal cells of MSxaaa
   # 
   # Notes:    
-  # here we annotated again the four daughters of MSxaaa
+  # 
   # 
   ##########################################
-  Rnb.iteration = 6
+  Rnb.iteration = 7
   Refine.annotated.ids = TRUE;
   
   resDir = paste0("results/", version.analysis, '/annoted_pharynx')
@@ -1237,9 +1237,10 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   #ids.sels = ids.current
   ids.sels = setdiff(ids.current, 
                      c('MSxaa', 'MSxap', 'MSpaapaa', 'MSaaapaa', 'MSaaapapp', 
-                       'MSxaaa', 'MSpaaapp', 'MSpaaapa', 'MSaappa', 'MSpaaaap.sure'))
+                       'MSxaaa', 'MSpaaapp', 'MSpaaapa', 'MSaappa', 'MSpaaaap.sure', 
+                        "MSaaaaa",  "MSaaaap", "MSpaaaa", "MSpaaap"))
    
-  ids.sels = c("MSaaaaa", "MSaaaap", "MSpaaaa", "MSpaaap", "MSxaaa.like.or.others")
+  #ids.sels = c("MSaaaaa", "MSaaaap", "MSpaaaa", "MSpaaap", "MSxaaa.like.or.others")
   ids.left = setdiff(ids.current, ids.sels)
   # print(ids.left)
   # nchar(ids.left)

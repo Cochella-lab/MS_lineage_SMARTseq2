@@ -5053,7 +5053,7 @@ library(ggplot2)
                   # check the counts of predicted ids for newly split clusters
                   ##########################################
 
-                  idents.sel = c('2', '4')
+                  idents.sel = c('2', '4', '3')
                   Idents(sub.obj) = sub.obj$seurat_clusters_split
                   sub.obj$predicted.ids = sub.obj$predicted.ids.scmap
                   sub.obj$predicted.ids.prob = sub.obj$predicted.scores
@@ -5112,7 +5112,8 @@ library(ggplot2)
 
                   features.sels = c('fem-1', 'ceh-32', 'ceh-27', 'let-381',
                                     'fkh-2', 'ceh-53', 'hlh-3', 'spi-1', 'F54E2.2',
-                                    'igcm-4', 'K04G2.12', 'F26B1.1'
+                                    'igcm-4', 'K04G2.12', 'F26B1.1', 
+                                    'ceh-34', 'C45G7.4', 'unc-30'
 
                                     )
                   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
@@ -5120,10 +5121,11 @@ library(ggplot2)
                   # update the annotation with marker genes
                   cluster.assingment = list(
                     c('0', 'MSpaaaa'),
-                    c('1', 'MSaaaaa'),
+                    c('3', 'MSaaaaa.to.confirm'),
                     c('5', 'MSaaaap'),
                     c('2', 'MSpaaap'),
-                    c('4', 'MSpaaap')
+                    c('4', 'MSpaaap'),
+                    c('1', 'MSaaaaaa.to.confirm')
 
                   )
 
@@ -5137,7 +5139,7 @@ library(ggplot2)
                   #load(file = paste0(RdataDir, 'Seurat.object_JM_BWM_data_markers.Rdata'))
                   source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
 
-                  ids.sel = c('MSpaaapp'); find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
+                  ids.sel = c('MSaaaaaa'); find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
 
 
                   ##########################################
