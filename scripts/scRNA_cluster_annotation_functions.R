@@ -1163,8 +1163,12 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   # revise terminal cells of MSxaaa
   # 
   # Notes:    
-  # 
-  # 
+  # annotated "MSxpaaaa/MSxpaaaax" changed to "MSxpaaaa" ring gang cells, because MSxpaaaax is together with MSaaaaaax, 
+  # i.e. "MSaaaaaax/MSxpaaaax" 
+  # all terminal cells of MSxaaa were kind of annotated, even though many of them were annotated based on a small set of markers,
+  # while other markers were controversial and confusing. 
+  # further comfirmed will be good by more reliable markers
+  # after this iteration, the first annotation revision is finished.
   ##########################################
   Rnb.iteration = 7
   Refine.annotated.ids = TRUE;
@@ -1182,6 +1186,9 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                      '_cleanedBWM_and_Pharynx_iteration_R', Rnb.iteration, '.rds')
   
   seurat.obj = readRDS(file = RDSsaved)
+  
+  #jj = which(seurat.obj$manual.annot.ids == "MSxpaaaa/MSxpaaaax") 
+  #seurat.obj$manual.annot.ids[jj] = 'MSxpaaaa'
   
   #pdfname = paste0(resDir, "/Manual_cluster_annotation_BDW_test_MSxp_lineage_iteration_", nb.iteration, ".pdf")
       
@@ -1332,7 +1339,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     sub.obj <- FindClusters(sub.obj, resolution = resolution, algorithm = 3)
     return(sub.obj$seurat_clusters)
   }
-  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:10, compute.SNN = TRUE)
+  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 5, dims = 1:10, compute.SNN = TRUE)
   sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.0)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
   
@@ -1345,21 +1352,17 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   (p2 + p4) / p1  + ggsave(paste0(resDir, '/splitcluster_timingEstimation_manual.IDs_iteration_R', Rnb.iteration, '.pdf'), 
                            width = 18, height = 16)
   
+  VlnPlot(sub.obj, features = c("FSC_log2", "BSC_log2"), ncol = 2,
+          group.by = 'seurat_clusters_split')
   #dev.off()
   ##########################################
   # check the counts of predicted ids for newly split clusters
   ##########################################
   
-  idents.sel = c('2', '4')
+  idents.sel = c('0', '2')
   Idents(sub.obj) = sub.obj$seurat_clusters_split
-  sub.obj$predicted.ids = sub.obj$predicted.ids.scmap
-  sub.obj$predicted.ids.prob = sub.obj$predicted.scores
-  sub.obj$predicted.ids.fitered = sub.obj$predicted.ids.scmap
-  sub.obj$predicted.ids.fitered[sub.obj$predicted.ids.prob < 0.7] = NA
-  
-  counts = table(sub.obj$predicted.ids, sub.obj$seurat_clusters_split)
+  counts = table(sub.obj$predicted.ids.scmap, sub.obj$seurat_clusters_split)
   counts.seurat = table(sub.obj$predicted.ids.seurat, sub.obj$seurat_clusters_split)
-  #counts.seurat.filter = table(sub.obj$predicted.ids.fitered, sub.obj$seurat_clusters_split)
   counts.annot = table(sub.obj$manual.annot.ids, sub.obj$seurat_clusters_split)
   if(exists('idents.sel')){
     if(length(setdiff(colnames(counts), idents.sel)) > 0){
@@ -1387,7 +1390,6 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                     'hlh-6', 'ces-1', 'Y51H7C.10', 'Y62F5A.9', # MSxapaapa
                     
   )
-  
   # features of MSxaap lineage
   features.sels = c('lin-12', 'ceh-36', 'tbx-2', 'tbx-7', 'ceh-34', 'ceh-32', 'clec-258', # MSxaapa
                     'sptf-1', 'ceh-22',  #MSaaapaa
@@ -1404,37 +1406,46 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                     #'let-381', 'fem-1', 'hphd-1', 'F26B1.1', # only MSaaaa
                     'ceh-13', # MSaaaap not MSpaaap
                     'ceh-27', 'spi-1', 'fem-1', 'unc-62', 'tbx-2', #MSpaaapp
-                    'lim-7', 'dod-6', 'ces-1' # MSpaaapa
+                    'lim-7', 'dod-6', 'ces-1', # MSpaaapa
+                    'let-381', 'F26B1.1', 'unc-30', 'ceh-32', 'fem-1', 'ceh-34', 'igcm-4', 'hphd-1', # MSaaaaa and daughers
+                    'ceh-27', 'hlh-3', 'spi-1', 'K04G2.12', 'F54E2.2', 'igcm-4', 'fem-1', # MSaaaapa and MSaaaaap
+                    'mnp-1', 'ceh-13', 'fkh-2', 'shc-2', # MSaaaaap
+                    'dod-6', 'ces-1', 'ceh-53', # MSaaaaapa (probably missing)
+                    'igcm-4', 'F54E2.2', 'K04G2.12', 
+                    'ceh-32', 'ceh-34', 'ceh-27', 'fem-1', 'spi-1', 'C45G7.4', # MSpaaaaa
+                    'dod-6', 'ceh-53', 'hlh-3', 'ceh-34', 'fkh-2', 'hlh-6' # MSaaaaapa
                     )
   
-  features.sels = c('fem-1', 'ceh-32', 'ceh-27', 'let-381',
-                    'fkh-2', 'ceh-53', 'hlh-3', 'spi-1', 'F54E2.2',
-                    'igcm-4', 'K04G2.12', 'F26B1.1'
-                    
+  features.sels = c('hlh-3', 'hlh-6'
                     )
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
   # update the annotation with marker genes
   cluster.assingment = list(
-    c('0', 'MSpaaaa'),
-    c('1', 'MSaaaaa'), 
-    c('5', 'MSaaaap'), 
-    c('2', 'MSpaaap'), 
-    c('4', 'MSpaaap')
-    
+    c('4', 'MSaaaaaa'),
+    c('6', 'MSaaaaaaa'),
+    c('5', 'MSaaaaap'), 
+    c('3', 'MSaaaapa'), 
+    c('7', 'MSaaaapa'), 
+    c('1', 'MSaaaapp'), 
+    c('0', 'MSpaaaaa'), 
+    c('2', 'MSaaaaapa')
   )
   
+  cat(length(cluster.assingment), 'clusters assigned \n')
+  cat(length(levels(sub.obj$seurat_clusters_split)), ' split clusters \n')
+  nb.unassigned = length(levels(sub.obj$seurat_clusters_split)) - length(cluster.assingment)
+  if(length(nb.unassigned) > 1){
+    cat(' Error  : ', nb.unassigned, 'clusters unassigned \n')
+  } 
   
   # check info in JM data for specific lineage
-  # ee = process.import.Murray.scRNA()
-  # murray.ids = unique(ee$lineage)
-  #markers.JM = readRDS(file = paste0(RdataDir, 'BWM_markerGenes_JM.rds'))
   markers.JM = read.xlsx('data/Supplementary_Tables_190611.xlsx', sheet=  4, startRow = 8, colNames = TRUE)
-  #markers = markers[!is.na(match(markers$Lineage, bwms)), ]
+  #markers.JM = readRDS(file = paste0(RdataDir, 'BWM_markerGenes_JM.rds'))
   #load(file = paste0(RdataDir, 'Seurat.object_JM_BWM_data_markers.Rdata'))
   source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
   
-  ids.sel = c('MSpaaapp'); find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
+  ids.sel = c('MSaaaaapa'); find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
   
   
   ##########################################
@@ -1444,13 +1455,6 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   # sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'likely_MSxpappp')] = 'MSxppapp/MSxpappp'
   # sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'likely_MSxppapp')] = 'MSxppapp/MSxpappp'
   # sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids.5 != 'MSxppapp')] = 'MSxppapp/MSxpappp'
-  
-  # sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == '')] = 'mixture_terminal_mothers'
-  # seurat.obj$manual.annot.ids[match(colnames(sub.obj), colnames(seurat.obj))] = sub.obj$manual.annot.ids
-  #mm = match(colnames(sub.obj), colnames(seurat.obj))
-  #seurat.obj$manual.annot.ids[mm] = sub.obj$manual.annot.ids
-  
-  # sub.obj$ids.backup = sub.obj$manual.annot.ids
   
   for(n in 1:length(cluster.assingment)){
     cluster.index = cluster.assingment[[n]][1];
