@@ -1160,14 +1160,14 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   ##########################################
   # Main aim:
-  # clean a bit the id names
-  # last time revise the clusters 31, 52, 28
+  # there are two BWM ids MSxppapp/MSxpappp and MSxppap/MSxpaaa/MSxpaaap
+  # especiall the latter needs to resolve 
   # 
   # Notes:    
-  # most of them were reput NA except MSxapappp.likely, MSxpapaa, MSxpaaaa and so on
-  # 
+  # at the end I did not change the annotation for MSxppap/MSxpaaa/MSxpaaap, because it is not clear and other cell ids seem to be 
+  # quite well annotated; making changes with newly split clusters would not improve too much but add cluster-based bias.
   ##########################################
-  GR.iteration = 4 # RG (revison global)
+  GR.iteration = 5 # RG (revison global)
   Refine.annotated.ids = TRUE
   
   resDir = paste0("results/", version.analysis, '/annoted_pharynx')
@@ -1222,7 +1222,6 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   # #ids.excl = c('MSxapp', 'MSxppa', 'MSpappa')
   #cluster.sels = c('3', '4', '8', '22', '0', '21', '23')
   #cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters_pharynx, cluster.sels))]
-  
   cluster.sels = c('28', '52', '31')
   cells.sels = colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))
                                    # & is.na(seurat.obj$manual.annot.ids)
@@ -1248,30 +1247,41 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   clean.id.names = FALSE # clean id names
   if(clean.id.names){
-    jj = which(seurat.obj$manual.annot.ids == "MSpaaaap.sure")
-    seurat.obj$manual.annot.ids[jj] = "MSpaaaap"
-    jj = which(seurat.obj$manual.annot.ids == "MSaaaappp.MSxapaapp")
-    seurat.obj$manual.annot.ids[jj] = "MSaaaappp/MSxapaapp"
+    # jj = which(seurat.obj$manual.annot.ids == "MSpaaaap.sure")
+    # seurat.obj$manual.annot.ids[jj] = "MSpaaaap"
+    # jj = which(seurat.obj$manual.annot.ids == "MSaaaappp.MSxapaapp")
+    # seurat.obj$manual.annot.ids[jj] = "MSaaaappp/MSxapaapp"
+    # 
+    # jj = which(seurat.obj$manual.annot.ids == "MSpaaappp.MSxapappa")
+    # seurat.obj$manual.annot.ids[jj] = "MSpaaappp/MSxapappa"
+    # 
+    # jj = which(seurat.obj$manual.annot.ids == 'unknown_MSxpppaa_MSxppppa_later')
+    # seurat.obj$manual.annot.ids[jj] = "MSxpppaa_MSxppppa_later_unknown"
+    # 
+    # jj = which(seurat.obj$manual.annot.ids == 'unknown.MSxpppaa')
+    # seurat.obj$manual.annot.ids[jj] = NA
+    # 
+    # jj = which(seurat.obj$manual.annot.ids == 'MSxapapp.pharynx')
+    # seurat.obj$manual.annot.ids[jj] = NA
+    # 
+    # jj = which(seurat.obj$manual.annot.ids == 'likely.nonBWM_origCluster_17')
+    # seurat.obj$manual.annot.ids[jj] = NA
+    # 
+    # jj = which(seurat.obj$manual.annot.ids == 'likely_nonBWM_origCluster_31')
+    # seurat.obj$manual.annot.ids[jj] = NA
     
-    jj = which(seurat.obj$manual.annot.ids == "MSpaaappp.MSxapappa")
-    seurat.obj$manual.annot.ids[jj] = "MSpaaappp/MSxapappa"
-    
-    jj = which(seurat.obj$manual.annot.ids == 'unknown_MSxpppaa_MSxppppa_later')
-    seurat.obj$manual.annot.ids[jj] = "MSxpppaa_MSxppppa_later_unknown"
-    
-    jj = which(seurat.obj$manual.annot.ids == 'unknown.MSxpppaa')
-    seurat.obj$manual.annot.ids[jj] = NA
-    
-    jj = which(seurat.obj$manual.annot.ids == 'MSxapapp.pharynx')
-    seurat.obj$manual.annot.ids[jj] = NA
-    
-    jj = which(seurat.obj$manual.annot.ids == 'likely.nonBWM_origCluster_17')
-    seurat.obj$manual.annot.ids[jj] = NA
-    
-    jj = which(seurat.obj$manual.annot.ids == 'likely_nonBWM_origCluster_31')
-    seurat.obj$manual.annot.ids[jj] = NA
+    # jj = which(seurat.obj$manual.annot.ids == 'MSxpppaa_MSxppppa_later_unknown')
+    # seurat.obj$manual.annot.ids[jj] = 'MSxpppaa_MSxppppa_later_like'
+    # 
+    # jj = which(seurat.obj$manual.annot.ids == 'MSxpaap.MSppaapp.likely')
+    # seurat.obj$manual.annot.ids[jj] = 'MSxpaap.MSppaapp.like'
+    # 
+    # jj = which(seurat.obj$manual.annot.ids == 'MSxapappp.likely')
+    # seurat.obj$manual.annot.ids[jj] = 'MSxapappp.like'
     
   }
+  
+  jj = which(seurat.obj$manual.annot.ids == "MSxppap/MSxpaaa/MSxpaaap")
   
   ids.current = names(table(seurat.obj$manual.annot.ids))
   #ids.sels = ids.current
@@ -1281,8 +1291,11 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                         "MSaaaaa",  "MSaaaap", "MSpaaaa", "MSpaaap"))
    
   
-  ids.sels = c('MSxppap/MSxpaaa/MSxpaaap', 'MSxppap', 'MSxpaaa', 'MSxpaaap',
-               "MSxppapp/MSxpappp"
+  ids.sels = c('MSxppap/MSxpaaa/MSxpaaap', 
+               'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp'
+               #'MSxpapa', 'MSxpaaa'  
+               #'MSxpaaap'
+               #"MSxppapp/MSxpappp"
                )
   
   ids.left = setdiff(ids.current, ids.sels)
@@ -1323,7 +1336,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     
   }
   
-  nfeatures = 2000;
+  nfeatures = 1000;
   sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
   #cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(sub.obj)), '\n')
   sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
@@ -1336,7 +1349,12 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
                      spread = spread, n.neighbors = n.neighbors,
                      min.dist = min.dist, verbose = TRUE)
+  DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
+    NoLegend()
+  
+  
   if(Refine.annotated.ids){
+    
     DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
       NoLegend()
     
@@ -1364,8 +1382,6 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     
   }
   
-  
-  
   ##########################################
   # redo the clustering using seurat FindCluster (SLM alogrithm) after testing k-mean from RaceID
   ##########################################
@@ -1374,8 +1390,8 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     sub.obj <- FindClusters(sub.obj, resolution = resolution, algorithm = 3)
     return(sub.obj$seurat_clusters)
   }
-  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:10, compute.SNN = TRUE)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.0)
+  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:5, compute.SNN = TRUE)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.5)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
   
   p1  = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 8, repel = TRUE,  pt.size = 3) +
@@ -1397,7 +1413,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   # check the counts of predicted ids for newly split clusters
   ##########################################
   
-  idents.sel = c('9', '6', '3', '10')
+  idents.sel = c('0', '6', '3', '9')
   Idents(sub.obj) = sub.obj$seurat_clusters_split
   counts = table(sub.obj$predicted.ids.scmap, sub.obj$seurat_clusters_split)
   counts.seurat = table(sub.obj$predicted.ids.seurat, sub.obj$seurat_clusters_split)
@@ -1455,17 +1471,16 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                     'let-381', 'F26B1.1', 'unc-30' # MSaaaaaax/MSxpaaaax
                     )
   
-  features.sels = c('maph-1.3', 'shc-2', 'K09G1.1', 'tbx-2', 'twk-31', 'zig-6', 'mec-2', 'stn-2'
+  features.sels = c('zig-8', 'pat-9', 'F19C6.4', 'tbx-8', 'her-1', 'ins-2'
                     )
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
   # update the annotation with marker genes
   cluster.assingment = list(
-    c('0', NA),
-    c('2', 'MSxapappp.likely'), 
-    c('1', NA), 
-    c('3', NA), 
-    c('4', NA)
+    c('4', 'MSxpaaa'),
+    
+    #c('4', ) # not MSxpaaa; not MSxpppa;
+    
   )
   
   cat(length(cluster.assingment), 'clusters assigned \n')
