@@ -1160,14 +1160,14 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   ##########################################
   # Main aim:
-  # I realized that there are many cells in seurat_clusters 42 and 44 without annotation and I will look into them 
+  # 
   # 
   # Notes:    
   # 17 cells in cluster 42 were annotated as MSxapa
   # cluster 44 were not annotated at all and failed to be annotated again, because no clear prediction were found in cluster 44
   # not much progress done for cluster 28, 52 and 31 except a likely MSxapappp
   ##########################################
-  GR.iteration = 2 # RG (revison global)
+  GR.iteration = 3 # RG (revison global)
   Refine.annotated.ids = FALSE;
   
   resDir = paste0("results/", version.analysis, '/annoted_pharynx')
@@ -1208,12 +1208,12 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   ##########################################
   # select subset of cells 
   ##########################################
-  jj = which(is.na(seurat.obj$manual.annot.ids))
-  print(table(seurat.obj$seurat_clusters[jj]))
-  
   
   # select cells with cluster index
   ##########################################
+  jj = which(is.na(seurat.obj$manual.annot.ids))
+  print(table(seurat.obj$seurat_clusters[jj]))
+  
   #cluster.sels = c('29', '32', '35', '40', '42')
   #cluster.sels = c('6', '24', '20', '7')
   #cluster.sels = c('13', '17', '18', '11', '25', '10')
