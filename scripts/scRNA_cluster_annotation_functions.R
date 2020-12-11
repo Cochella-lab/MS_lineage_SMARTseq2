@@ -1160,12 +1160,12 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   ##########################################
   # Main aim:
-  # there are two BWM ids MSxppapp/MSxpappp and MSxppap/MSxpaaa/MSxpaaap
-  # especiall the latter needs to resolve 
+  # try to solve MSxppap/MSxpaaa/MSxpaaap and mixture ids
+  # 
   # 
   # Notes:    
-  # at the end I did not change the annotation for MSxppap/MSxpaaa/MSxpaaap, because it is not clear and other cell ids seem to be 
-  # quite well annotated; making changes with newly split clusters would not improve too much but add cluster-based bias.
+  # all mixture annotation were solved for the first time and requires comfirmation
+  # 
   ##########################################
   GR.iteration = 6 # RG (revison global)
   Refine.annotated.ids = TRUE
@@ -1470,8 +1470,10 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                     )
   
   features.sels = c('unc-62','gana-1','clec-264', 'maph-1.3', 'zig-6', 'maph-1.2', 
-                    #'mec-2', 'twk-31', 'stn-2', 'ZC449.5',  'shc-2', 'ham-1', 'ceh-34',
-                    'K09G1.1',  'ceh-13',  'tbx-2', 'D1086.12', 'hot-1', 'sul-1', 'zig-7', 'hmg-1.1'
+                    'mec-2', 'twk-31', 'stn-2', 'ZC449.5',  'shc-2', 'ham-1', 'ceh-34',
+                    'K09G1.1',
+                    'ceh-13',  'tbx-2', 'D1086.12', 'hot-1', 'sul-1', 'zig-7', 'hmg-1.1'
+                    #'gsnl-2', 'abts-1'
                     )
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
@@ -1484,13 +1486,15 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     c('2', 'MSxpppaa_new'), 
     c('8', 'MSxpppaa_new'), 
     c('3', 'MSxpppaa_new'),
-    
+    c('1', 'MSxapppax_new'),
+    c('7', 'MSxpappp_new'),
+    c('9', 'MSxpapap_new')
   )
   
   cat(length(cluster.assingment), 'clusters assigned \n')
   cat(length(levels(sub.obj$seurat_clusters_split)), ' split clusters \n')
   nb.unassigned = length(levels(sub.obj$seurat_clusters_split)) - length(cluster.assingment)
-  if(nb.unassigned > 1){
+  if(nb.unassigned >= 1){
     cat(' Error  : ', nb.unassigned, 'clusters unassigned \n')
   } 
   
