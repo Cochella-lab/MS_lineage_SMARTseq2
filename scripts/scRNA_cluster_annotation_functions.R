@@ -1279,9 +1279,11 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     # jj = which(seurat.obj$manual.annot.ids == 'MSxapappp.likely')
     # seurat.obj$manual.annot.ids[jj] = 'MSxapappp.like'
     
+    #jj = which(seurat.obj$manual.annot.ids == "MSxppap/MSxpaaa/MSxpaaap")
+    #seurat.obj$manual.annot.ids[jj] = 'mixture_transitionToTerminal'
+    
   }
   
-  jj = which(seurat.obj$manual.annot.ids == "MSxppap/MSxpaaa/MSxpaaap")
   
   ids.current = names(table(seurat.obj$manual.annot.ids))
   #ids.sels = ids.current
@@ -1291,11 +1293,8 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                         "MSaaaaa",  "MSaaaap", "MSpaaaa", "MSpaaap"))
    
   
-  ids.sels = c('MSxppap/MSxpaaa/MSxpaaap', 
-               'MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp'
-               #'MSxpapa', 'MSxpaaa'  
-               #'MSxpaaap'
-               #"MSxppapp/MSxpappp"
+  ids.sels = c("mixture_MSxpaaap.MSxppapp.MSxpappp.MSxpapap", "mixture_MSxppppp.MSxppppa.MSxpppap.MSxpppaa.MSxpappa",
+               "mixture_transitionToTerminal"
                )
   
   ids.left = setdiff(ids.current, ids.sels)
@@ -1336,7 +1335,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     
   }
   
-  nfeatures = 1000;
+  nfeatures = 3000;
   sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
   #cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(sub.obj)), '\n')
   sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
@@ -1344,7 +1343,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   ElbowPlot(sub.obj, ndims = 50)
   
   nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 20;
+  n.neighbors = 10;
   min.dist = 0.01; spread = 1
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
                      spread = spread, n.neighbors = n.neighbors,
@@ -1390,8 +1389,8 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     sub.obj <- FindClusters(sub.obj, resolution = resolution, algorithm = 3)
     return(sub.obj$seurat_clusters)
   }
-  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:5, compute.SNN = TRUE)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.5)
+  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:10, compute.SNN = TRUE)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.0)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
   
   p1  = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 8, repel = TRUE,  pt.size = 3) +

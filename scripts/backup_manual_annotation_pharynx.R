@@ -7064,6 +7064,9 @@ saveRDS(seurat.obj, file = RDS2save)
    #
    # jj = which(seurat.obj$manual.annot.ids == 'MSxapappp.likely')
    # seurat.obj$manual.annot.ids[jj] = 'MSxapappp.like'
+   
+   #jj = which(seurat.obj$manual.annot.ids == "MSxppap/MSxpaaa/MSxpaaap")
+   #seurat.obj$manual.annot.ids[jj] = 'mixture_transitionToTerminal'
 
  }
 
@@ -7337,4 +7340,3 @@ saveRDS(seurat.obj, file = RDS2save)
 
 
  saveRDS(seurat.obj, file = RDS2save)
- 
