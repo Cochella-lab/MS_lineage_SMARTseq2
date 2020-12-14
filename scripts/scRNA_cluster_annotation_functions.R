@@ -1160,13 +1160,14 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   ##########################################
   # Main aim:
-  # MSxpappa veryfication and MSxpppaa
-  # 
+  # terminal cells but start with something easily to resolve
+  # MSxpppp and MSxpppa
+  #
   # Notes:    
-  # there is still confusion for terminal cells due to the inconsistancy of marker genes
+  # here we annotate MSxppppx and MSxpppax
   # 
   ##########################################
-  GR.iteration = 10 # RG (revison global)
+  GR.iteration = 11 # RG (revison global)
   Refine.annotated.ids = TRUE
   
   resDir = paste0("results/", version.analysis, '/annoted_pharynx')
@@ -1250,7 +1251,8 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   #ids.sels = c("mixture_MSxpaaap.MSxppapp.MSxpappp.MSxpapap", "mixture_MSxppppp.MSxppppa.MSxpppap.MSxpppaa.MSxpappa",
   #             "mixture_transitionToTerminal")
   ids.sels = c(
-              "MSxpppaa_new", 'MSxpppaa','MSxpappa'
+              #"MSxpppaa_new", 'MSxpppaa','MSxpappa'
+              'MSxpppp', 'MSxpppa'
               #'MSxppapp', 'MSxpappp', "MSxpappp_new", "MSxpappp_new2", "MSxppapp_new",  "MSxppapp_new2"
               #'MSxpapap', 'MSxpaaap', "MSxpaaap_new","MSxpapap_new"
     
@@ -1294,7 +1296,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     
   }
   
-  nfeatures = 5000;
+  nfeatures = 3000;
   sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
   #cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(sub.obj)), '\n')
   sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
@@ -1302,7 +1304,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   ElbowPlot(sub.obj, ndims = 50)
   
   nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 10;
+  n.neighbors = 30;
   min.dist = 0.01; spread = 1
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
                      spread = spread, n.neighbors = n.neighbors,
@@ -1310,6 +1312,8 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
     NoLegend()
   
+  DimPlot(sub.obj, group.by = 'seurat_clusters_split', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
+    NoLegend()
   
   if(Refine.annotated.ids){
     
@@ -1349,7 +1353,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     return(sub.obj$seurat_clusters)
   }
   sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:5, compute.SNN = TRUE)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.5)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.0)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
   
   p1  = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 8, repel = TRUE,  pt.size = 3) +
@@ -1359,7 +1363,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   p4 = VlnPlot(sub.obj, features = c('timingEst'), ncol = 1, group.by = 'seurat_clusters_split') + NoLegend()
   
   (p2 + p4) / p1  + ggsave(paste0(resDir, '/splitcluster_timingEstimation_manual.IDs_iteration_GR', GR.iteration, 
-                                  '_MSxpppaa_MSxpappa.pdf'), 
+                                  '_MSxpppp_MSxpppa.pdf'), 
                            width = 18, height = 16)
   
     
@@ -1369,7 +1373,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   ##########################################
   # check the counts of predicted ids for newly split clusters
   ##########################################
-  #idents.sel = c('0', '1', '2', '3', '4')
+  idents.sel = c('0', '1', '3', '4', '5', '2', '6')
   Idents(sub.obj) = sub.obj$seurat_clusters_split
   counts = table(sub.obj$predicted.ids.scmap, sub.obj$seurat_clusters_split)
   counts.seurat = table(sub.obj$predicted.ids.seurat.keep, sub.obj$seurat_clusters_split)
@@ -1427,25 +1431,28 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                     'let-381', 'F26B1.1', 'unc-30' # MSaaaaaax/MSxpaaaax
                     )
   
-  features.sels = c('unc-62','gana-1','clec-264', 
+  features.sels = c('unc-62','gana-1','clec-264', 'lin-39',
                     #'maph-1.3', 'zig-6', 'maph-1.2', 
                     #'mec-2', 'twk-31',  'ZC449.5',  'shc-2', 'ham-1', 'ceh-34',
                     #'K09G1.1', 'T25G12.11', 
                     'stn-2', 'igcm-4', 'E01G4.5', 'fbxc-24', 'fbxb-88', 'D1086.12', 'Y9C2UA.1', # MSxpappa
                     #'Y37E3.30', 'hnd-1', 'Y9C2UA.1'
                     'sul-1', 'tbx-2', 'hot-1', 'hmg-1.1', 'bgal-1', 'zig-7',
-                    
-                    'gsnl-2', 'abts-1'
+                    'camt-1', 'ctg-1', 'irx-1',
+                     'abts-1'
                     )
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
   # update the annotation with marker genes
   cluster.assingment = list(
-    c('3', 'MSxpappa'),
-    c('1', 'MSxpappa'), 
-    c('0', 'MSxpppaa'), 
-    c('2', 'MSxpppaa'), 
-    c('4', 'MSxpppaa')
+    c('0', 'MSxpppa'),
+    c('5', 'MSxpppax'),
+    c('2', 'MSxpppax'),
+    c('4', 'MSxpppp'), 
+    c('3', 'MSxpppp'), 
+    c('1', 'MSxppppx'), 
+    c('6', 'MSxppppx')
+    
   )
   
   cat(length(cluster.assingment), 'clusters assigned \n')
@@ -1461,7 +1468,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   #load(file = paste0(RdataDir, 'Seurat.object_JM_BWM_data_markers.Rdata'))
   source.my.script('scRNA_cluster_annotation_utilityFunctions.R')
   
-  ids.sel = c('MSxpaaap'); find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
+  ids.sel = c('MSxpppax'); find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers.JM)
   #find.markerGenes.used.in.JM.scRNAseq(ids = ids.sel, markers = markers)
   
   ##########################################
