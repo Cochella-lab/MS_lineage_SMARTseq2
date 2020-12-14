@@ -1160,12 +1160,12 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   ##########################################
   # Main aim:
-  # 
-  # 
-  # 
+  # in this iteration, BWM terminal cells were revised to confirm newly resolved ones
+  # here MSxpaaap and MSxpapap were focused 
   # Notes:    
-  # 
-  # 
+  # at the end, the annotation of terminal cells using terminal cells is still somewhat confusing, because the presence/absence of 
+  # some marker genes were inconsistant, either because of the cluster cells were mixture of cell ids or there were inaccuracies in  
+  # the marker genes
   ##########################################
   GR.iteration = 8 # RG (revison global)
   Refine.annotated.ids = TRUE
@@ -1231,15 +1231,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
           cells.highlight = cells.sels, cols.highlight = 'red', sizes.highlight = 1,
           pt.size = 2, label.size = 5) + NoLegend() 
   
-  #                                           
-  # if(length(ids.sel)>0){
-  #   cells.sels = unique(colnames(seurat.obj)[(!is.na(match(seurat.obj$seurat_clusters_pharynx, cluster.sels)) |
-  #                                            !is.na(match(seurat.obj$manual.annot.ids, ids.sel))) &
-  #                                              is.na(match(seurat.obj$manual.annot.ids, ids.excl))])
-  # }else{
-  #   cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$seurat_clusters, cluster.sels))])
-  # }
-  
+    
   # select cells with ids
   ##########################################
   #index.pharynx.cells = which(!is.na(seurat.obj$seurat_clusters_pharynx))
@@ -1247,38 +1239,6 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   clean.id.names = FALSE # clean id names
   if(clean.id.names){
-    # jj = which(seurat.obj$manual.annot.ids == "MSpaaaap.sure")
-    # seurat.obj$manual.annot.ids[jj] = "MSpaaaap"
-    # jj = which(seurat.obj$manual.annot.ids == "MSaaaappp.MSxapaapp")
-    # seurat.obj$manual.annot.ids[jj] = "MSaaaappp/MSxapaapp"
-    # 
-    # jj = which(seurat.obj$manual.annot.ids == "MSpaaappp.MSxapappa")
-    # seurat.obj$manual.annot.ids[jj] = "MSpaaappp/MSxapappa"
-    # 
-    # jj = which(seurat.obj$manual.annot.ids == 'unknown_MSxpppaa_MSxppppa_later')
-    # seurat.obj$manual.annot.ids[jj] = "MSxpppaa_MSxppppa_later_unknown"
-    # 
-    # jj = which(seurat.obj$manual.annot.ids == 'unknown.MSxpppaa')
-    # seurat.obj$manual.annot.ids[jj] = NA
-    # 
-    # jj = which(seurat.obj$manual.annot.ids == 'MSxapapp.pharynx')
-    # seurat.obj$manual.annot.ids[jj] = NA
-    # 
-    # jj = which(seurat.obj$manual.annot.ids == 'likely.nonBWM_origCluster_17')
-    # seurat.obj$manual.annot.ids[jj] = NA
-    # 
-    # jj = which(seurat.obj$manual.annot.ids == 'likely_nonBWM_origCluster_31')
-    # seurat.obj$manual.annot.ids[jj] = NA
-    
-    # jj = which(seurat.obj$manual.annot.ids == 'MSxpppaa_MSxppppa_later_unknown')
-    # seurat.obj$manual.annot.ids[jj] = 'MSxpppaa_MSxppppa_later_like'
-    # 
-    # jj = which(seurat.obj$manual.annot.ids == 'MSxpaap.MSppaapp.likely')
-    # seurat.obj$manual.annot.ids[jj] = 'MSxpaap.MSppaapp.like'
-    # 
-    # jj = which(seurat.obj$manual.annot.ids == 'MSxapappp.likely')
-    # seurat.obj$manual.annot.ids[jj] = 'MSxapappp.like'
-    
     #jj = which(seurat.obj$manual.annot.ids == "MSxppap/MSxpaaa/MSxpaaap")
     #seurat.obj$manual.annot.ids[jj] = 'mixture_transitionToTerminal'
     
@@ -1287,14 +1247,14 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   ids.current = names(table(seurat.obj$manual.annot.ids))
   #ids.sels = ids.current
-  ids.sels = setdiff(ids.current, 
-                     c('MSxaa', 'MSxap', 'MSpaapaa', 'MSaaapaa', 'MSaaapapp', 
-                       'MSxaaa', 'MSpaaapp', 'MSpaaapa', 'MSaappa', 'MSpaaaap.sure', 
-                        "MSaaaaa",  "MSaaaap", "MSpaaaa", "MSpaaap"))
-   
+  
+  ids.current[grep('_new', ids.current)] 
+     
   #ids.sels = c("mixture_MSxpaaap.MSxppapp.MSxpappp.MSxpapap", "mixture_MSxppppp.MSxppppa.MSxpppap.MSxpppaa.MSxpappa",
   #             "mixture_transitionToTerminal")
-  ids.sels = c("MSxppapp/MSxpappp")
+  ids.sels = c(
+              #'MSxppapp', 'MSxpappp', "MSxpappp_new", "MSxpappp_new2", "MSxppapp_new",  "MSxppapp_new2",
+              'MSxpapap', 'MSxpaaap', "MSxpaaap_new","MSxpapap_new")
   
   ids.left = setdiff(ids.current, ids.sels)
   # print(ids.left)
@@ -1389,7 +1349,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     return(sub.obj$seurat_clusters)
   }
   sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:5, compute.SNN = TRUE)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.5)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.3)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
   
   p1  = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 8, repel = TRUE,  pt.size = 3) +
@@ -1398,7 +1358,8 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                label.size = 8, na.value = "gray", combine = TRUE)
   p4 = VlnPlot(sub.obj, features = c('timingEst'), ncol = 1, group.by = 'seurat_clusters_split') + NoLegend()
   
-  (p2 + p4) / p1  + ggsave(paste0(resDir, '/splitcluster_timingEstimation_manual.IDs_iteration_GR', GR.iteration, '.pdf'), 
+  (p2 + p4) / p1  + ggsave(paste0(resDir, '/splitcluster_timingEstimation_manual.IDs_iteration_GR', GR.iteration, 
+                                  '_MSxpaaap_MSxpapap.pdf'), 
                            width = 18, height = 16)
   
   #jj.missing = which(is.na(sub.obj$manual.annot.ids)) 
@@ -1468,10 +1429,12 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                     'let-381', 'F26B1.1', 'unc-30' # MSaaaaaax/MSxpaaaax
                     )
   
-  features.sels = c('unc-62','gana-1','clec-264', 'maph-1.3', 'zig-6', 'maph-1.2', 
+  features.sels = c('unc-62','gana-1','clec-264', 
+                    'maph-1.3', 'zig-6', 'maph-1.2', 
                     'mec-2', 'twk-31', 'stn-2', 'ZC449.5',  'shc-2', 'ham-1', 'ceh-34',
-                    'K09G1.1', 'T25G12.11', 'shc-2',
-                    'ceh-13',  'tbx-2', 'D1086.12', 'sul-1'
+                    'K09G1.1', 'T25G12.11', 
+                    'ceh-13',  'tbx-2', 'D1086.12', 'sul-1',
+                    'Y37E3.30', 'hnd-1', 'Y9C2UA.1'
                     
                     #'gsnl-2', 'abts-1'
                     )
@@ -1479,11 +1442,11 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   # update the annotation with marker genes
   cluster.assingment = list(
-    c('3', 'MSxpappp_new2'),
-    c('1', 'MSxpappp_new2'),
-    c('0', 'MSxppapp_new2'), 
-    c('2', 'MSxppapp_new2'), 
-    c('4', 'MSxppapp_new2')
+    c('3', 'MSxpapap'),
+    c('2', 'MSxpapap'),
+    c('0', 'MSxpaaap'),
+    c('4', 'MSxpaaap'),
+    c('1', 'MSxpappp')
   )
   
   cat(length(cluster.assingment), 'clusters assigned \n')
