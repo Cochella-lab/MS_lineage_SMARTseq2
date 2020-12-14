@@ -1164,10 +1164,10 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   # MSxpppp and MSxpppa
   #
   # Notes:    
-  # here we annotate MSxppppx and MSxpppax
+  # for the convergence trajectory, the annotation is more satisfying. 
   # 
   ##########################################
-  GR.iteration = 11 # RG (revison global)
+  GR.iteration = 12 # RG (revison global)
   Refine.annotated.ids = TRUE
   
   resDir = paste0("results/", version.analysis, '/annoted_pharynx')
@@ -1252,7 +1252,8 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   #             "mixture_transitionToTerminal")
   ids.sels = c(
               #"MSxpppaa_new", 'MSxpppaa','MSxpappa'
-              'MSxpppp', 'MSxpppa'
+              #'MSxpppp', 'MSxpppa',
+              "MSxapppax_new", 'MSxapppp', 'MSxappppx', 'MSxapppa', 'MSxpppax'
               #'MSxppapp', 'MSxpappp', "MSxpappp_new", "MSxpappp_new2", "MSxppapp_new",  "MSxppapp_new2"
               #'MSxpapap', 'MSxpaaap', "MSxpaaap_new","MSxpapap_new"
     
@@ -1296,15 +1297,15 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     
   }
   
-  nfeatures = 3000;
+  nfeatures = 5000;
   sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
   #cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(sub.obj)), '\n')
   sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
   sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, weight.by.var = FALSE)
   ElbowPlot(sub.obj, ndims = 50)
   
-  nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 30;
+  nb.pcs = 5 # nb of pcs depends on the considered clusters or ids 
+  n.neighbors = 20;
   min.dist = 0.01; spread = 1
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
                      spread = spread, n.neighbors = n.neighbors,
@@ -1312,8 +1313,8 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
     NoLegend()
   
-  DimPlot(sub.obj, group.by = 'seurat_clusters_split', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
-    NoLegend()
+  #DimPlot(sub.obj, group.by = 'seurat_clusters_split', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
+  #  NoLegend()
   
   if(Refine.annotated.ids){
     
@@ -1353,7 +1354,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     return(sub.obj$seurat_clusters)
   }
   sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:5, compute.SNN = TRUE)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 1.0)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.5)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
   
   p1  = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 8, repel = TRUE,  pt.size = 3) +
@@ -1363,7 +1364,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   p4 = VlnPlot(sub.obj, features = c('timingEst'), ncol = 1, group.by = 'seurat_clusters_split') + NoLegend()
   
   (p2 + p4) / p1  + ggsave(paste0(resDir, '/splitcluster_timingEstimation_manual.IDs_iteration_GR', GR.iteration, 
-                                  '_MSxpppp_MSxpppa.pdf'), 
+                                  '_MSxapppxx.pdf'), 
                            width = 18, height = 16)
   
     
@@ -1438,20 +1439,21 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                     'stn-2', 'igcm-4', 'E01G4.5', 'fbxc-24', 'fbxb-88', 'D1086.12', 'Y9C2UA.1', # MSxpappa
                     #'Y37E3.30', 'hnd-1', 'Y9C2UA.1'
                     'sul-1', 'tbx-2', 'hot-1', 'hmg-1.1', 'bgal-1', 'zig-7',
-                    'camt-1', 'ctg-1', 'irx-1',
+                    #'camt-1', 'ctg-1', 'irx-1',
                      'abts-1'
                     )
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
   # update the annotation with marker genes
   cluster.assingment = list(
-    c('0', 'MSxpppa'),
-    c('5', 'MSxpppax'),
-    c('2', 'MSxpppax'),
-    c('4', 'MSxpppp'), 
-    c('3', 'MSxpppp'), 
-    c('1', 'MSxppppx'), 
-    c('6', 'MSxppppx')
+    c('4', 'MSxapppp'),
+    c('1', 'MSxapppp'),
+    c('6', 'MSxappppx'),
+    c('3', 'MSxappppx'),
+    
+    c('2', 'MSxapppa'),
+    c('5', 'MSxapppa'), 
+    c('0', 'MSxapppax')
     
   )
   
