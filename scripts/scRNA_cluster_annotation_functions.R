@@ -1160,14 +1160,14 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   ##########################################
   # Main aim:
-  # here we solved the mixed terminal cells ids.sels = c("MSxppapp/MSxpappp") 
+  # 
   # 
   # 
   # Notes:    
-  # all mixture annotation were solved for the first time and requires comfirmation
+  # 
   # 
   ##########################################
-  GR.iteration = 7 # RG (revison global)
+  GR.iteration = 8 # RG (revison global)
   Refine.annotated.ids = TRUE
   
   resDir = paste0("results/", version.analysis, '/annoted_pharynx')
