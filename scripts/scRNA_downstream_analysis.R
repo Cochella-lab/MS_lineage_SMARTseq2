@@ -260,43 +260,47 @@ if(Correction.Batch.using.fastMNN){
 # 
 ########################################################
 ########################################################
-#load(file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata'))
-
-#ms <- FindNeighbors(object = ms, reduction = "pca", k.param = 20, dims = 1:20)
-#ms <- FindClusters(ms, resolution = 12, algorithm = 3)
-library(Seurat)
-library(SeuratWrappers)
-library(cowplot)
-library(ggplot2)
-
-#ElbowPlot(ms)
-#ms <- FindNeighbors(object = ms, reduction = 'pca', dims = 1:20)
-nb.pcs = 50; n.neighbors = 50; min.dist = 0.4;
-
-ms <- RunUMAP(object = ms, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, 
-              min.dist = min.dist)
-DimPlot(ms, reduction = "umap", group.by = 'SCT_snn_res.12', label = TRUE) 
-
-Idents(ms) = ms$SCT_snn_res.12
-
-DimPlot(ms, reduction = "umap", label = TRUE) 
-ms[['umap_sct']] = ms[['UMAP']]
-ms[['UMAP']] = NULL
-
-FeaturePlot(ms, reduction = 'umap', features = c('pha-4', 'hnd-1', 'nhr-67'))
-
-saveRDS(ms, file = paste0(RdataDir, 'processed_6.5k.cells_scran.normalized.rds'))
-
-
-##########################################
-# mapping reference with scmap, seurat, svm, rf
-# alternatively, sysmatic marker-gene-based cluster annotation can be also applied given that the clusters is well defined, which is 
-# also a challenging problem (see Cellassign and Garnet)
-##########################################
-ms = readRDS(file = paste0(RdataDir, 'processed_6.5k.cells_scran.normalized.rds'))
-source.my.script("scRNA_cluster_annotation_functions.R")
-
-ms = reference.based.cluster.annotation(seurat.obj = ms, redefine.clusters = TRUE, predict.unassignedCells = FALSE)
+Transferring.cell.annotation.from.JMdata = FALSE
+if(Transferring.cell.annotation.from.JMdata){
+  #load(file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata'))
+  
+  #ms <- FindNeighbors(object = ms, reduction = "pca", k.param = 20, dims = 1:20)
+  #ms <- FindClusters(ms, resolution = 12, algorithm = 3)
+  library(Seurat)
+  library(SeuratWrappers)
+  library(cowplot)
+  library(ggplot2)
+  
+  #ElbowPlot(ms)
+  #ms <- FindNeighbors(object = ms, reduction = 'pca', dims = 1:20)
+  nb.pcs = 50; n.neighbors = 50; min.dist = 0.4;
+  
+  ms <- RunUMAP(object = ms, reduction = 'pca', reduction.name = "umap", dims = 1:nb.pcs, n.neighbors = n.neighbors, 
+                min.dist = min.dist)
+  DimPlot(ms, reduction = "umap", group.by = 'SCT_snn_res.12', label = TRUE) 
+  
+  Idents(ms) = ms$SCT_snn_res.12
+  
+  DimPlot(ms, reduction = "umap", label = TRUE) 
+  ms[['umap_sct']] = ms[['UMAP']]
+  ms[['UMAP']] = NULL
+  
+  FeaturePlot(ms, reduction = 'umap', features = c('pha-4', 'hnd-1', 'nhr-67'))
+  
+  saveRDS(ms, file = paste0(RdataDir, 'processed_6.5k.cells_scran.normalized.rds'))
+  
+  
+  ##########################################
+  # mapping reference with scmap, seurat, svm, rf
+  # alternatively, sysmatic marker-gene-based cluster annotation can be also applied given that the clusters is well defined, which is 
+  # also a challenging problem (see Cellassign and Garnet)
+  ##########################################
+  ms = readRDS(file = paste0(RdataDir, 'processed_6.5k.cells_scran.normalized.rds'))
+  source.my.script("scRNA_cluster_annotation_functions.R")
+  
+  ms = reference.based.cluster.annotation(seurat.obj = ms, redefine.clusters = TRUE, predict.unassignedCells = FALSE)
+  
+}
 
 ########################################################
 ########################################################
@@ -310,67 +314,72 @@ ms = reference.based.cluster.annotation(seurat.obj = ms, redefine.clusters = TRU
 # 
 ########################################################
 ########################################################
-rdsfile.saved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds')
-ms = readRDS(file = rdsfile.saved)
-
-##########################################
-# 1) overview of all given clusters and predicted labels
-##########################################
-## current 54 clusters were define using 3000 variable genes and resolution =3, 20 pcs and k = 10
-p0 = DimPlot(ms, group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
-             na.value = "gray") + 
-  ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
-  scale_colour_hue(drop = FALSE) + 
-  NoLegend()
-
-plot(p0)
-
-## compare scmap and seurat reference-based annotation
-source.my.script('scRNA_cluster_annotation_functions.R')
-overview.and.compare.predicted.labels(seurat.obj = ms)
-
-##########################################
-# 2) focus short list of cell identities and manual annotate with other information
-##########################################
-source.my.script('scRNA_cluster_annotation_functions.R')
-
-ms$manual.annot.ids = NA
-ms = manual.annotation.for.BWM.clusters(seurat.obj = ms)
-
+Manually.Annotate.BWM.cell.IDs = FALSE
+if(Manually.Annotate.BWM.cell.IDs){
+  rdsfile.saved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds')
+  ms = readRDS(file = rdsfile.saved)
+  
+  ##########################################
+  # 1) overview of all given clusters and predicted labels
+  ##########################################
+  ## current 54 clusters were define using 3000 variable genes and resolution =3, 20 pcs and k = 10
+  p0 = DimPlot(ms, group.by = "seurat_clusters", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+               na.value = "gray") + 
+    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  plot(p0)
+  
+  ## compare scmap and seurat reference-based annotation
+  source.my.script('scRNA_cluster_annotation_functions.R')
+  overview.and.compare.predicted.labels(seurat.obj = ms)
+  
+  ##########################################
+  # 2) focus short list of cell identities and manual annotate with other information
+  ##########################################
+  source.my.script('scRNA_cluster_annotation_functions.R')
+  
+  ms$manual.annot.ids = NA
+  ms = manual.annotation.for.BWM.clusters(seurat.obj = ms)
+  
+}
 
 ##########################################
 # read annotated seurat.obj and save loom file for PAGA analysis
 ##########################################
-# install scater https://bioconductor.org/packages/release/bioc/html/scater.html
-library(scater)
-# install loomR from GitHub using the remotes package remotes::install_github(repo =
-# 'mojaveazure/loomR', ref = 'develop')
-library(loomR)
-library(Seurat)
-library(patchwork)
-
-nb.iteration = 36
-RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
-                  nb.iteration, '.rds')
-seurat.obj = readRDS(file = RDSsaved)
-
-## select manually annotated bwm cells
-ids.bwm = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
-cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.bwm))])
-sub.obj = subset(seurat.obj, cells = cells.sels)
-
-#saveRDS(sub.obj, file = paste0(RdataDir, 'manual_annotated_BWM_3.5k.cells.rds'))
-source.my.script('scRNA_cluster_annotation_functions.R')
-# compare.bwm.with.JMdata(sub.obj)
-
-manual.annot.ids = sub.obj$manual.annot.ids
-sub.obj@meta.data[, grep('pred|ids|scmap|previous.iteration.clusters|BWM.cells', colnames(sub.obj@meta.data))] = NULL
-sub.obj$manual.ids = manual.annot.ids
-
-sub.loom <- as.loom(sub.obj, filename = "seuratObj_BWM_manual_cellIds_iteration_36.loom", verbose = FALSE)
-sub.loom
-sub.loom$close_all()
-
+Prepare.input.for.scanpy = FALSE
+if(Prepare.input.for.scanpy){
+  library(scater)
+  # install loomR from GitHub using the remotes package remotes::install_github(repo =
+  # 'mojaveazure/loomR', ref = 'develop')
+  library(loomR)
+  library(Seurat)
+  library(patchwork)
+  
+  nb.iteration = 36
+  RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
+                    nb.iteration, '.rds')
+  seurat.obj = readRDS(file = RDSsaved)
+  
+  ## select manually annotated bwm cells
+  ids.bwm = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
+  cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.bwm))])
+  sub.obj = subset(seurat.obj, cells = cells.sels)
+  
+  #saveRDS(sub.obj, file = paste0(RdataDir, 'manual_annotated_BWM_3.5k.cells.rds'))
+  source.my.script('scRNA_cluster_annotation_functions.R')
+  # compare.bwm.with.JMdata(sub.obj)
+  
+  manual.annot.ids = sub.obj$manual.annot.ids
+  sub.obj@meta.data[, grep('pred|ids|scmap|previous.iteration.clusters|BWM.cells', colnames(sub.obj@meta.data))] = NULL
+  sub.obj$manual.ids = manual.annot.ids
+  
+  sub.loom <- as.loom(sub.obj, filename = "seuratObj_BWM_manual_cellIds_iteration_36.loom", verbose = FALSE)
+  sub.loom
+  sub.loom$close_all()
+  
+}
 
 ########################################################
 ########################################################
@@ -378,43 +387,80 @@ sub.loom$close_all()
 # 
 ########################################################
 ########################################################
-source.my.script('scRNA_cluster_annotation_functions.R')
-
-resDir = paste0("results/", version.analysis, '/annoted_pharynx')
-
-if(!dir.exists("results/")){dir.create("results/")}
-if(!dir.exists(resDir)){dir.create(resDir)}
-
-nb.iteration = 37
-RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
-                  nb.iteration, '.rds')
-seurat.obj = readRDS(file = RDSsaved)
-
-DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
-        na.value = "gray") + 
-  ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_annotedIDs")) +
-  scale_colour_hue(drop = FALSE) + 
-  NoLegend()
-
-
-seurat.obj = manual.annotation.for.pharynx.clusters(seurat.obj)
+manually.annotate.pharynx = FALSE
+if(manually.annotate.pharynx){
+  source.my.script('scRNA_cluster_annotation_functions.R')
+  
+  resDir = paste0("results/", version.analysis, '/annoted_pharynx')
+  
+  if(!dir.exists("results/")){dir.create("results/")}
+  if(!dir.exists(resDir)){dir.create(resDir)}
+  
+  nb.iteration = 37
+  RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
+                    nb.iteration, '.rds')
+  seurat.obj = readRDS(file = RDSsaved)
+  
+  DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+          na.value = "gray") + 
+    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_annotedIDs")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  seurat.obj = manual.annotation.for.pharynx.clusters(seurat.obj)
+  
+}
 
 
 ########################################################
 ########################################################
-# Section : 
+# Section : identify regulators of convergence lineages with expression matrix  
 # 
 ########################################################
 ########################################################
-RDSsaved = paste0(RdataDir, 
-"processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_cleanedBWM_and_Pharynx_iteration_GR14.rds")
-seurat.obj = readRDS(file = RDSsaved)
-DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
-        na.value = "gray") + 
-  ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_annotedIDs")) +
-  scale_colour_hue(drop = FALSE) + 
-  NoLegend()
+Identify.regulators.convergence.lineages = FALSE
 
+if(Identify.regulators.convergence.lineages){
+  
+  RDSsaved = paste0(RdataDir, 
+                    "processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_cleanedBWM_and_Pharynx_iteration_GR14.rds")
+  seurat.obj = readRDS(file = RDSsaved)
+  DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+          na.value = "gray") + 
+    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_annotedIDs")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+    
+}
+
+########################################################
+########################################################
+# Section : compare pairs of cell ids
+# 
+########################################################
+########################################################
+Compare.cell.ids.pairs = FALSE
+
+if(Compare.cell.ids.pairs){
+  
+  
+}
+
+
+########################################################
+########################################################
+# Section : run RNA velocity with velocyto  
+# 
+########################################################
+########################################################
+Run.RNA.velocity = FALSE
+if(Run.RNA.velocity){
+  source.my.script('run_RNAvelocity.R')
+  
+  run.RNAvelocity.with.velocyto(sub.obj = sub.obj)
+  
+}
 
 ########################################################
 ########################################################
@@ -427,65 +473,62 @@ DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = T
 # MARA is used for inferring TF actvities 
 ########################################################
 ########################################################
-resDir = paste0("results/", version.analysis, '/annoted_BWM')
-tabDir = paste0(resDir, "/tables/")
-
-if(!dir.exists("results/")){dir.create("results/")}
-if(!dir.exists(resDir)){dir.create(resDir)}
-if(!dir.exists(tabDir)){dir.create(tabDir)}
-
-nb.iteration = 37
-RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
-                  nb.iteration, '.rds')
-seurat.obj = readRDS(file = RDSsaved)
-
-DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
-        na.value = "gray") + 
-  ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_annotedIDs")) +
-  scale_colour_hue(drop = FALSE) + 
-  NoLegend()
-
-
-## select manually annotated bwm cells
-ids.bwm = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
-cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.bwm))])
-sub.obj = subset(seurat.obj, cells = cells.sels)
-
-rm(seurat.obj) # remove big object to clear memory
-
-#sub.obj = readRDS(file = paste0(RdataDir, 'manual_annotated_BWM_3.5k.cells.rds'))
-sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxppppp.MSxppppa.MSxpppap.MSxpppaa.MSxpappa')] =
-  'mixture_terminal_1'
-sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxpaaap.MSxppapp.MSxpappp.MSxpapap')] = 
-  'mixture_terminal_2'
-
-Test.Umap.Params = FALSE
-if(Test.Umap.Params){
-  source.my.script('scRNA_functions.R')
-  require(tictoc)
-  tic()
-  test.umap.params.for.BWM.cells(sub.obj, 
-                                 pdfname = 'UMAP_param_TEST_BWM_all_MSx_weight.by.var.FALSE_v2.pdf',
-                                 group.by = 'manual.annot.ids', with_legend = FALSE, weight.by.var = FALSE,
-                                 nfeatures.sampling = c(3000, 5000), nb.pcs.sampling = c(10, 20, 30, 50),
-                                 n.neighbors.sampling = c(20, 30, 50), 
-                                 min.dist.sampling = c(0.01, 0.1, 0.3)
-  )
-  toc()
+Infer.TFs.with.scMARA = FALSE
+if(Infer.TFs.with.scMARA){
+  resDir = paste0("results/", version.analysis, '/annoted_BWM')
+  tabDir = paste0(resDir, "/tables/")
+  
+  if(!dir.exists("results/")){dir.create("results/")}
+  if(!dir.exists(resDir)){dir.create(resDir)}
+  if(!dir.exists(tabDir)){dir.create(tabDir)}
+  
+  nb.iteration = 37
+  RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
+                    nb.iteration, '.rds')
+  seurat.obj = readRDS(file = RDSsaved)
+  
+  DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+          na.value = "gray") + 
+    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_annotedIDs")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  
+  ## select manually annotated bwm cells
+  ids.bwm = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
+  cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.bwm))])
+  sub.obj = subset(seurat.obj, cells = cells.sels)
+  
+  rm(seurat.obj) # remove big object to clear memory
+  
+  #sub.obj = readRDS(file = paste0(RdataDir, 'manual_annotated_BWM_3.5k.cells.rds'))
+  sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxppppp.MSxppppa.MSxpppap.MSxpppaa.MSxpappa')] =
+    'mixture_terminal_1'
+  sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxpaaap.MSxppapp.MSxpappp.MSxpapap')] = 
+    'mixture_terminal_2'
+  
+  Test.Umap.Params = FALSE
+  if(Test.Umap.Params){
+    source.my.script('scRNA_functions.R')
+    require(tictoc)
+    tic()
+    test.umap.params.for.BWM.cells(sub.obj, 
+                                   pdfname = 'UMAP_param_TEST_BWM_all_MSx_weight.by.var.FALSE_v2.pdf',
+                                   group.by = 'manual.annot.ids', with_legend = FALSE, weight.by.var = FALSE,
+                                   nfeatures.sampling = c(3000, 5000), nb.pcs.sampling = c(10, 20, 30, 50),
+                                   n.neighbors.sampling = c(20, 30, 50), 
+                                   min.dist.sampling = c(0.01, 0.1, 0.3)
+    )
+    toc()
+    
+  }
+  
+  ##########################################
+  # run the sc_MARA
+  ##########################################
+  source.my.script('scMARA.R')
+  
+  res = predict.TF.MARA.for.scdata(sub.obj, mode = 'cluster.wise', id = 'manual.annot.ids')
   
 }
 
-##########################################
-# run the sc_MARA
-##########################################
-source.my.script('scMARA.R')
-
-res = predict.TF.MARA.for.scdata(sub.obj, mode = 'cluster.wise', id = 'manual.annot.ids')
-
-
-##########################################
-# run RNA velocity with velocyto  
-##########################################
-source.my.script('run_RNAvelocity.R')
-
-run.RNAvelocity.with.velocyto(sub.obj = sub.obj)
