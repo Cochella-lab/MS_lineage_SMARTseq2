@@ -10012,8 +10012,8 @@ saveRDS(seurat.obj, file = RDS2save)
    #
    #
    # Notes:
-   # it is not very clear how to resolve those terminal cells.
-   # But I will stop here
+   # it is not very clear how to resolve those terminal cells due to the inconsistent marker genes
+   #
    ##########################################
    GR.iteration = 13 # RG (revison global)
    Refine.annotated.ids = TRUE
@@ -10368,4 +10368,3 @@ saveRDS(seurat.obj, file = RDS2save)
 
 
    saveRDS(seurat.obj, file = RDS2save)
-   
