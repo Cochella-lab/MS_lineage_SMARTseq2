@@ -1160,14 +1160,16 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   ##########################################
   # Main aim:
-  # here try to revise MSxppppp and MSxpppap
+  # revise MSxppppa and MSxpppaa, MSxpappa
   # 
-  #
   # Notes:    
-  # it is not very clear how to resolve those terminal cells due to the inconsistent marker genes
-  # 
+  # it becomes apparent that MSxpappa is quite close to MSxpppaa and MSxppppa
+  # But it is still difficult to disentangle them clearly and annotate them at the end
+  #
+  # This is the last iteration for global revision (GR)
+  # I need to move on 
   ##########################################
-  GR.iteration = 13 # RG (revison global)
+  GR.iteration = 14 # RG (revison global)
   Refine.annotated.ids = TRUE
   
   resDir = paste0("results/", version.analysis, '/annoted_pharynx')
@@ -1254,8 +1256,8 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
               #"MSxapppax_new", 'MSxapppp', 'MSxappppx', 'MSxapppa', 'MSxpppax'
               #'MSxppapp', 'MSxpappp', "MSxpappp_new", "MSxpappp_new2", "MSxppapp_new",  "MSxppapp_new2"
               #'MSxpapap', 'MSxpaaap', "MSxpaaap_new","MSxpapap_new"
-               'MSxppppp', 'MSxpppap' 
-               #'MSxppppa',  'MSxpppaa', 'MSxpappa'
+              # 'MSxppppp', 'MSxpppap' 
+              'MSxppppa',  'MSxpppaa', 'MSxpappa'
               )
   
   ids.left = setdiff(ids.current, ids.sels)
@@ -1352,7 +1354,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     sub.obj <- FindClusters(sub.obj, resolution = resolution, algorithm = 3)
     return(sub.obj$seurat_clusters)
   }
-  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:10, compute.SNN = TRUE)
+  sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:5, compute.SNN = TRUE)
   sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.5)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
   
@@ -1363,7 +1365,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   p4 = VlnPlot(sub.obj, features = c('timingEst'), ncol = 1, group.by = 'seurat_clusters_split') + NoLegend()
   
   (p2 + p4) / p1  + ggsave(paste0(resDir, '/splitcluster_timingEstimation_manual.IDs_iteration_GR', GR.iteration, 
-                                  '_MSxppppp_MSxpppap.pdf'), 
+                                  '_MSxppppa_MSxpppaa_MSxpappa.pdf'), 
                            width = 18, height = 16)
   
     
@@ -1446,10 +1448,12 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   
   # update the annotation with marker genes
   cluster.assingment = list(
-    c('1', 'MSxppppp'),
-    c('2', 'MSxppppp'), 
-    c('0', 'MSxpppap')
-    
+    c('1', 'MSxpappa'),
+    c('5', 'MSxpappa'),
+    c('4', 'MSxppppa'),
+    c('0', 'MSxppppa'),
+    c('2', 'MSxpppaa'),
+    c('3', 'MSxpppaa')
   )
   
   cat(length(cluster.assingment), 'clusters assigned \n')

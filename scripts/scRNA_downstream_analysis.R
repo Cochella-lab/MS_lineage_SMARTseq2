@@ -399,6 +399,23 @@ DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = T
 
 seurat.obj = manual.annotation.for.pharynx.clusters(seurat.obj)
 
+
+########################################################
+########################################################
+# Section : 
+# 
+########################################################
+########################################################
+RDSsaved = paste0(RdataDir, 
+"processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_cleanedBWM_and_Pharynx_iteration_GR14.rds")
+seurat.obj = readRDS(file = RDSsaved)
+DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+        na.value = "gray") + 
+  ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_annotedIDs")) +
+  scale_colour_hue(drop = FALSE) + 
+  NoLegend()
+
+
 ########################################################
 ########################################################
 # Section : regulator prediction using sc_TF_MARA.R
