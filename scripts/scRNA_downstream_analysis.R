@@ -414,7 +414,7 @@ if(manually.annotate.pharynx){
 
 ########################################################
 ########################################################
-# Section : identify regulators of convergence lineages with expression matrix  
+# Section : compare pairs of cell ids and identify regulators of convergence lineages with expression matrix  
 # 
 ########################################################
 ########################################################
@@ -422,30 +422,36 @@ Identify.regulators.convergence.lineages = FALSE
 
 if(Identify.regulators.convergence.lineages){
   
+  resDir = paste0("results/", version.analysis, '/regulators_identification')
+  tabDir = paste0(resDir, "/tables/")
+  
+  if(!dir.exists("results/")){dir.create("results/")}
+  if(!dir.exists(resDir)){dir.create(resDir)}
+  if(!dir.exists(tabDir)){dir.create(tabDir)}
+  
   RDSsaved = paste0(RdataDir, 
                     "processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_cleanedBWM_and_Pharynx_iteration_GR14.rds")
+  
   seurat.obj = readRDS(file = RDSsaved)
+  
+  # in case clean or change some id names
+  clean.id.names = FALSE 
+  if(clean.id.names){
+    #jj = which(seurat.obj$manual.annot.ids == "MSxppap/MSxpaaa/MSxpaaap")
+    #seurat.obj$manual.annot.ids[jj] = 'mixture_transitionToTerminal'
+  }
+  
+  ids.current = names(table(seurat.obj$manual.annot.ids))
+  
   DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
           na.value = "gray") + 
-    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_annotedIDs")) +
+    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_Pharynx_annotedIDs")) +
     scale_colour_hue(drop = FALSE) + 
     NoLegend()
   
     
 }
 
-########################################################
-########################################################
-# Section : compare pairs of cell ids
-# 
-########################################################
-########################################################
-Compare.cell.ids.pairs = FALSE
-
-if(Compare.cell.ids.pairs){
-  
-  
-}
 
 
 ########################################################
