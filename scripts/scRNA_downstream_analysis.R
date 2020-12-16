@@ -411,10 +411,23 @@ if(manually.annotate.pharynx){
   
 }
 
+########################################################
+########################################################
+# Section : run RNA velocity with velocyto  
+# sort of computationally confirm the cluster annotation using a different method
+########################################################
+########################################################
+Run.RNA.velocity = FALSE
+if(Run.RNA.velocity){
+  source.my.script('run_RNAvelocity.R')
+  
+  run.RNAvelocity.with.velocyto(sub.obj = sub.obj)
+  
+}
 
 ########################################################
 ########################################################
-# Section : compare pairs of cell ids and identify regulators of convergence lineages with expression matrix  
+# Section : Regulators of convergence lineages 
 # 
 ########################################################
 ########################################################
@@ -449,92 +462,77 @@ if(Identify.regulators.convergence.lineages){
     scale_colour_hue(drop = FALSE) + 
     NoLegend()
   
+  ##########################################
+  # step I: compare the pairs of annotated cell ids to find out when the convergence was happening  
+  ##########################################
     
-}
-
-
-
-########################################################
-########################################################
-# Section : run RNA velocity with velocyto  
-# 
-########################################################
-########################################################
-Run.RNA.velocity = FALSE
-if(Run.RNA.velocity){
-  source.my.script('run_RNAvelocity.R')
   
-  run.RNAvelocity.with.velocyto(sub.obj = sub.obj)
-  
-}
-
-########################################################
-########################################################
-# Section : regulator prediction using sc_TF_MARA.R
-# ideally, at the end we will have a package easily to be install in Github
-# inputs will be either mRNA or pre-mRNA matrix
-# the data will be processed either cluster-wise (id-wise) or cell-wise
-# imputation will be done for cell-wise analysis
-# dynamic genes will be identified using gam package
-# MARA is used for inferring TF actvities 
-########################################################
-########################################################
-Infer.TFs.with.scMARA = FALSE
-if(Infer.TFs.with.scMARA){
-  resDir = paste0("results/", version.analysis, '/annoted_BWM')
-  tabDir = paste0(resDir, "/tables/")
-  
-  if(!dir.exists("results/")){dir.create("results/")}
-  if(!dir.exists(resDir)){dir.create(resDir)}
-  if(!dir.exists(tabDir)){dir.create(tabDir)}
-  
-  nb.iteration = 37
-  RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
-                    nb.iteration, '.rds')
-  seurat.obj = readRDS(file = RDSsaved)
-  
-  DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
-          na.value = "gray") + 
-    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_annotedIDs")) +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
+  ##########################################
+  # step II:  
+  ##########################################
   
   
-  ## select manually annotated bwm cells
-  ids.bwm = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
-  cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.bwm))])
-  sub.obj = subset(seurat.obj, cells = cells.sels)
-  
-  rm(seurat.obj) # remove big object to clear memory
-  
-  #sub.obj = readRDS(file = paste0(RdataDir, 'manual_annotated_BWM_3.5k.cells.rds'))
-  sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxppppp.MSxppppa.MSxpppap.MSxpppaa.MSxpappa')] =
-    'mixture_terminal_1'
-  sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxpaaap.MSxppapp.MSxpappp.MSxpapap')] = 
-    'mixture_terminal_2'
-  
-  Test.Umap.Params = FALSE
-  if(Test.Umap.Params){
-    source.my.script('scRNA_functions.R')
-    require(tictoc)
-    tic()
-    test.umap.params.for.BWM.cells(sub.obj, 
-                                   pdfname = 'UMAP_param_TEST_BWM_all_MSx_weight.by.var.FALSE_v2.pdf',
-                                   group.by = 'manual.annot.ids', with_legend = FALSE, weight.by.var = FALSE,
-                                   nfeatures.sampling = c(3000, 5000), nb.pcs.sampling = c(10, 20, 30, 50),
-                                   n.neighbors.sampling = c(20, 30, 50), 
-                                   min.dist.sampling = c(0.01, 0.1, 0.3)
-    )
-    toc()
+  ##########################################
+  # step III: prediction using sc_TF_MARA.R
+  # ideally, at the end we will have a package easily to be install in Github
+  # inputs will be either mRNA or pre-mRNA matrix
+  # the data will be processed either cluster-wise (id-wise) or cell-wise
+  # imputation will be done for cell-wise analysis
+  # dynamic genes will be identified using gam package
+  # MARA is used for inferring TF actvities 
+  ##########################################
+  Infer.TFs.with.scMARA = FALSE
+  if(Infer.TFs.with.scMARA){
+    
+    nb.iteration = 37
+    RDSsaved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_', 
+                      nb.iteration, '.rds')
+    seurat.obj = readRDS(file = RDSsaved)
+    
+    DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+            na.value = "gray") + 
+      ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_annotedIDs")) +
+      scale_colour_hue(drop = FALSE) + 
+      NoLegend()
+    
+    
+    ## select manually annotated bwm cells
+    ids.bwm = names(table(seurat.obj$manual.annot.ids[!is.na(seurat.obj$BWM.cells)], useNA = 'ifany'))
+    cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.bwm))])
+    sub.obj = subset(seurat.obj, cells = cells.sels)
+    
+    rm(seurat.obj) # remove big object to clear memory
+    
+    #sub.obj = readRDS(file = paste0(RdataDir, 'manual_annotated_BWM_3.5k.cells.rds'))
+    sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxppppp.MSxppppa.MSxpppap.MSxpppaa.MSxpappa')] =
+      'mixture_terminal_1'
+    sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxpaaap.MSxppapp.MSxpappp.MSxpapap')] = 
+      'mixture_terminal_2'
+    
+    Test.Umap.Params = FALSE
+    if(Test.Umap.Params){
+      source.my.script('scRNA_functions.R')
+      require(tictoc)
+      tic()
+      test.umap.params.for.BWM.cells(sub.obj, 
+                                     pdfname = 'UMAP_param_TEST_BWM_all_MSx_weight.by.var.FALSE_v2.pdf',
+                                     group.by = 'manual.annot.ids', with_legend = FALSE, weight.by.var = FALSE,
+                                     nfeatures.sampling = c(3000, 5000), nb.pcs.sampling = c(10, 20, 30, 50),
+                                     n.neighbors.sampling = c(20, 30, 50), 
+                                     min.dist.sampling = c(0.01, 0.1, 0.3)
+      )
+      toc()
+      
+    }
+    
+    ##########################################
+    # run the sc_MARA
+    ##########################################
+    source.my.script('scMARA.R')
+    
+    res = predict.TF.MARA.for.scdata(sub.obj, mode = 'cluster.wise', id = 'manual.annot.ids')
     
   }
-  
-  ##########################################
-  # run the sc_MARA
-  ##########################################
-  source.my.script('scMARA.R')
-  
-  res = predict.TF.MARA.for.scdata(sub.obj, mode = 'cluster.wise', id = 'manual.annot.ids')
   
 }
 
