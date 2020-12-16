@@ -1,0 +1,76 @@
+##########################################################################
+##########################################################################
+# Project: MS lineage 
+# Script purpose: analyze convergence lineages and identify potential regulators
+# Usage example: 
+# Author: Jingkui Wang (jingkui.wang@imp.ac.at)
+# Date of creation: Wed Dec 16 11:55:32 2020
+##########################################################################
+##########################################################################
+library(pheatmap)
+library(RColorBrewer)
+library(grid)
+library(Seurat)
+library(scater)
+library(SingleCellExperiment)
+library(scran)
+
+aggregate.cells.across.ids = function(seurat.obj)
+{
+  ids.current = names(table(seurat.obj$manual.annot.ids))
+  cat(length(ids.current), ' annotated ids in total \n')
+  
+  ids.to.drop = ids.current[grep('doublets|like', ids.current)]
+  if(length(ids.to.drop) >0) {
+    ids.sel = setdiff(ids.current, ids.to.drop)
+    cat('ids to drop : \n')
+    print(ids.to.drop)
+  }else{
+    cat('no ids dropped \n')
+    ids.sel = ids.current
+  }
+  
+  cat(length(ids.sel), ' annotated ids were selected to aggregate \n')
+  
+  cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.sel))])
+  
+  cat(length(cells.sels), ' cells selected to annotate \n')
+  
+  sub.obj = subset(seurat.obj, cells = cells.sels)
+  
+  # convert seurat object to SingleCellExperiment 
+  sce = as.SingleCellExperiment(sub.obj)
+  
+  summed <- aggregateAcrossCells(sce, 
+                                 id=colData(sce)[, c("manual.annot.ids")])
+  summed
+  
+  # Creating up a DGEList object for use in edgeR:
+  library(edgeR)
+  y <- DGEList(counts(summed), samples=colData(summed))
+  #y
+  
+  # normalize pseudo-bulk 
+  y <- calcNormFactors(y)
+  y$samples
+  
+  par(mfrow=c(2,2))
+  for (i in seq_len(ncol(y))) {
+    plotMD(y, column=i)
+  }
+  
+  #plotMDS(cpm(y, log=TRUE), 
+  #        col=ifelse(y$samples$tomato, "red", "blue"))
+  
+  # output is DGEList object from edgeR 
+  return(y) 
+  
+}
+
+compare.convergence.lineages.with.others = function(y)
+{
+    
+}
+
+
+

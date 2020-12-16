@@ -45,7 +45,6 @@ library(Seurat)
 library(ggplot2)
 library(dplyr)
 
-source.my.script('scRNA_cluster_annotation_functions.R')
 
 ########################################################
 ########################################################
@@ -316,6 +315,8 @@ if(Transferring.cell.annotation.from.JMdata){
 ########################################################
 Manually.Annotate.BWM.cell.IDs = FALSE
 if(Manually.Annotate.BWM.cell.IDs){
+  source.my.script('scRNA_cluster_annotation_functions.R')
+  
   rdsfile.saved = paste0(RdataDir, 'processed_cells_scran.normalized_reference.based.annotation.scmap.seurat.rds')
   ms = readRDS(file = rdsfile.saved)
   
@@ -389,6 +390,7 @@ if(Prepare.input.for.scanpy){
 ########################################################
 manually.annotate.pharynx = FALSE
 if(manually.annotate.pharynx){
+  
   source.my.script('scRNA_cluster_annotation_functions.R')
   
   resDir = paste0("results/", version.analysis, '/annoted_pharynx')
@@ -462,15 +464,20 @@ if(Identify.regulators.convergence.lineages){
     scale_colour_hue(drop = FALSE) + 
     NoLegend()
   
+  # first aggreate cells of the same annotated ids
+  source.my.script('downstream_Analysis_convergence_lineage.R')
+  y = aggregate.cells.across.ids(seurat.obj)
+  
   ##########################################
   # step I: compare the pairs of annotated cell ids to find out when the convergence was happening  
   ##########################################
-    
+  source.my.script('downstream_Analysis_convergence_lineage.R')  
+  compare.convergence.lineages.with.others(y)
   
   ##########################################
   # step II:  
   ##########################################
-  
+  source.my.script('downstream_Analysis_convergence_lineage.R')  
   
   ##########################################
   # step III: prediction using sc_TF_MARA.R
