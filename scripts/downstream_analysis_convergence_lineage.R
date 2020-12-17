@@ -92,7 +92,7 @@ compare.convergence.lineages.with.others = function(y)
   barplot(counts, main="Car Distribution by Gears and VS",
           xlab="Number of Gears", col=c("darkblue","red"),
           legend = rownames(counts), beside=TRUE)
-  list1.ids = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+  ids.convergence = c('MSx', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
   list2.ids = c('MSxp', 'MSxpp', 'MSxppp', 'MSxapa', 'MSxpppp', 'MSxapap', 'MSxapapp', 
                 'MSxppppp', "MSpaaappp/MSxapappa")
   
@@ -103,11 +103,15 @@ compare.convergence.lineages.with.others = function(y)
   ii2 = match(list2.ids, rownames(sampleDistMatrix))
   compares = sampleDistMatrix[ii2, ii1]
   
+  pdfname = paste0(resDir, "/convergence_lineage_distance_to_others.pdf")
+  pdf(pdfname, width=12, height = 8)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
   barplot(compares, beside = TRUE, col = c(1:nrow(compares)), 
           legend.text = rownames(compares), args.legend = c(x = 'topleft', bty = 'n'), 
           ylim = c(0, 800))
           
-  
+  dev.off()
   
   
 }

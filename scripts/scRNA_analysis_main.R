@@ -437,7 +437,7 @@ Identify.regulators.convergence.lineages = FALSE
 
 if(Identify.regulators.convergence.lineages){
   
-  resDir = paste0("results/", version.analysis, '/regulators_identification')
+  resDir = paste0("results/", version.analysis, '/convergence_lineage')
   tabDir = paste0(resDir, "/tables/")
   
   if(!dir.exists("results/")){dir.create("results/")}
