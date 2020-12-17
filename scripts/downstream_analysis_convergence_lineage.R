@@ -69,7 +69,47 @@ aggregate.cells.across.ids = function(seurat.obj)
 
 compare.convergence.lineages.with.others = function(y)
 {
-    
+  library("pheatmap")
+  library("RColorBrewer")
+  
+  # here the input is the DGEList object from edgeR
+  cpm = edgeR::cpm(y, log = TRUE, prior.count = 1)
+  
+  sampleDists <- dist(t(cpm))
+  
+  sampleDistMatrix <- as.matrix(sampleDists)
+  #rownames(sampleDistMatrix) <- paste( vsd$dex, vsd$cell, sep = " - " )
+  #colnames(sampleDistMatrix) <- NULL
+  colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+  pheatmap(sampleDistMatrix,
+           clustering_distance_rows = sampleDists,
+           clustering_distance_cols = sampleDists,
+           col = colors)
+  
+  
+  # Grouped Bar Plot
+  counts <- table(mtcars$vs, mtcars$gear)
+  barplot(counts, main="Car Distribution by Gears and VS",
+          xlab="Number of Gears", col=c("darkblue","red"),
+          legend = rownames(counts), beside=TRUE)
+  list1.ids = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+  list2.ids = c('MSxp', 'MSxpp', 'MSxppp', 'MSxapa', 'MSxpppp', 'MSxapap', 'MSxapapp', 
+                'MSxppppp', "MSpaaappp/MSxapappa")
+  
+  compares =  matrix(NA, nrow = length(list2.ids), ncol = length(list1.ids))
+  colnames(compares) = list1.ids
+  rownames(compares) = list2.ids
+  ii1 = match(list1.ids, colnames(sampleDistMatrix))
+  ii2 = match(list2.ids, rownames(sampleDistMatrix))
+  compares = sampleDistMatrix[ii2, ii1]
+  
+  barplot(compares, beside = TRUE, col = c(1:nrow(compares)), 
+          legend.text = rownames(compares), args.legend = c(x = 'topleft', bty = 'n'), 
+          ylim = c(0, 800))
+          
+  
+  
+  
 }
 
 
