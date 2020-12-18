@@ -88,31 +88,36 @@ compare.convergence.lineages.with.others = function(y)
   
   
   # Grouped Bar Plot
-  counts <- table(mtcars$vs, mtcars$gear)
-  barplot(counts, main="Car Distribution by Gears and VS",
-          xlab="Number of Gears", col=c("darkblue","red"),
-          legend = rownames(counts), beside=TRUE)
+  #counts <- table(mtcars$vs, mtcars$gear)
+  #barplot(counts, main="Car Distribution by Gears and VS",
+  #        xlab="Number of Gears", col=c("darkblue","red"),
+  #        legend = rownames(counts), beside=TRUE)
   ids.convergence = c('MSx', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
-  list2.ids = c('MSxp', 'MSxpp', 'MSxppp', 'MSxapa', 'MSxpppp', 'MSxapap', 'MSxapapp', 
-                'MSxppppp', "MSpaaappp/MSxapappa")
   
-  compares =  matrix(NA, nrow = length(list2.ids), ncol = length(list1.ids))
-  colnames(compares) = list1.ids
-  rownames(compares) = list2.ids
-  ii1 = match(list1.ids, colnames(sampleDistMatrix))
-  ii2 = match(list2.ids, rownames(sampleDistMatrix))
-  compares = sampleDistMatrix[ii2, ii1]
+  ids.to.comapre = c('MSxp', 'MSxpp', 'MSxppp', 'MSxapa', 'MSxpppp', 'MSxapap', 'MSxapapp', 
+                'MSxppppp', "MSpaaappp/MSxapappa")
   
   pdfname = paste0(resDir, "/convergence_lineage_distance_to_others.pdf")
   pdf(pdfname, width=12, height = 8)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
-  barplot(compares, beside = TRUE, col = c(1:nrow(compares)), 
-          legend.text = rownames(compares), args.legend = c(x = 'topleft', bty = 'n'), 
-          ylim = c(0, 800))
-          
-  dev.off()
+  for(n in 1:length(ids.convergence))
+  {
+    # n = 1
+    list1.ids = ids.convergence[n]
+    cat(list1.ids, '\n')
+    
+    ii1 = match(list1.ids, colnames(sampleDistMatrix))
+    ii2 = match(list2.ids, rownames(sampleDistMatrix))
+    compares = sampleDistMatrix[ii2, ii1]
+    
+    barplot(compares, beside = TRUE, col = c(1:nrow(compares)), 
+            legend.text = rownames(compares), args.legend = c(x = 'topleft', bty = 'n'), 
+            ylim = c(0, 800))
+    
+  }
   
+  dev.off()
   
 }
 
