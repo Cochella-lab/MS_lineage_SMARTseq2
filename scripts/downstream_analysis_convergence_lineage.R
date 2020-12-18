@@ -94,10 +94,20 @@ compare.convergence.lineages.with.others = function(y)
   #        legend = rownames(counts), beside=TRUE)
   ids.convergence = c('MSx', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
   
-  ids.to.comapre = c('MSxp', 'MSxpp', 'MSxppp', 'MSxapa', 'MSxpppp', 'MSxapap', 'MSxapapp', 
-                'MSxppppp', "MSpaaappp/MSxapappa")
   
-  pdfname = paste0(resDir, "/convergence_lineage_distance_to_others.pdf")
+  
+  pdfname = paste0(resDir, "/convergence_lineage_compared_with_one.BWM.lineage_one.Pharynx.lineage.pdf")
+  pdf(pdfname, width=12, height = 8)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  ids.to.comapre = c('MSxp', 'MSxpp', 'MSxppp', 'MSxapa', 'MSxpppp', 'MSxapap', 'MSxapapp', 
+                     'MSxppppp', "MSpaaappp/MSxapappa")
+  
+  
+  
+  dev.off()
+  
+  pdfname = paste0(resDir, "/convergence_lineage_compared_with_one.BWM.lineage_one.Pharynx.lineage.pdf")
   pdf(pdfname, width=12, height = 8)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
