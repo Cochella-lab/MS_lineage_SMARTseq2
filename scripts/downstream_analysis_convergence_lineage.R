@@ -67,38 +67,33 @@ aggregate.cells.across.ids = function(seurat.obj)
   
 }
 
-compare.convergence.lineages.with.others = function(y)
+compare.convergence.lineages.with.others = function(y, method = c('euclidean', 'correlation', 'jsd'))
 {
   library("pheatmap")
   library("RColorBrewer")
+  library(philentropy)
   
   # here the input is the DGEList object from edgeR
   cpm = edgeR::cpm(y, log = TRUE, prior.count = 1)
   
-  sampleDists <- dist(t(cpm))
+  method = 'jsd'
+  #colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+  
+  if(method == 'euclidean'){ sampleDists <- dist(t(cpm), method = 'euclidean'); xlim = c(0, 500)}
+  
+  if(method == 'correlation'){ sampleDists = cor(cpm, method = 'pearson'); xlim = c(0, 1)}
+  
+  if(method == 'jsd') {sampleDists = JSD(t(as.matrix(cpm)), unit = 'log2')}
   
   sampleDistMatrix <- as.matrix(sampleDists)
-  #rownames(sampleDistMatrix) <- paste( vsd$dex, vsd$cell, sep = " - " )
-  #colnames(sampleDistMatrix) <- NULL
-  colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
-  pheatmap(sampleDistMatrix,
-           clustering_distance_rows = sampleDists,
-           clustering_distance_cols = sampleDists,
-           col = colors)
   
-  
-  # Grouped Bar Plot
-  #counts <- table(mtcars$vs, mtcars$gear)
-  #barplot(counts, main="Car Distribution by Gears and VS",
-  #        xlab="Number of Gears", col=c("darkblue","red"),
-  #        legend = rownames(counts), beside=TRUE)
   ids.convergence = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
   ids.bwm = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
   ids.phrx = c('MSxapa', 'MSxapap', 'MSxapapp', "MSpaaappp/MSxapappa")
   
-  pdfname = paste0(resDir, "/convergence_lineage_compared_with_one.BWM.lineage_one.Pharynx.lineage.pdf")
+  pdfname = paste0(resDir, "/convergence_lineage_compared_with_one.BWM.lineage_one.Pharynx.lineage", method, ".pdf")
   pdf(pdfname, width=12, height = 8)
-  par(cex =0.7, mar = c(5,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  par(cex =0.7, mar = c(5,8,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   cc = matrix(NA, ncol = length(ids.convergence), nrow = length(c(ids.bwm, ids.phrx)))
   colnames(cc) = ids.convergence
@@ -123,8 +118,8 @@ compare.convergence.lineages.with.others = function(y)
     
     barplot(cc.dist, beside = TRUE, col=c(1:length(cc.dist)), main = colnames(cc)[n], 
             #legend.text = rownames(cc.vec), args.legend = c(x = 'topleft', bty = 'n'), 
-            names.arg = names(cc.dist), las = 2,
-            ylim = c(0, 600))
+            names.arg = names(cc.dist), las = 2, horiz = TRUE,
+            xlim = xlim)
     
   }
   names(cc.vec) = cc.vec.names
@@ -133,7 +128,7 @@ compare.convergence.lineages.with.others = function(y)
   
   ids.mothers = c('MSx', 'MSxa', 'MSxap')
    
-  pdfname = paste0(resDir, "/convergence_lineage_compared_mothers_sisters.pdf")
+  pdfname = paste0(resDir, "/convergence_lineage_compared_mothers_sisters", method, ".pdf")
   pdf(pdfname, width=10, height = 6)
   par(cex =0.7, mar = c(4,10,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
@@ -154,7 +149,7 @@ compare.convergence.lineages.with.others = function(y)
     
     barplot(cc, beside = TRUE, col = c(1:length(cc)), horiz = TRUE,
             names.arg = names(cc),
-           las = 2, xlim = c(0, 500))
+           las = 2, xlim = xlim)
     
   }
   
