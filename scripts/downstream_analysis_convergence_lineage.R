@@ -92,38 +92,69 @@ compare.convergence.lineages.with.others = function(y)
   #barplot(counts, main="Car Distribution by Gears and VS",
   #        xlab="Number of Gears", col=c("darkblue","red"),
   #        legend = rownames(counts), beside=TRUE)
-  ids.convergence = c('MSx', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
-  
-  
+  ids.convergence = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+  ids.bwm = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+  ids.phrx = c('MSxapa', 'MSxapap', 'MSxapapp', "MSpaaappp/MSxapappa")
   
   pdfname = paste0(resDir, "/convergence_lineage_compared_with_one.BWM.lineage_one.Pharynx.lineage.pdf")
   pdf(pdfname, width=12, height = 8)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  par(cex =0.7, mar = c(5,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
-  ids.to.comapre = c('MSxp', 'MSxpp', 'MSxppp', 'MSxapa', 'MSxpppp', 'MSxapap', 'MSxapapp', 
-                     'MSxppppp', "MSpaaappp/MSxapappa")
+  cc = matrix(NA, ncol = length(ids.convergence), nrow = length(c(ids.bwm, ids.phrx)))
+  colnames(cc) = ids.convergence
+  rownames(cc) = c(ids.bwm, ids.phrx)
   
-  
+  #ii1 = match(ids.convergence[-c(1:2)], colnames(sampleDistMatrix))
+  #ii2 = match(ids.phrx, rownames(sampleDistMatrix))
+  cc.vec = c()
+  cc.vec.names = c()
+  for(n in 1:ncol(cc))
+  {
+    # n = 1
+    ii1 = match(colnames(cc)[n], colnames(sampleDistMatrix))
+    ids2compare = c(ids.bwm[which(nchar(ids.bwm) <= (nchar(colnames(cc)[n]) + 1))], 
+                    ids.phrx[which(nchar(ids.phrx) == nchar(colnames(cc)[n]))])
+    ii2 = match(ids2compare, rownames(sampleDistMatrix))
+    
+    cc[match(ids2compare, rownames(cc)), n] = sampleDistMatrix[ii2, ii1]
+    cc.vec = c(cc.vec, sampleDistMatrix[ii2, ii1])
+    cc.dist = sampleDistMatrix[ii2, ii1]
+    cc.vec.names = c(cc.vec.names, paste0(colnames(cc)[n], '_vs_', ids2compare))
+    
+    barplot(cc.dist, beside = TRUE, col=c(1:length(cc.dist)), main = colnames(cc)[n], 
+            #legend.text = rownames(cc.vec), args.legend = c(x = 'topleft', bty = 'n'), 
+            names.arg = names(cc.dist), las = 2,
+            ylim = c(0, 600))
+    
+  }
+  names(cc.vec) = cc.vec.names
   
   dev.off()
   
-  pdfname = paste0(resDir, "/convergence_lineage_compared_with_one.BWM.lineage_one.Pharynx.lineage.pdf")
-  pdf(pdfname, width=12, height = 8)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  ids.mothers = c('MSx', 'MSxa', 'MSxap')
+   
+  pdfname = paste0(resDir, "/convergence_lineage_compared_mothers_sisters.pdf")
+  pdf(pdfname, width=10, height = 6)
+  par(cex =0.7, mar = c(4,10,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
-  for(n in 1:length(ids.convergence))
+  for(n in 1:length(ids.mothers))
   {
     # n = 1
-    list1.ids = ids.convergence[n]
-    cat(list1.ids, '\n')
+    ids2compare = c(ids.mothers[n], paste0(ids.mothers[n], c('p', 'a')))
+    #ii1 = match(list1.ids, colnames(sampleDistMatrix))
+    #ii2 = match(list2.ids, rownames(sampleDistMatrix))
+    compares = sampleDistMatrix[match(ids2compare, rownames(sampleDistMatrix)), 
+                                match(ids2compare, colnames(sampleDistMatrix))]
+    compares[lower.tri(compares, diag = TRUE)] <- NA
+    cc.names = expand.grid(colnames(compares), '_vs_', rownames(compares))
+    cc.names = paste0(cc.names[, 3], cc.names[,2], cc.names[,1]) 
+    cc = as.vector(compares)
+    names(cc) = cc.names
+    cc = cc[!is.na(cc)]
     
-    ii1 = match(list1.ids, colnames(sampleDistMatrix))
-    ii2 = match(list2.ids, rownames(sampleDistMatrix))
-    compares = sampleDistMatrix[ii2, ii1]
-    
-    barplot(compares, beside = TRUE, col = c(1:nrow(compares)), 
-            legend.text = rownames(compares), args.legend = c(x = 'topleft', bty = 'n'), 
-            ylim = c(0, 800))
+    barplot(cc, beside = TRUE, col = c(1:length(cc)), horiz = TRUE,
+            names.arg = names(cc),
+           las = 2, xlim = c(0, 500))
     
   }
   
