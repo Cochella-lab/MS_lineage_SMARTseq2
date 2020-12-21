@@ -471,12 +471,13 @@ if(Identify.regulators.convergence.lineages){
   # step I: compare the pairs of annotated cell ids to find out when the convergence was happening  
   ##########################################
   source.my.script('downstream_Analysis_convergence_lineage.R')  
-  compare.convergence.lineages.with.others(y)
+  # compare.convergence.lineages.with.others(y)
   
   ##########################################
   # step II:  
   ##########################################
-  source.my.script('downstream_Analysis_convergence_lineage.R')  
+  source.my.script('downstream_Analysis_convergence_lineage.R')
+  find.regulators.for.convergence.lineage(y)
   
   ##########################################
   # step III: prediction using sc_TF_MARA.R

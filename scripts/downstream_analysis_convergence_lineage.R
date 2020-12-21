@@ -71,7 +71,7 @@ compare.convergence.lineages.with.others = function(y, method = c('euclidean', '
 {
   library("pheatmap")
   library("RColorBrewer")
-  library(philentropy)
+  #library(philentropy)
   
   # here the input is the DGEList object from edgeR
   cpm = edgeR::cpm(y, log = TRUE, prior.count = 1)
@@ -83,7 +83,13 @@ compare.convergence.lineages.with.others = function(y, method = c('euclidean', '
   
   if(method == 'correlation'){ sampleDists = cor(cpm, method = 'pearson'); xlim = c(0, 1)}
   
-  if(method == 'jsd') {sampleDists = JSD(t(as.matrix(cpm)), unit = 'log2')}
+  if(method == 'jsd') {
+    library(cummeRbund)
+    cpm2 = log2(2^cpm + 1)
+    probs <- cummeRbund::makeprobs(cpm2)
+    sampleDists <-cummeRbund::JSdist(probs)
+    #sampleDists = JSD(t(as.matrix(cpm)), unit = 'log2')
+  }
   
   sampleDistMatrix <- as.matrix(sampleDists)
   
@@ -91,7 +97,7 @@ compare.convergence.lineages.with.others = function(y, method = c('euclidean', '
   ids.bwm = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
   ids.phrx = c('MSxapa', 'MSxapap', 'MSxapapp', "MSpaaappp/MSxapappa")
   
-  pdfname = paste0(resDir, "/convergence_lineage_compared_with_one.BWM.lineage_one.Pharynx.lineage", method, ".pdf")
+  pdfname = paste0(resDir, "/convergence_lineage_compared_with_one.BWM.lineage_one.Pharynx.lineage_", method, ".pdf")
   pdf(pdfname, width=12, height = 8)
   par(cex =0.7, mar = c(5,8,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
@@ -122,13 +128,14 @@ compare.convergence.lineages.with.others = function(y, method = c('euclidean', '
             xlim = xlim)
     
   }
+  
   names(cc.vec) = cc.vec.names
   
   dev.off()
   
   ids.mothers = c('MSx', 'MSxa', 'MSxap')
    
-  pdfname = paste0(resDir, "/convergence_lineage_compared_mothers_sisters", method, ".pdf")
+  pdfname = paste0(resDir, "/convergence_lineage_compared_mothers_sisters_", method, ".pdf")
   pdf(pdfname, width=10, height = 6)
   par(cex =0.7, mar = c(4,10,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
@@ -157,5 +164,20 @@ compare.convergence.lineages.with.others = function(y, method = c('euclidean', '
   
 }
 
-
+find.regulators.for.convergence.lineage = function(y)
+{
+  library("pheatmap")
+  library("RColorBrewer")
+    
+  # here the input is the DGEList object from edgeR
+  cpm = edgeR::cpm(y, log = TRUE, prior.count = 1)
+  
+  ids.convergence = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+  ids.bwm = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+  ids.phrx = c('MSxapa', 'MSxapap', 'MSxapapp', "MSpaaappp/MSxapappa")
+  
+  ids.sel = c('MSx', ids.convergence, ids.bwm, ids.phrx)
+  
+  
+}
 
