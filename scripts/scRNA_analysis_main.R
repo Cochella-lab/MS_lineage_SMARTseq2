@@ -45,7 +45,6 @@ library(Seurat)
 library(ggplot2)
 library(dplyr)
 
-
 ########################################################
 ########################################################
 # Section : annotate scRNA clusters by mapping to reference
