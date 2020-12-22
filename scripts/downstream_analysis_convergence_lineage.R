@@ -173,10 +173,10 @@ find.regulators.for.convergence.lineage = function(y)
   cpm = edgeR::cpm(y, log = TRUE, prior.count = 1)
   
   ids.convergence = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
-  ids.bwm = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+  ids.bwm = c('MSx', 'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
   ids.phrx = c('MSxapa', 'MSxapap', 'MSxapapp', "MSpaaappp/MSxapappa")
   
-  ids.sel = c('MSx', ids.convergence, ids.bwm, ids.phrx)
+  #ids.sel = c( ids.convergence, ids.bwm, ids.phrx)
   
   
   
