@@ -175,6 +175,7 @@ find.regulators.for.convergence.lineage = function(y)
   ids.convergence = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
   ids.bwm = c('MSx', 'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppx', 'MSxppppp')
   ids.phrx = c('MSxapa', 'MSxapap', 'MSxapapp', "MSpaaappp/MSxapappa")
+  #ids.phrx2 = c('MSxaa')
   
   ids.sel = c(ids.bwm, ids.convergence, ids.phrx)
   #indexs = c(c(1:7), c(2:7), c(3:6))
