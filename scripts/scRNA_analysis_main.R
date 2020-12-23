@@ -465,7 +465,10 @@ if(Identify.regulators.convergence.lineages){
   
   # first aggreate cells of the same annotated ids
   source.my.script('downstream_Analysis_convergence_lineage.R')
-  y = aggregate.cells.across.ids(seurat.obj)
+  #y = aggregate.cells.across.ids(seurat.obj)
+  #saveRDS(y, file = paste0(RdataDir, 'sce_object_cells_aggregated_across.ids.rds'))
+  
+  y = readRDS(file = paste0(RdataDir, 'sce_object_cells_aggregated_across.ids.rds'))
   
   ##########################################
   # step I: compare the pairs of annotated cell ids to find out when the convergence was happening  

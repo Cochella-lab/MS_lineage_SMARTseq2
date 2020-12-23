@@ -173,12 +173,46 @@ find.regulators.for.convergence.lineage = function(y)
   cpm = edgeR::cpm(y, log = TRUE, prior.count = 1)
   
   ids.convergence = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
-  ids.bwm = c('MSx', 'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+  ids.bwm = c('MSx', 'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppx', 'MSxppppp')
   ids.phrx = c('MSxapa', 'MSxapap', 'MSxapapp', "MSpaaappp/MSxapappa")
   
-  #ids.sel = c( ids.convergence, ids.bwm, ids.phrx)
+  ids.sel = c(ids.bwm, ids.convergence, ids.phrx)
+  #indexs = c(c(1:7), c(2:7), c(3:6))
+  #cols = c('black', rep('darkblue', 6), rep('red', 6), rep('orange', 4))
   
+  tfs = readxl::read_xlsx('../data/motifs_tfs/Table-S2-wTF-3.0-Fuxman-Bass-Mol-Sys-Biol-2016.xlsx', sheet = 1)
+  gene2plot = unique(c('pha-4', 'hnd-1', 'hlh-1', 'unc-120', 'nhr-67', tfs$`Public name`))
+  gene2plot = gene2plot[!is.na(match(gene2plot, rownames(cpm)))]
   
+  cpmxx = cpm[match(gene2plot, rownames(cpm)), match(ids.sel, colnames(cpm))]
+  kk = apply(as.matrix(cpmxx), 1, function(x) !all(as.numeric(x)<2))
+  cpmxx = cpmxx[kk, ]
+  
+  pdfname = paste0(resDir, "/convergence_lineage_regulators_profiles_v2.pdf")
+  pdf(pdfname, width=10, height = 6)
+  par(cex =1.0, mar = c(4,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  for(n in 1:nrow(cpmxx))
+  {
+    # n = 2
+    if(!all(is.na(cpmxx[n]))){
+      cat(n, ' -- ', rownames(cpmxx)[n], '\n')
+      ylims = range(cpmxx[n, ]) + c(-1, 1)
+      plot(c(1:7), cpmxx[n, c(1:7)], ylim = ylims, col = 'darkblue', type='b', main = rownames(cpmxx)[n], pch = 15, lwd = 1.5,
+           ylab = 'log2(cpm)', xlab = 'cell ids')
+      points(c(1:7), cpmxx[n, c(1, 8:13)], col = 'red', type = 'b', lwd = 3.0, pch = 16)
+      points(c(3:7), cpmxx[n, c(9, 14:17)], col = 'black', type = 'b', pch =17)
+      abline(v = c(4, 5), lwd =2.0, lty = 'dashed', col = 'gray')
+      legend('topright', c('bwm', 'convergence', 'pharynx'),lwd = c(1, 2, 1), pch = c(15, 16, 17),
+             col = c('darkblue', 'red', 'black'),  adj = c(0, 0.6), bty = 'n')
+      # add text
+      text(c(1:7), cpmxx[n, c(1:7)], ids.bwm, pos = 3, cex = 0.8)
+      text(c(2:7), cpmxx[n, c(8:13)], ids.convergence, pos = 3, cex = 0.8)
+      text(c(4:7), cpmxx[n, c(14:17)], ids.phrx, pos = 3, cex = 0.8)
+    }
+   
+  }
+  dev.off()
   
 }
 
