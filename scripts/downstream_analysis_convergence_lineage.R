@@ -175,9 +175,10 @@ find.regulators.for.convergence.lineage = function(y)
   ids.convergence = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
   ids.bwm = c('MSx', 'MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppx', 'MSxppppp')
   ids.phrx = c('MSxapa', 'MSxapap', 'MSxapapp', "MSpaaappp/MSxapappa")
-  #ids.phrx2 = c('MSxaa')
+  ids.phrx2 = c('MSxaa', 'MSxaaa', 'MSpaaap', 'MSpaaapp', 'MSpaaappp/MSxapappa')
+  ids.bwm2 = c('MSxpa', 'MSxpaa', 'MSxpaaa', 'MSxpaaap')
   
-  ids.sel = c(ids.bwm, ids.convergence, ids.phrx)
+  ids.sel = c(ids.bwm, ids.convergence, ids.phrx, ids.phrx2, ids.bwm2)
   #indexs = c(c(1:7), c(2:7), c(3:6))
   #cols = c('black', rep('darkblue', 6), rep('red', 6), rep('orange', 4))
   
@@ -190,29 +191,36 @@ find.regulators.for.convergence.lineage = function(y)
   cpmxx = cpmxx[kk, ]
   
   pdfname = paste0(resDir, "/convergence_lineage_regulators_profiles_v2.pdf")
-  pdf(pdfname, width=10, height = 6)
+  pdf(pdfname, width=15, height = 10)
   par(cex =1.0, mar = c(4,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   for(n in 1:nrow(cpmxx))
   {
-    # n = 2
+    # n = 1
     if(!all(is.na(cpmxx[n]))){
       cat(n, ' -- ', rownames(cpmxx)[n], '\n')
       ylims = range(cpmxx[n, ]) + c(-1, 1)
-      plot(c(1:7), cpmxx[n, c(1:7)], ylim = ylims, col = 'darkblue', type='b', main = rownames(cpmxx)[n], pch = 15, lwd = 1.5,
+      plot(c(1:7), cpmxx[n, c(1:7)], ylim = ylims, col = 'darkblue', type='b', main = rownames(cpmxx)[n], pch = 15, lwd = 2.0,
            ylab = 'log2(cpm)', xlab = 'cell ids')
-      points(c(1:7), cpmxx[n, c(1, 8:13)], col = 'red', type = 'b', lwd = 3.0, pch = 16)
+      #points(c(2:6), cpmxx[n, c(2, 23:26)], col = 'darkblue', type = 'b', pch =17, lty = 2, lwd = 2.0)
+      points(c(1:7), cpmxx[n, c(1, 8:13)], col = 'red', type = 'b', lwd = 4.0, pch = 16)
       points(c(3:7), cpmxx[n, c(9, 14:17)], col = 'black', type = 'b', pch =17)
+      points(c(2:7), cpmxx[n, c(8, 18:22)], col = 'black', type = 'b', pch =17, lty = 2)
+      
+      
       abline(v = c(4, 5), lwd =2.0, lty = 'dashed', col = 'gray')
       legend('topright', c('bwm', 'convergence', 'pharynx'),lwd = c(1, 2, 1), pch = c(15, 16, 17),
              col = c('darkblue', 'red', 'black'),  adj = c(0, 0.6), bty = 'n')
       # add text
       text(c(1:7), cpmxx[n, c(1:7)], ids.bwm, pos = 3, cex = 0.8)
       text(c(2:7), cpmxx[n, c(8:13)], ids.convergence, pos = 3, cex = 0.8)
-      text(c(4:7), cpmxx[n, c(14:17)], ids.phrx, pos = 3, cex = 0.8)
+      text(c(4:7), cpmxx[n, c(14:17)], ids.phrx, pos = 3, cex = 0.7)
+      text(c(3:7), cpmxx[n, c(18:22)], ids.phrx2, pos = 3, cex = 0.5)
+      #text(c(3:6), cpmxx[n, c(23:26)], ids.bwm2, pos = 3, cex = 0.5)
     }
    
   }
+  
   dev.off()
   
 }
