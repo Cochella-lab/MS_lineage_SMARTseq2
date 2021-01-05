@@ -223,5 +223,13 @@ find.regulators.for.convergence.lineage = function(y)
   
   dev.off()
   
+  ##########################################
+  # supporting argument for asymmetric cell division 
+  ##########################################
+  
+  
+  
+  
+  
 }
 
