@@ -226,8 +226,12 @@ find.regulators.for.convergence.lineage = function(y)
   ##########################################
   # supporting argument for asymmetric cell division 
   ##########################################
+  cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, c('MSxap', 'MSxapa', 'MSxapp',
+                                                                                       'MSxpp', 'MSxppa', 'MSxppp')))])
+  sub.obj = subset(seurat.obj, cells = cells.sels)
   
-  
+  VlnPlot(sub.obj, features = c("FSC_log2", "BSC_log2"), ncol = 2,
+          group.by = 'manual.annot.ids')
   
   
   
