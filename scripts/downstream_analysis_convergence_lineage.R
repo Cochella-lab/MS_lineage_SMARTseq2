@@ -190,7 +190,7 @@ find.regulators.for.convergence.lineage = function(y)
   kk = apply(as.matrix(cpmxx), 1, function(x) !all(as.numeric(x)<2))
   cpmxx = cpmxx[kk, ]
   
-  pdfname = paste0(resDir, "/convergence_lineage_regulators_profiles_v2.pdf")
+  pdfname = paste0(resDir, "/convergence_lineage_regulators_profiles_v3.pdf")
   pdf(pdfname, width=15, height = 10)
   par(cex =1.0, mar = c(4,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
@@ -233,6 +233,13 @@ find.regulators.for.convergence.lineage = function(y)
   VlnPlot(sub.obj, features = c("FSC_log2", "BSC_log2"), ncol = 2,
           group.by = 'manual.annot.ids')
   
+  #FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
+  VlnPlot(sub.obj, features = c("par-1", 'par-3', 'par-2', 'par-5',  'par-6', 'pkc-3', 'num-1',
+                                "mex-5", 'mex-6', 'ref-1', 'ref-2'), ncol = 3,
+          group.by = 'manual.annot.ids') +
+    ggsave(paste0(resDir, '/genes_in_asymmetric.cell.division_Notch.signaling.pdf'),  width = 18, height = 16)
+  
+  FeaturePlot(seurat.obj, reduction = 'umap', features = c('ref-1', 'ref-2'))
   
   
 }
