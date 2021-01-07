@@ -240,7 +240,11 @@ find.regulators.for.convergence.lineage = function(y)
           group.by = 'manual.annot.ids') +
     ggsave(paste0(resDir, '/genes_in_asymmetric.cell.division_Notch.signaling.pdf'),  width = 18, height = 16)
   
-  FeaturePlot(seurat.obj, reduction = 'umap', features = c('ref-1', 'ref-2', 'glp-1', 'pop-1'))
+  VlnPlot(sub.obj, features = c('hnd-1', 'pha-4' #"par-1", 'par-3', 'par-2', 'par-5',  'par-6', 'pkc-3', 'num-1',
+                                #"mex-5", 'mex-6', 'ref-1', 'ref-2', 'glp-1' #'rnt-1', 'bro-1'
+  ), ncol = 3,  group.by = 'manual.annot.ids')
+  
+  FeaturePlot(seurat.obj, reduction = 'umap', features = c('ref-1', 'ref-2', 'glp-1', 'pop-1', 'hnd-1', 'pha-4'))
   
   
 }
