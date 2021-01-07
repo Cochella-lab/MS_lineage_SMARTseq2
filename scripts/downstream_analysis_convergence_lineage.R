@@ -226,8 +226,11 @@ find.regulators.for.convergence.lineage = function(y)
   ##########################################
   # supporting argument for asymmetric cell division 
   ##########################################
-  cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, c('MSxap', 'MSxapa', 'MSxapp',
-                                                                                       'MSxpp', 'MSxppa', 'MSxppp')))])
+  ms.early = c('MSx', 
+               'MSxp', 'MSxa', 
+               'MSxpp', 'MSxpa', 'MSxap', 'MSxaa', 
+               'MSxppp', 'MSxppa', 'MSxpap', 'MSxpaa', 'MSxapp', 'MSxapa', 'MSxaap', 'MSxaaa')
+  cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ms.early))])
   sub.obj = subset(seurat.obj, cells = cells.sels)
   
   VlnPlot(sub.obj, features = c("FSC_log2", "BSC_log2"), ncol = 2,
@@ -242,7 +245,7 @@ find.regulators.for.convergence.lineage = function(y)
   
   VlnPlot(sub.obj, features = c('hnd-1', 'pha-4' #"par-1", 'par-3', 'par-2', 'par-5',  'par-6', 'pkc-3', 'num-1',
                                 #"mex-5", 'mex-6', 'ref-1', 'ref-2', 'glp-1' #'rnt-1', 'bro-1'
-  ), ncol = 3,  group.by = 'manual.annot.ids')
+  ), ncol = 2,  group.by = 'manual.annot.ids')
   
   FeaturePlot(seurat.obj, reduction = 'umap', features = c('ref-1', 'ref-2', 'glp-1', 'pop-1', 'hnd-1', 'pha-4'))
   

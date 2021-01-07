@@ -428,7 +428,11 @@ if(Run.RNA.velocity){
 
 ########################################################
 ########################################################
-# Section : Regulators of convergence lineages 
+# Section : analyze convergence lineages (two steps)
+# step 1) : demonstrate after the cell division Msxap, MSxapp start to show difference from pharynx lineages
+# and MSxappp is converged into BWM
+# step 2) : explore the underlying mechanisms (asymmetric cell division, or Notch, Wnt singaling after cell division) 
+# and associated regulators (e.g. TFs to test)
 # 
 ########################################################
 ########################################################
