@@ -463,7 +463,7 @@ if(Identify.regulators.convergence.lineages){
   
   DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
           na.value = "gray") + 
-    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10_BWM_Pharynx_annotedIDs")) +
+    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pcs_k10_BWM_Pharynx_annotedIDs")) +
     scale_colour_hue(drop = FALSE) + 
     NoLegend()
   
@@ -471,14 +471,16 @@ if(Identify.regulators.convergence.lineages){
   source.my.script('downstream_Analysis_convergence_lineage.R')
   #y = aggregate.cells.across.ids(seurat.obj)
   #saveRDS(y, file = paste0(RdataDir, 'sce_object_cells_aggregated_across.ids.rds'))
-  
   y = readRDS(file = paste0(RdataDir, 'sce_object_cells_aggregated_across.ids.rds'))
   
   ##########################################
-  # step I: compare the pairs of annotated cell ids to find out when the convergence was happening  
+  # step 1): when does the convergence start and end (convergence time window)
+  # by compare the pairs of annotated cell ids   
+  # or dimensiona reduction
   ##########################################
   source.my.script('downstream_Analysis_convergence_lineage.R')  
-  # compare.convergence.lineages.with.others(y)
+  compare.convergence.lineages.with.others(y, seurat.obj)
+  #Reduction.plot.convergence.lineage
   
   ##########################################
   # step II:  

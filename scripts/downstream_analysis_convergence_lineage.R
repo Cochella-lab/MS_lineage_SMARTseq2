@@ -67,12 +67,96 @@ aggregate.cells.across.ids = function(seurat.obj)
   
 }
 
-compare.convergence.lineages.with.others = function(y, method = c('euclidean', 'correlation', 'jsd'))
+compare.convergence.lineages.with.others = function(y, seurat.obj,  method = c('euclidean', 'correlation', 'jsd'))
 {
   library("pheatmap")
   library("RColorBrewer")
   #library(philentropy)
   
+  tfs = readxl::read_xlsx('../data/motifs_tfs/Table-S2-wTF-3.0-Fuxman-Bass-Mol-Sys-Biol-2016.xlsx', sheet = 1)
+  
+  ids.convergence = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+  ids.bwm = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+  ids.phrx = c('MSxapa', 'MSxapap', 'MSxapapp', "MSpaaappp/MSxapappa")
+  
+  ##########################################
+  # step 1: dimension reduction to visualize the convergence lineage, one bwm and one pharynx lineages    
+  ##########################################
+  ids.sel = unique(c('MSx', ids.bwm, ids.convergence, ids.phrx))
+  cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.sel))])
+  sub.obj = subset(seurat.obj, cells = cells.sels)
+  
+  DimPlot(sub.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+          na.value = "gray") +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  USE.UMAP = FALSE
+  if(USE.UMAP){
+    nfeatures = 2000;
+    sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
+    sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
+    sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, weight.by.var = FALSE)
+    ElbowPlot(sub.obj, ndims = 50)
+    
+    nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
+    n.neighbors = 10;
+    min.dist = 0.3; spread = 1
+    sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
+                       spread = spread, n.neighbors = n.neighbors,
+                       min.dist = min.dist, verbose = TRUE)
+    DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
+      NoLegend()
+  }
+  
+  USE.MDS = FALSE
+  if(USE.MDS){
+    library(pheatmap)
+    library(RColorBrewer)
+    library(grid)
+    library(Seurat)
+    library(scater)
+    library(SingleCellExperiment)
+    library(scran)
+    sce = as.SingleCellExperiment(sub.obj)
+    
+    dec <- modelGeneVar(sce)
+    plot(dec$mean, dec$total, xlab="Mean log-expression", ylab="Variance")
+    curve(metadata(dec)$trend(x), col="blue", add=TRUE)
+    
+    top.hvgs <- getTopHVGs(dec, n=2000)
+    
+    sce <- runPCA(sce, subset_row=top.hvgs)
+    reducedDimNames(sce)
+    
+    
+    sce = runDiffusionMap(sce, ncomponents = 4, n_pcs = 50, k = 100)
+    plotDiffusionMap(sce, ncomponents = c(1, 3), colour_by = "manual.annot.ids", text_by="manual.annot.ids")
+    plotDiffusionMap(sce, ncomponents = c(1, 2), colour_by = "manual.annot.ids", text_by="manual.annot.ids")
+    
+    #install.packages("plot3D")
+    library("plot3D")
+    x = reducedDim(sce, 'DiffusionMap')[, 1]
+    y = reducedDim(sce, 'DiffusionMap')[, 2]
+    z = reducedDim(sce, 'DiffusionMap')[, 3]
+    scatter3D(x, y, z, pch = 18,  theta = 20, phi = 20,
+              main = "Iris data", xlab = "DC1",
+              ylab ="DC2", zlab = "DC3")
+    
+    
+    sce <- runMDS(sce, ncomponents=2, dimred = 'DiffusionMap', n_dimred = 3, scale_features = FALSE)
+    plotMDS(sce, ncomponents = 2, colour_by = "manual.annot.ids", text_by="manual.annot.ids")
+    
+    #library(destiny)
+    #ll.pca = reducedDim(sce, 'PCA')[, c(1:50)]
+    #dm <- DiffusionMap(ll.pca, sigma = 'local', n_eigs = 3, k = 30, distance = 'euclidean', n_pcs = NA)
+    #plot(dm)
+    
+  }
+  
+  ##########################################
+  # step 2: comparer the distance or correlation between the convergence lineage, BWM and pharynx lienages
+  ##########################################
   # here the input is the DGEList object from edgeR
   cpm = edgeR::cpm(y, log = TRUE, prior.count = 1)
   
@@ -93,9 +177,6 @@ compare.convergence.lineages.with.others = function(y, method = c('euclidean', '
   
   sampleDistMatrix <- as.matrix(sampleDists)
   
-  ids.convergence = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
-  ids.bwm = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
-  ids.phrx = c('MSxapa', 'MSxapap', 'MSxapapp', "MSpaaappp/MSxapappa")
   
   pdfname = paste0(resDir, "/convergence_lineage_compared_with_one.BWM.lineage_one.Pharynx.lineage_", method, ".pdf")
   pdf(pdfname, width=12, height = 8)
@@ -247,7 +328,8 @@ find.regulators.for.convergence.lineage = function(y)
                                 #"mex-5", 'mex-6', 'ref-1', 'ref-2', 'glp-1' #'rnt-1', 'bro-1'
   ), ncol = 2,  group.by = 'manual.annot.ids')
   
-  FeaturePlot(seurat.obj, reduction = 'umap', features = c('ref-1', 'ref-2', 'glp-1', 'pop-1', 'hnd-1', 'pha-4'))
+  FeaturePlot(seurat.obj, reduction = 'umap', features = c('ref-1', 'ref-2', 'glp-1', 'pop-1', 'hnd-1', 'pha-4', 'sys-1', 'mom-4',
+                                                           'mom-5'))
   
   
 }
