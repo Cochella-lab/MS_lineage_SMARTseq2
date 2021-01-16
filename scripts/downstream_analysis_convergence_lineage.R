@@ -331,6 +331,11 @@ find.regulators.for.convergence.lineage = function(y)
   FeaturePlot(seurat.obj, reduction = 'umap', features = c('ref-1', 'ref-2', 'glp-1', 'pop-1', 'hnd-1', 'pha-4', 'sys-1', 'mom-4',
                                                            'mom-5'))
   
+  FeaturePlot(seurat.obj, reduction = 'umap', features = c('hnd-1', 'pha-4', #'pal-1',
+                                                           'sys-1', 'bar-1', 'wrm-1', 'hmp-2', 'pop-1', 'unc-37', 
+                                                           'cwn-2', 'cwn-1', 'mom-2',
+                                                           'mom-5', 'cam-1')) +
+  ggsave(paste0(resDir, '/genes_in_asymmetric.cell.division_Wnt.signaling_cwn-2.pdf'),  width = 20, height = 16)
   
 }
 
