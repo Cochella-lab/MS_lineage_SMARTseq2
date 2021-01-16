@@ -339,3 +339,40 @@ find.regulators.for.convergence.lineage = function(y)
   
 }
 
+
+########################################################
+########################################################
+# Section : compare programmed cell death lineage
+# 
+########################################################
+########################################################
+heatmap.for.cell.death.lineage.MSxaap = function()
+{
+  
+  ms.sels = c('MSxaap', 'MSxaaa', 'MSxapa')
+  cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ms.sels))])
+  sub.obj = subset(seurat.obj, cells = cells.sels)
+  
+  Idents(sub.obj) = sub.obj$manual.annot.ids
+  
+  FeaturePlot(sub.obj, reduction = 'umap', features = c('egl-1'), label = FALSE)
+
+  markers <- FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+  top10 <- markers %>% group_by(cluster) %>% top_n(n = 30, wt = avg_logFC)
+  
+  DoHeatmap(sub.obj, features = top10$gene) + NoLegend()
+  
+  cluster1.markers <- FindMarkers(sub.obj, ident.1 = 'MSxaap', min.pct = 0.25, logfc.threshold = 0.5, only.pos = TRUE)
+  head(cluster1.markers, n = 5)
+  topgenes = cluster1.markers[which(cluster1.markers$p_val<0.001), ]
+  topgenes <- topgenes[order(-topgenes$avg_logFC), ]
+  
+  DoHeatmap(sub.obj, features = c('egl-1', rownames(topgenes)[1:30])) +
+    ggsave(paste0(resDir, '/heatmap_MSxaap_cellDeath.lineage.pdf'),  width = 12, height = 8)
+   
+}
+
+
+
+
+
