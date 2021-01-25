@@ -448,7 +448,7 @@ if(Identify.regulators.convergence.lineages){
   if(!dir.exists(tabDir)){dir.create(tabDir)}
   
   RDSsaved = paste0(RdataDir, 
-                    "processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_cleanedBWM_and_Pharynx_iteration_GR14.rds")
+                    "processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_cleanedBWM_and_Pharynx_iteration_GR15.rds")
   
   seurat.obj = readRDS(file = RDSsaved)
   

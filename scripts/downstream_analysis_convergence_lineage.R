@@ -349,7 +349,7 @@ find.regulators.for.convergence.lineage = function(y)
 heatmap.for.cell.death.lineage.MSxaap = function()
 {
   
-  ms.sels = c('MSxaap', 'MSaaapp', 'MSxaapa', 'MSxaaa', 'MSxapa')
+  ms.sels = c('MSxaap', 'MSxaapa', 'MSxaaa', 'MSxapa')
   setdiff(ms.sels, ids.current)
   
   cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ms.sels))])
@@ -383,9 +383,10 @@ heatmap.for.cell.death.lineage.MSxaap = function()
   }
   
   markers <- FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
-  top10 <- markers %>% group_by(cluster) %>% top_n(n = 30, wt = avg_logFC)
   
-  DoHeatmap(sub.obj, features = top10$gene) + NoLegend()
+  top10 <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+  
+  DoHeatmap(sub.obj, features = c('egl-1', top10$gene)) + NoLegend()
   
   cluster1.markers <- FindMarkers(sub.obj, ident.1 = 'MSxaap', min.pct = 0.25, logfc.threshold = 0.5, only.pos = TRUE)
   head(cluster1.markers, n = 5)
