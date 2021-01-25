@@ -1164,8 +1164,8 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   # 
   # Notes:     
   # 
-  # 
-  #
+  # At the end MSxaapa is found again but the annotations of MSxaapa daughters are still not great. 
+  # These annotaions require more well-defined marker genes and confirmation 
   # 
   ##########################################
   GR.iteration = 15 # RG (revison global)
@@ -1257,7 +1257,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
               #'MSxpapap', 'MSxpaaap', "MSxpaaap_new","MSxpapap_new"
               # 'MSxppppp', 'MSxpppap' 
               #'MSxppppa',  'MSxpppaa', 'MSxpappa'
-              'MSxaap', 'MSaaapp', 'MSaaappp', 'MSxaapap', 'MSaaapaa' 
+              'MSxaapa', 'MSxaapap', 'MSpaapaa', 'MSaaapaa', 'MSaaapapp', 'MSxaapapa/ABalpappapp' 
               )
   #ids.sels = ids.current[grep('MSxaap|MSaaap|MSpaap', ids.current)]
   
@@ -1307,7 +1307,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   ElbowPlot(sub.obj, ndims = 50)
   
   nb.pcs = 5 # nb of pcs depends on the considered clusters or ids 
-  n.neighbors = 30;
+  n.neighbors = 10;
   min.dist = 0.01; spread = 1
   sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
                      spread = spread, n.neighbors = n.neighbors,
@@ -1356,7 +1356,7 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
     return(sub.obj$seurat_clusters)
   }
   sub.obj <- FindNeighbors(object = sub.obj, reduction = "pca", k.param = 10, dims = 1:5, compute.SNN = TRUE)
-  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.7)
+  sub.obj$seurat_clusters_split = FindClusters_subclusters(sub.obj, resolution = 0.5)
   DimPlot(sub.obj, group.by = "seurat_clusters_split", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 2, label.size = 5)
   
   p1  = DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 8, repel = TRUE,  pt.size = 3) +
@@ -1441,28 +1441,34 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
                     )
   
   # features of MSxaap lineage
-  features.sels = c('lin-12', 'ceh-36', 'tbx-2', 'tbx-7', 'ceh-34', 'ceh-32', 'clec-258', # MSxaapa
+  features.sels = c(
+                    #'lin-12', 'ceh-36', 'tbx-2', 'tbx-7', 'ceh-34', 'ceh-32', 'clec-258', # MSxaapa
                     #'sptf-1', 'ceh-22',  #MSaaapaa
                     #'lin-12', 'pax-1', # MSxaapap
                     #'ngn-1', 'ces-1', 'lin-12', # MSpaapaa
-                    'ceh-36', 'ceh-34',  # MSaaapp
-                    'ttx-1', 'irx-1' # MSaaappp
-                    #'pax-1', 'lin-12', 'ttx-1', 'agr-1', 'irx-1', 'cwn-2', # MSxaapap and MSxaapapa
-                    #'ref-1', 'aff-1', 'K04G2.12', 'unc-129' # MSaaapapp
+                    #'ceh-36', 'ceh-34',  # MSaaapp
+                    #'ttx-1', 'irx-1', # MSaaappp
+                    'pax-1', 'lin-12', 'ttx-1', 'agr-1', 'irx-1', 'cwn-2', # MSxaapap and MSxaapapa
+                    'ref-1', 'aff-1', 'K04G2.12', 'unc-129' # MSaaapapp
   )
   FeaturePlot(sub.obj, reduction = 'umap', features = features.sels)
   
   DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 8, repel = TRUE,  pt.size = 3) +
     ggtitle('manual.ids') + NoLegend()
   
+  sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'MSaaapaa')] = 'MSxaapa'
+  sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'MSxaapap')] = 'MSxaapap.MSaaapaa'
+  seurat.obj$manual.annot.ids[match(colnames(sub.obj), colnames(seurat.obj))] = sub.obj$manual.annot.ids
+  
   # update the annotation with marker genes
   cluster.assingment = list(
-    c('1', 'MSxpappa'),
-    c('5', 'MSxpappa'),
-    c('4', 'MSxppppa'),
-    c('0', 'MSxppppa'),
-    c('2', 'MSxpppaa'),
-    c('3', 'MSxpppaa')
+    c('0', 'MSxaapa'), 
+    c('2', 'MSpaapaa'),
+    c('5', 'MSpaapaa'),
+    c('1', 'MSaaapaa'), 
+    c('4', 'MSxaapap'),
+    c('3', 'MSxaapapx')
+    
   )
   
   cat(length(cluster.assingment), 'clusters assigned \n')
@@ -1501,7 +1507,6 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
   #   
   # }
   
-  # sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'mixture_MSxppapp_MSxpappp')] = 'MSxppapp'
   # sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'likely_MSxpappp')] = 'MSxppapp/MSxpappp'
   # sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids == 'likely_MSxppapp')] = 'MSxppapp/MSxpappp'
   # sub.obj$manual.annot.ids[which(sub.obj$manual.annot.ids.5 != 'MSxppapp')] = 'MSxppapp/MSxpappp'
@@ -1530,7 +1535,6 @@ manual.annotation.for.pharynx.clusters = function(seurat.obj = seurat.obj)
           na.value = "gray") +
     ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pca_k10")) +
     scale_colour_hue(drop = FALSE) + NoLegend()
-  
   
   saveRDS(seurat.obj, file = RDS2save)
   
