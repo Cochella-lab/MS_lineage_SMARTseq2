@@ -349,14 +349,39 @@ find.regulators.for.convergence.lineage = function(y)
 heatmap.for.cell.death.lineage.MSxaap = function()
 {
   
-  ms.sels = c('MSxaap', 'MSxaaa', 'MSxapa')
+  ms.sels = c('MSxaap', 'MSaaapp', 'MSxaapa', 'MSxaaa', 'MSxapa')
+  setdiff(ms.sels, ids.current)
+  
   cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ms.sels))])
   sub.obj = subset(seurat.obj, cells = cells.sels)
   
   Idents(sub.obj) = sub.obj$manual.annot.ids
   
   FeaturePlot(sub.obj, reduction = 'umap', features = c('egl-1'), label = FALSE)
-
+  
+  ##########################################
+  # 
+  ##########################################
+  test.uamp.params = FALSE
+  if(test.umap.params){
+    nfeatures = 1000;
+    sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
+    #cat('nb of variableFeatures excluding timer genes : ', length(VariableFeatures(sub.obj)), '\n')
+    sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
+    sub.obj <- RunPCA(object = sub.obj, features = VariableFeatures(sub.obj), verbose = FALSE, weight.by.var = FALSE)
+    ElbowPlot(sub.obj, ndims = 50)
+    
+    nb.pcs = 10 # nb of pcs depends on the considered clusters or ids 
+    n.neighbors = 30;
+    min.dist = 0.01; spread = 1
+    sub.obj <- RunUMAP(object = sub.obj, reduction = 'pca', reduction.name = "umap", dims = c(1:nb.pcs), 
+                       spread = spread, n.neighbors = n.neighbors,
+                       min.dist = min.dist, verbose = TRUE)
+    
+    DimPlot(sub.obj, group.by = 'manual.annot.ids', reduction = 'umap', label = TRUE, label.size = 6, pt.size = 2.0, repel = TRUE) + 
+      NoLegend()
+  }
+  
   markers <- FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
   top10 <- markers %>% group_by(cluster) %>% top_n(n = 30, wt = avg_logFC)
   
