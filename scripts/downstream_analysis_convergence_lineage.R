@@ -395,6 +395,7 @@ heatmap.for.cell.death.lineage.MSxaap = function()
   
   DoHeatmap(sub.obj, features = c('egl-1', rownames(topgenes)[1:30])) +
     ggsave(paste0(resDir, '/heatmap_MSxaap_cellDeath.lineage.pdf'),  width = 12, height = 8)
+  
    
 }
 
