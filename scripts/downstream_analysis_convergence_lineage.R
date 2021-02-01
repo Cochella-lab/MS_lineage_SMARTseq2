@@ -349,7 +349,9 @@ find.regulators.for.convergence.lineage = function(y)
 heatmap.for.cell.death.lineage.MSxaap = function()
 {
   
-  ms.sels = c('MSxaap', 'MSxaapa', 'MSxaaa', 'MSxapa')
+  ms.sels = c('MSxaap', 'MSxaapa', 'MSaaapp', 'MSxaaa', 'MSxapa')
+  
+  #ms.sels = c('MSxaap', 'MSxaaa', 'MSxapa')
   setdiff(ms.sels, ids.current)
   
   cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ms.sels))])
@@ -358,6 +360,15 @@ heatmap.for.cell.death.lineage.MSxaap = function()
   Idents(sub.obj) = sub.obj$manual.annot.ids
   
   FeaturePlot(sub.obj, reduction = 'umap', features = c('egl-1'), label = FALSE)
+  sub.obj$timingEst = as.numeric(as.character(sub.obj$timingEst))
+  
+  VlnPlot(sub.obj, features = c("FSC_log2", "BSC_log2"), ncol = 2,
+          group.by = 'manual.annot.ids') + NoLegend() + 
+    ggsave(paste0(resDir, '/cellDeath.lineage_MSxaap_size.pdf'),  width = 12, height = 8)
+  
+  VlnPlot(sub.obj, features = c('timingEst'), ncol = 1,
+          group.by = 'manual.annot.ids') + NoLegend() + 
+    ggsave(paste0(resDir, '/cellDeath.lineage_MSxaap_estimatedTiming.pdf'),  width = 10, height = 8)
   
   ##########################################
   # 
@@ -382,19 +393,21 @@ heatmap.for.cell.death.lineage.MSxaap = function()
       NoLegend()
   }
   
+  cluster1.markers <- FindMarkers(sub.obj, ident.1 = 'MSxaap', min.pct = 0.25, logfc.threshold = 0.5, only.pos = TRUE)
+  head(cluster1.markers, n = 5)
+  topgenes = cluster1.markers[which(cluster1.markers$p_val<0.001), ]
+  topgenes <- topgenes[order(-topgenes$avg_logFC), ]
+  
   markers <- FindAllMarkers(sub.obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
   
   top10 <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
   
   DoHeatmap(sub.obj, features = c('egl-1', top10$gene)) + NoLegend()
   
-  cluster1.markers <- FindMarkers(sub.obj, ident.1 = 'MSxaap', min.pct = 0.25, logfc.threshold = 0.5, only.pos = TRUE)
-  head(cluster1.markers, n = 5)
-  topgenes = cluster1.markers[which(cluster1.markers$p_val<0.001), ]
-  topgenes <- topgenes[order(-topgenes$avg_logFC), ]
+  genesToshow = c('egl-1', rownames(topgenes)[1:30])
   
-  DoHeatmap(sub.obj, features = c('egl-1', rownames(topgenes)[1:30])) +
-    ggsave(paste0(resDir, '/heatmap_MSxaap_cellDeath.lineage.pdf'),  width = 12, height = 8)
+  DoHeatmap(sub.obj, features = genesToshow) +
+    ggsave(paste0(resDir, '/heatmap_MSxaap_and_daughters_cellDeath.lineage.pdf'),  width = 14, height = 8)
   
    
 }
