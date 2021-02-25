@@ -350,7 +350,54 @@ find.regulators.for.convergence.lineage = function(y)
 ########################################################
 characterize.bwm.terminal.cells = function(seurat.obj)
 {
-    
+  terminals = c('MSxppppp', 'MSxppppa', 'MSxpppap', 'MSxpppaa', 
+                'MSxppapp', 
+                'MSxpappp', 'MSxpappa', 
+                'MSxpapap', 
+                'MSxpaaap', 
+                #'MSxapppp', 'MSxapppa',
+                'MSxappppx', 'MSxapppax'
+  )
+  
+  setdiff(terminals, ids.current)
+  
+  cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, terminals))])
+  sub.obj = subset(seurat.obj, cells = cells.sels)
+  
+  Idents(sub.obj) = sub.obj$manual.annot.ids
+  
+  #FeaturePlot(sub.obj, reduction = 'umap', features = c('egl-1'), label = FALSE)
+  sub.obj$timingEst = as.numeric(as.character(sub.obj$timingEst))
+  
+  markers <- FindAllMarkers(sub.obj, only.pos = FALSE, min.pct = 0.25, test.use = 'MAST')
+  
+  saveRDS(markers, file = paste0(resDir, '/bwm_terminal.cells_markers_FindAllMarkers.rds'))
+  
+  markers = readRDS(file = paste0(resDir, '/bwm_terminal.cells_markers_FindAllMarkers.rds'))
+  
+  qval.cutoff = 0.01;
+  logfc.cutoff = 0.5
+  ntop = 20
+  
+  markers = markers[which(abs(markers$avg_logFC) > logfc.cutoff & markers$p_val_adj < qval.cutoff), ]
+  
+  topGenes <- markers %>% group_by(cluster) %>% top_n(n = ntop, wt = avg_logFC)
+  gene.sels = markers$gene[which(markers$p_val_adj < qval.cutoff)]
+  gene.sels = topGenes$gene
+  p1 = DoHeatmap(sub.obj, features = gene.sels) + NoLegend()
+  
+  plot(p1) + ggsave(paste0(resDir, '/heatmap_BWMterminalCells_avg_logFC.', logfc.cutoff, 
+                           ' _qval.', qval.cutoff, '_top', ntop, '.pdf'),
+                    width = 10, height = 16)
+  
+  #genesToshow = c('egl-1', rownames(topgenes)[1:30])
+  #DoHeatmap(sub.obj, features = genesToshow) +
+  
+  write.csv(markers, file = paste0(resDir, 'BWM_terminalCell_markerGenes_avg_logFC.', logfc.cutoff, 
+                                   ' _qval.', qval.cutoff, '.csv'), row.names = FALSE)
+  
+  
+  
 }
 
 ########################################################
