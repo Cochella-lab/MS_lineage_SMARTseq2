@@ -340,13 +340,26 @@ find.regulators.for.convergence.lineage = function(y)
 }
 
 
+
+
+########################################################
+########################################################
+# Section : characterize the BWM terminal cells
+# 
+########################################################
+########################################################
+characterize.bwm.terminal.cells = function(seurat.obj)
+{
+    
+}
+
 ########################################################
 ########################################################
 # Section : compare programmed cell death lineage
 # 
 ########################################################
 ########################################################
-heatmap.for.cell.death.lineage.MSxaap = function()
+heatmap.for.cell.death.lineage.MSxaap = function(seurat.obj)
 {
   
   ms.sels = c('MSxaap', 'MSxaapa', 'MSaaapp', 'MSxaaa', 'MSxapa')

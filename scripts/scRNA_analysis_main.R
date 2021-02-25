@@ -45,9 +45,10 @@ library(Seurat)
 library(ggplot2)
 library(dplyr)
 
+
 ########################################################
 ########################################################
-# Section : annotate scRNA clusters by mapping to reference
+# Section : import dataset processed by Aleks
 # 
 ########################################################
 ########################################################
@@ -307,9 +308,6 @@ if(Transferring.cell.annotation.from.JMdata){
 # 2) predicted labels from seurat and scmap 
 # 3) cell size info and estimated timing
 # 3.5) marker genes
-# 4) cluster connection by PAGA or VarID 
-# 5) RNA velocity (not sure ...)
-# 
 ########################################################
 ########################################################
 Manually.Annotate.BWM.cell.IDs = FALSE
@@ -482,6 +480,7 @@ if(Identify.regulators.convergence.lineages){
   compare.convergence.lineages.with.others(y, seurat.obj)
   #Reduction.plot.convergence.lineage
   
+  
   ##########################################
   # step II:  
   ##########################################
@@ -552,3 +551,47 @@ if(Identify.regulators.convergence.lineages){
   
 }
 
+
+########################################################
+########################################################
+# Section : downstream analysis
+#  -- characterize BWM terminal cells
+########################################################
+########################################################
+Characterizing.bwm.terminal.cells = FALSE
+if(Characterizing.bwm.terminal.cells){
+  
+  resDir = paste0("results/", version.analysis, '/BWM_terminalCells')
+  tabDir = paste0(resDir, "/tables/")
+  
+  if(!dir.exists("results/")){dir.create("results/")}
+  if(!dir.exists(resDir)){dir.create(resDir)}
+  if(!dir.exists(tabDir)){dir.create(tabDir)}
+  
+  RDSsaved = paste0(RdataDir, 
+                    "processed_cells_scran.normalized_reference.based.annotation.scmap.seurat_ManualClusterAnnot_cleanedBWM_and_Pharynx_iteration_GR15.rds")
+  
+  seurat.obj = readRDS(file = RDSsaved)
+  
+  # in case clean or change some id names
+  clean.id.names = FALSE 
+  if(clean.id.names){
+    #jj = which(seurat.obj$manual.annot.ids == "MSxppap/MSxpaaa/MSxpaaap")
+    #seurat.obj$manual.annot.ids[jj] = 'mixture_transitionToTerminal'
+  }
+  
+  ids.current = names(table(seurat.obj$manual.annot.ids))
+  
+  DimPlot(seurat.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+          na.value = "gray") + 
+    ggtitle(paste0("Seurat_clustering_SLM_resolution3_3000variableFeatures_20pcs_k10_BWM_Pharynx_annotedIDs")) +
+    scale_colour_hue(drop = FALSE) + 
+    NoLegend()
+  
+  
+  source.my.script('downstream_Analysis_convergence_lineage.R')  
+  
+  
+  
+  
+}
