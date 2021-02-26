@@ -68,11 +68,11 @@ aggregate.cells.across.ids = function(seurat.obj)
 }
 
 
-compare.convergence.lineages.with.others = function(y, seurat.obj,  method = c('euclidean', 'correlation', 'jsd'))
+compute.group.distances = function(y, seurat.obj,  method = c('euclidean', 'correlation', 'jsd'))
 {
   library("pheatmap")
   library("RColorBrewer")
-  #library(philentropy)
+  
   
   tfs = readxl::read_xlsx('../data/motifs_tfs/Table-S2-wTF-3.0-Fuxman-Bass-Mol-Sys-Biol-2016.xlsx', sheet = 1)
   
@@ -244,8 +244,8 @@ compare.convergence.lineages.with.others = function(y, seurat.obj,  method = c('
   
   dev.off()
   
-  
 }
+
 
 find.regulators.for.convergence.lineage = function(y)
 {
@@ -342,12 +342,11 @@ find.regulators.for.convergence.lineage = function(y)
 }
 
 
-
-
 ########################################################
 ########################################################
 # Section : characterize the BWM terminal cells
-# 
+# marker genes and heatmap for top marker genes
+# distance between terminal cells
 ########################################################
 ########################################################
 characterize.bwm.terminal.cells = function(seurat.obj)
@@ -397,8 +396,6 @@ characterize.bwm.terminal.cells = function(seurat.obj)
   
   write.csv(markers, file = paste0(resDir, 'BWM_terminalCell_markerGenes_avg_logFC.', logfc.cutoff, 
                                    ' _qval.', qval.cutoff, '.csv'), row.names = FALSE)
-  
-  
   
 }
 
@@ -470,6 +467,8 @@ heatmap.for.cell.death.lineage.MSxaap = function(seurat.obj)
   
   DoHeatmap(sub.obj, features = genesToshow) +
     ggsave(paste0(resDir, '/heatmap_MSxaap_and_daughters_cellDeath.lineage.pdf'),  width = 14, height = 8)
+  
+  
   
    
 }

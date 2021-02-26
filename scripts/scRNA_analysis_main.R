@@ -466,7 +466,7 @@ if(Identify.regulators.convergence.lineages){
     NoLegend()
   
   # first aggreate cells of the same annotated ids
-  source.my.script('downstream_Analysis_convergence_lineage.R')
+  source.my.script('downstream_analysis_functions.R')
   #y = aggregate.cells.across.ids(seurat.obj)
   #saveRDS(y, file = paste0(RdataDir, 'sce_object_cells_aggregated_across.ids.rds'))
   y = readRDS(file = paste0(RdataDir, 'sce_object_cells_aggregated_across.ids.rds'))
@@ -476,7 +476,7 @@ if(Identify.regulators.convergence.lineages){
   # by compare the pairs of annotated cell ids   
   # or dimensiona reduction
   ##########################################
-  source.my.script('downstream_Analysis_convergence_lineage.R')  
+  source.my.script('downstream_analysis_functions.R')  
   compare.convergence.lineages.with.others(y, seurat.obj)
   #Reduction.plot.convergence.lineage
   
@@ -484,7 +484,7 @@ if(Identify.regulators.convergence.lineages){
   ##########################################
   # step II:  
   ##########################################
-  source.my.script('downstream_Analysis_convergence_lineage.R')
+  source.my.script('downstream_analysis_functions.R')
   find.regulators.for.convergence.lineage(y)
   
   ##########################################
@@ -589,7 +589,16 @@ if(Characterizing.bwm.terminal.cells){
     NoLegend()
   
   
-  source.my.script('downstream_Analysis_convergence_lineage.R')  
+  ##########################################
+  # marker genes and distance between them
+  ##########################################
+  source.my.script('downstream_analysis_functions.R')  
+  aggs = readRDS(file = paste0(RdataDir, 'sce_object_cells_aggregated_across.ids.rds'))
+  
+  characterize.bwm.terminal.cells(seurat.obj, aggs)
+  
+  compute.group.distances(y = aggs, seurat.obj=seurat.obj, method = 'jsd')
+  
   
   
   
