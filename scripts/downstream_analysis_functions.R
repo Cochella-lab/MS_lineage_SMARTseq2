@@ -73,27 +73,26 @@ compute.group.distances = function(y, seurat.obj,  method = c('euclidean', 'corr
   library("pheatmap")
   library("RColorBrewer")
   
-  
-  tfs = readxl::read_xlsx('../data/motifs_tfs/Table-S2-wTF-3.0-Fuxman-Bass-Mol-Sys-Biol-2016.xlsx', sheet = 1)
-  
-  ids.convergence = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
-  ids.bwm = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
-  ids.phrx = c('MSxapa', 'MSxapap', 'MSxapapp', "MSpaaappp/MSxapappa")
-  
   ##########################################
   # step 1: dimension reduction to visualize the convergence lineage, one bwm and one pharynx lineages    
   ##########################################
-  ids.sel = unique(c('MSx', ids.bwm, ids.convergence, ids.phrx))
-  cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.sel))])
-  sub.obj = subset(seurat.obj, cells = cells.sels)
-  
-  DimPlot(sub.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
-          na.value = "gray") +
-    scale_colour_hue(drop = FALSE) + 
-    NoLegend()
-  
-  USE.UMAP = FALSE
-  if(USE.UMAP){
+  Test.DM.umap = FALSE
+  if(Test.DM){
+    #tfs = readxl::read_xlsx('../data/motifs_tfs/Table-S2-wTF-3.0-Fuxman-Bass-Mol-Sys-Biol-2016.xlsx', sheet = 1)
+    
+    ids.convergence = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+    ids.bwm = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+    ids.phrx = c('MSxapa', 'MSxapap', 'MSxapapp', "MSpaaappp/MSxapappa")
+    
+    ids.sel = unique(c('MSx', ids.bwm, ids.convergence, ids.phrx))
+    cells.sels = unique(colnames(seurat.obj)[!is.na(match(seurat.obj$manual.annot.ids, ids.sel))])
+    sub.obj = subset(seurat.obj, cells = cells.sels)
+    
+    DimPlot(sub.obj, group.by = "manual.annot.ids", reduction = 'umap', label = TRUE, repel = TRUE, pt.size = 1, label.size = 5,
+            na.value = "gray") +
+      scale_colour_hue(drop = FALSE) + 
+      NoLegend()
+    
     nfeatures = 2000;
     sub.obj <- FindVariableFeatures(sub.obj, selection.method = "vst", nfeatures = nfeatures)
     sub.obj = ScaleData(sub.obj, features = rownames(sub.obj))
@@ -110,8 +109,8 @@ compute.group.distances = function(y, seurat.obj,  method = c('euclidean', 'corr
       NoLegend()
   }
   
-  USE.MDS = FALSE
-  if(USE.MDS){
+  Test.DM..MDS = FALSE
+  if(Test.DM.MDS){
     library(pheatmap)
     library(RColorBrewer)
     library(grid)
@@ -158,10 +157,11 @@ compute.group.distances = function(y, seurat.obj,  method = c('euclidean', 'corr
   ##########################################
   # step 2: comparer the distance or correlation between the convergence lineage, BWM and pharynx lienages
   ##########################################
+  method = 'jsd'
+  y = aggs
   # here the input is the DGEList object from edgeR
   cpm = edgeR::cpm(y, log = TRUE, prior.count = 1)
   
-  method = 'jsd'
   #colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
   
   if(method == 'euclidean'){ sampleDists <- dist(t(cpm), method = 'euclidean'); xlim = c(0, 500)}
@@ -178,71 +178,138 @@ compute.group.distances = function(y, seurat.obj,  method = c('euclidean', 'corr
   
   sampleDistMatrix <- as.matrix(sampleDists)
   
-  
-  pdfname = paste0(resDir, "/convergence_lineage_compared_with_one.BWM.lineage_one.Pharynx.lineage_", method, ".pdf")
-  pdf(pdfname, width=12, height = 8)
-  par(cex =0.7, mar = c(5,8,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  
-  cc = matrix(NA, ncol = length(ids.convergence), nrow = length(c(ids.bwm, ids.phrx)))
-  colnames(cc) = ids.convergence
-  rownames(cc) = c(ids.bwm, ids.phrx)
-  
-  #ii1 = match(ids.convergence[-c(1:2)], colnames(sampleDistMatrix))
-  #ii2 = match(ids.phrx, rownames(sampleDistMatrix))
-  cc.vec = c()
-  cc.vec.names = c()
-  for(n in 1:ncol(cc))
-  {
-    # n = 1
-    ii1 = match(colnames(cc)[n], colnames(sampleDistMatrix))
-    ids2compare = c(ids.bwm[which(nchar(ids.bwm) <= (nchar(colnames(cc)[n]) + 1))], 
-                    ids.phrx[which(nchar(ids.phrx) == nchar(colnames(cc)[n]))])
-    ii2 = match(ids2compare, rownames(sampleDistMatrix))
+  Compute.distance.across.sisters.siblings = FALSE
+  if(Compute.distance.across.sisters.siblings){
     
-    cc[match(ids2compare, rownames(cc)), n] = sampleDistMatrix[ii2, ii1]
-    cc.vec = c(cc.vec, sampleDistMatrix[ii2, ii1])
-    cc.dist = sampleDistMatrix[ii2, ii1]
-    cc.vec.names = c(cc.vec.names, paste0(colnames(cc)[n], '_vs_', ids2compare))
+    ids.list = list(c('MSxp', 'MSxa'), 
+                    c('MSxpp', 'MSxpa', 'MSxap'), 
+                    c('MSxppp', 'MSxppa', 'MSxpap', 'MSxpaa', 'MSxapp'), 
+                    c('MSxpppp', 'MSxpppa', 'MSxppap', 'MSxpapp', 'MSxpapa', 'MSxpaaa', 'MSxappp', 'MSpappa'), 
+                    terminals)
+    res = c()
+    for(n in 1:length(ids.list))
+    {
+      # n = 2
+      ii = match(ids.list[[n]], colnames(sampleDistMatrix))
+      ii = ii[which(!is.na(ii))]
+      
+      dist.valeus = sampleDistMatrix[ii, ii]
+      dist.valeus = dist.valeus[lower.tri(dist.valeus)]
+      res = rbind(res, cbind(dist.valeus, rep((n+1), length(dist.valeus))))
+    }
     
-    barplot(cc.dist, beside = TRUE, col=c(1:length(cc.dist)), main = colnames(cc)[n], 
-            #legend.text = rownames(cc.vec), args.legend = c(x = 'topleft', bty = 'n'), 
-            names.arg = names(cc.dist), las = 2, horiz = TRUE,
-            xlim = xlim)
+    res = as.data.frame(res)
+    colnames(res) = c('dist', 'cellDivision')
+    res$cellDivision = as.factor(res$cellDivision)
+    ggplot(res, aes(x=cellDivision, y=dist, color = cellDivision)) + 
+      geom_violin(trim=FALSE) + 
+      geom_boxplot(width=0.1) 
+      
     
-  }
-  
-  names(cc.vec) = cc.vec.names
-  
-  dev.off()
-  
-  ids.mothers = c('MSx', 'MSxa', 'MSxap')
-   
-  pdfname = paste0(resDir, "/convergence_lineage_compared_mothers_sisters_", method, ".pdf")
-  pdf(pdfname, width=10, height = 6)
-  par(cex =0.7, mar = c(4,10,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  
-  for(n in 1:length(ids.mothers))
-  {
-    # n = 1
-    ids2compare = c(ids.mothers[n], paste0(ids.mothers[n], c('p', 'a')))
-    #ii1 = match(list1.ids, colnames(sampleDistMatrix))
-    #ii2 = match(list2.ids, rownames(sampleDistMatrix))
-    compares = sampleDistMatrix[match(ids2compare, rownames(sampleDistMatrix)), 
-                                match(ids2compare, colnames(sampleDistMatrix))]
-    compares[lower.tri(compares, diag = TRUE)] <- NA
-    cc.names = expand.grid(colnames(compares), '_vs_', rownames(compares))
-    cc.names = paste0(cc.names[, 3], cc.names[,2], cc.names[,1]) 
-    cc = as.vector(compares)
-    names(cc) = cc.names
-    cc = cc[!is.na(cc)]
+    ##########################################
+    # here compare the distance between mother and daughter
+    ##########################################
+    res = c()
     
-    barplot(cc, beside = TRUE, col = c(1:length(cc)), horiz = TRUE,
-            names.arg = names(cc),
-           las = 2, xlim = xlim)
+    for(n in 1:length(ids.list))
+    {
+      # n = 1
+      for(m in 1:length(ids.list[[n]]))
+      {
+        teststring = ids.list[[n]][m]
+        ii = match(c(teststring, substr(teststring, 1, nchar(teststring)-1)), colnames(sampleDistMatrix))
+        ii = ii[which(!is.na(ii))]
+        if(length(ii)>0){
+          dist.valeus = sampleDistMatrix[ii, ii]
+          dist.valeus = dist.valeus[lower.tri(dist.valeus)]
+          res = rbind(res, cbind(dist.valeus, rep((n+1), length(dist.valeus))))
+        }
+      }
+      
+    }
+    
+    res = as.data.frame(res)
+    colnames(res) = c('dist', 'cellDivision')
+    res$cellDivision = as.factor(res$cellDivision)
+    ggplot(res, aes(x=cellDivision, y=dist, color = cellDivision)) + 
+      geom_violin(trim=FALSE) + 
+      geom_boxplot(width=0.1) 
     
   }
   
-  dev.off()
+  
+  Compute.distance.convergence.lineage = FALSE
+  if(Compute.distance.convergence.lineage){
+    
+    ids.convergence = c('MSxa', 'MSxap', 'MSxapp', 'MSxappp', 'MSxapppp', 'MSxappppx')
+    ids.bwm = c('MSxp', 'MSxpp', 'MSxppp', 'MSxpppp', 'MSxppppp')
+    ids.phrx = c('MSxapa', 'MSxapap', 'MSxapapp', "MSpaaappp/MSxapappa")
+    
+    pdfname = paste0(resDir, "/convergence_lineage_compared_with_one.BWM.lineage_one.Pharynx.lineage_", method, ".pdf")
+    pdf(pdfname, width=12, height = 8)
+    par(cex =0.7, mar = c(5,8,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    cc = matrix(NA, ncol = length(ids.convergence), nrow = length(c(ids.bwm, ids.phrx)))
+    colnames(cc) = ids.convergence
+    rownames(cc) = c(ids.bwm, ids.phrx)
+    
+    #ii1 = match(ids.convergence[-c(1:2)], colnames(sampleDistMatrix))
+    #ii2 = match(ids.phrx, rownames(sampleDistMatrix))
+    cc.vec = c()
+    cc.vec.names = c()
+    for(n in 1:ncol(cc))
+    {
+      # n = 1
+      ii1 = match(colnames(cc)[n], colnames(sampleDistMatrix))
+      ids2compare = c(ids.bwm[which(nchar(ids.bwm) <= (nchar(colnames(cc)[n]) + 1))], 
+                      ids.phrx[which(nchar(ids.phrx) == nchar(colnames(cc)[n]))])
+      ii2 = match(ids2compare, rownames(sampleDistMatrix))
+      
+      cc[match(ids2compare, rownames(cc)), n] = sampleDistMatrix[ii2, ii1]
+      cc.vec = c(cc.vec, sampleDistMatrix[ii2, ii1])
+      cc.dist = sampleDistMatrix[ii2, ii1]
+      cc.vec.names = c(cc.vec.names, paste0(colnames(cc)[n], '_vs_', ids2compare))
+      
+      barplot(cc.dist, beside = TRUE, col=c(1:length(cc.dist)), main = colnames(cc)[n], 
+              #legend.text = rownames(cc.vec), args.legend = c(x = 'topleft', bty = 'n'), 
+              names.arg = names(cc.dist), las = 2, horiz = TRUE,
+              xlim = xlim)
+      
+    }
+    
+    names(cc.vec) = cc.vec.names
+    
+    dev.off()
+    
+    ids.mothers = c('MSx', 'MSxa', 'MSxap')
+    
+    pdfname = paste0(resDir, "/convergence_lineage_compared_mothers_sisters_", method, ".pdf")
+    pdf(pdfname, width=10, height = 6)
+    par(cex =0.7, mar = c(4,10,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    for(n in 1:length(ids.mothers))
+    {
+      # n = 1
+      ids2compare = c(ids.mothers[n], paste0(ids.mothers[n], c('p', 'a')))
+      #ii1 = match(list1.ids, colnames(sampleDistMatrix))
+      #ii2 = match(list2.ids, rownames(sampleDistMatrix))
+      compares = sampleDistMatrix[match(ids2compare, rownames(sampleDistMatrix)), 
+                                  match(ids2compare, colnames(sampleDistMatrix))]
+      compares[lower.tri(compares, diag = TRUE)] <- NA
+      cc.names = expand.grid(colnames(compares), '_vs_', rownames(compares))
+      cc.names = paste0(cc.names[, 3], cc.names[,2], cc.names[,1]) 
+      cc = as.vector(compares)
+      names(cc) = cc.names
+      cc = cc[!is.na(cc)]
+      
+      barplot(cc, beside = TRUE, col = c(1:length(cc)), horiz = TRUE,
+              names.arg = names(cc),
+              las = 2, xlim = xlim)
+      
+    }
+    
+    dev.off()
+  }
   
 }
 
@@ -472,8 +539,3 @@ heatmap.for.cell.death.lineage.MSxaap = function(seurat.obj)
   
    
 }
-
-
-
-
-
