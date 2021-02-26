@@ -67,6 +67,7 @@ aggregate.cells.across.ids = function(seurat.obj)
   
 }
 
+
 compare.convergence.lineages.with.others = function(y, seurat.obj,  method = c('euclidean', 'correlation', 'jsd'))
 {
   library("pheatmap")
@@ -242,6 +243,7 @@ compare.convergence.lineages.with.others = function(y, seurat.obj,  method = c('
   }
   
   dev.off()
+  
   
 }
 
