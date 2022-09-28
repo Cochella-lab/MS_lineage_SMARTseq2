@@ -1,6 +1,6 @@
 ##################################################
 ##################################################
-## Project: transcriptional priming mechanism by tbx in C.elegans
+## Project: single cell RNA seq C elegans MS lineage
 ## Script purpose: analysis the single-cell RNA-seq data
 ## Usage example:
 ## Author: Jingkui Wang (jingkui.wang@imp.ac.at)
@@ -9,7 +9,13 @@
 ##################################################
 ##################################################
 
-#Function for soursing functions
+##
+## Important remark! This script won't work being directly downloaded from github, since the some heavy raw data is missing.
+##
+
+
+
+#Function for sourcing functions
 source.my.script <- function(name.of.function){
   tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
            error = function(e){
@@ -20,7 +26,7 @@ source.my.script <- function(name.of.function){
 }
 
 
-#Setup the enviroment
+#Setup the environment
 #Determine the script location and user
 tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
          error = function(e){
@@ -31,7 +37,8 @@ tryCatch(path <- rstudioapi::getSourceEditorContext()$path,
 source.my.script("scRNAseq_functions.R")
 
 user <- "results_aleks"
-setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user))
+working_directory <- '' #HERE SHOULD BE A WORKING DIRECTORY
+setwd(paste0("",user))
 version.DATA = 'all_batches'
 version.analysis =  paste0(version.DATA, '_20191115')
 
@@ -138,6 +145,7 @@ if(Manually.Specify.sampleInfos.filtering.4scRNAseq){
 
 ##########################################
 # aggregated quality controls from nf-RNAseq
+# Metadata is missing in the GitHub repository
 ##########################################
 if(Aggregate.nf.QCs.plots.in.designMatrix){
   # load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_RNA_seq.Rdata'))
@@ -196,8 +204,9 @@ sce <- SingleCellExperiment(assays = list(counts = counts),
                             rowData = data.frame(gene_names = rownames(counts), feature_symbol = rownames(counts)))
 
 
-
+##################################################
 ### Adding FACS data ####
+### Additional analysis of the FACS data is done later
 ##########################################
 #load(file=paste0(RdataDir, version.DATA, '_RAW_Read_Counts_design_technicalRepMerged.Rdata'))
 
@@ -284,7 +293,7 @@ dev.off()
 # here we are using the 50,000 for library size and 100 expressed genes as thresholds
 ##########################################
 threshod.total.counts.per.cell = 10^5
-threshod.nb.detected.genes.per.cell = 750 # Adjust the number for each batch
+threshod.nb.detected.genes.per.cell = 750 
 
 #libsize.drop <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE)
 #feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE)
@@ -295,7 +304,7 @@ filter_by_total_counts <- (sce$total_counts > threshod.total.counts.per.cell)
 table(filter_by_total_counts)
 filter_by_expr_features <- (sce$total_features_by_counts > threshod.nb.detected.genes.per.cell)
 table(filter_by_expr_features)
-filter_by_MT = sce$pct_counts_Mt < 8 # Adjust the number for each batch
+filter_by_MT = sce$pct_counts_Mt < 8 
 table(filter_by_MT)
 
 sce$use <- (
@@ -371,3 +380,6 @@ summary(genes.to.keep)
 sce <- sce[genes.to.keep, ]
 
 save(sce, file=paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_SCE.Rdata'))
+
+# This data is used in the next pre-processing step
+

@@ -1,1 +1,0 @@
-wget -c --no-check-certificate --auth-no-challenge --user 'aleksandr.bykov' --password 'DISCOVER|begin|russia|during|21' https://ngs.vbcf.ac.at/filemanager/byurl/4fEsUCWw2L-HHNMMBGXC_20191107B_demux_1.zip
