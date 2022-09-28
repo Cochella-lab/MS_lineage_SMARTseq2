@@ -26,7 +26,7 @@ source.path <- sub(basename(path), "", path)
 
 
 user <- "results_jiwang/"
-setwd(paste0("/Volumes/groups/cochella/git_aleks_jingkui/scRNAseq_MS_lineage/",user))
+setwd(paste0("INSERT HERE WORKING DIRECTORY",user))
 
 version.DATA = 'all_batches'
 version.analysis =  paste0(version.DATA, '_20191115')
@@ -45,7 +45,6 @@ correct.cellCycle = FALSE
 ########################################################
 ########################################################
 # Section : timingEst with cpm normalization and add it to the metadata
-#
 ########################################################
 ########################################################
 ## import the R object from the previous step and double check the cells and genes from table
@@ -68,7 +67,7 @@ plotColData(sce,
 
 
 ##########################################
-# here estimat the timing with timer genes
+# here estimate the timing with timer genes
 ### first test 5 lineages from Hashimsholy et al. paper
 ##########################################
 reEstimate.timing.using.timer.genes.using.cpmNorm = FALSE
@@ -135,7 +134,7 @@ library(ggplot2)
 ## convert sce to seurat object
 ms = as.Seurat(sce, counts = 'counts', data = NULL, assay = "RNA")
 
-nfeatures = 2000
+nfeatures = 2000 # this can be variable
 # new normalization from Seurat
 # tried regress out the pct_counts_Mt but works less well
 ms <- SCTransform(object = ms, variable.features.n = nfeatures) 
@@ -161,6 +160,7 @@ if(correct.cellCycle){
 ##########################################
 # Batch correction using fastMNN from scran
 # here we are calling fastMNN from Seurat 
+# Not really important to call this function
 ##########################################
 Correction.Batch.using.fastMNN = TRUE
 if(Correction.Batch.using.fastMNN){
@@ -205,4 +205,7 @@ if(Correction.Batch.using.fastMNN){
   save(ms, file = paste0(RdataDir, version.DATA, '_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata'))
 
 }
+
+
+
 

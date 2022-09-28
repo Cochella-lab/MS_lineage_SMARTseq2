@@ -48,13 +48,13 @@ library(dplyr)
 
 ########################################################
 ########################################################
-# Section : import dataset processed by Aleks
+# Section : import dataset processed 
 # 
 ########################################################
 ########################################################
-# import processed data by Aleks
-dir.processed.data = "/Users/jiwang/workspace/imp/scRNAseq_MS_lineage_dev/results_aleks/results/all_batches_202008_6.5k_cells/Rdata"
-load(paste0(dir.processed.data, "/6.5k_cells_QCed_cells_genes_filtered_timingEst_Normed_bc_Seurat.Rdata"))
+# import processed data 
+dir.processed.data = ""
+load(paste0(dir.processed.data, ""))
 
 ms <- FindNeighbors(object = ms, reduction = "mnn", k.param = 20, dims = 1:20)
 ms <- FindClusters(ms, resolution = 12, algorithm = 3)
